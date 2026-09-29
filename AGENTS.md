@@ -53,8 +53,8 @@ echo, read_file e list_dir.
 - ApprovalProvider: uma aprovação vale para uma única call; não persiste decisão,
   não oferece "sempre permitir". Padrão é No; EOF e entrada inválida negam sem
   falhar o run. Cancelamento interrompe a aprovação e retorna o erro de contexto.
-- Argumentos exibidos são sanitizados: caracteres de controle não chegam ao
-  terminal; conteúdo de arquivo nunca é exibido. Prompts vão ao stderr injetado;
+- Argumentos exibidos são sanitizados: controles e formatação Unicode não chegam
+  ao terminal; conteúdo de arquivo nunca é exibido. Prompts vão ao stderr injetado;
   nada lê os.Stdin dentro da política.
 - Authorize recebe runCtx e continua governado por MaxRunDuration e deadlines externos.
 - ToolAuthorizationRequest recebe os argumentos copiados defensivamente.

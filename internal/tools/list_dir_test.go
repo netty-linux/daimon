@@ -126,6 +126,25 @@ func TestListDirLimits(t *testing.T) {
 	}
 }
 
+func TestListDirEntryBoundaryIsExact(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"a.txt", "b.txt"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte("x"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exact := newLister(t, root, 2, 1024)
+	if result, err := exact.Execute(context.Background(), argsFor(".")); err != nil || result.IsError {
+		t.Fatalf("%+v %v", result, err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "c.txt"), []byte("x"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := exact.Execute(context.Background(), argsFor(".")); !errors.Is(err, ErrListTooLarge) {
+		t.Fatalf("one extra entry must exceed the limit: %v", err)
+	}
+}
+
 func TestListDirSymlinks(t *testing.T) {
 	root, outside := t.TempDir(), t.TempDir()
 	if err := os.Symlink(outside, filepath.Join(root, "escape-dir")); err != nil {

@@ -3,6 +3,7 @@ package policy
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/netty-linux/daimon/internal/agentloop"
 	"github.com/netty-linux/daimon/internal/model"
+	"github.com/netty-linux/daimon/internal/tools"
 )
 
 func requestFor(name, arguments string) agentloop.ToolAuthorizationRequest {
@@ -271,5 +273,137 @@ func TestTerminalApprovalCanceledBeforePrompt(t *testing.T) {
 	approvals := NewTerminalApproval(strings.NewReader("y\n"), io.Discard)
 	if _, err := approvals.Approve(ctx, requestFor("echo", "{}")); !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
+	}
+}
+
+// failingWriter makes every prompt write fail, proving an undisplayed
+// prompt fails closed instead of silently accepting queued input.
+type failingWriter struct{ err error }
+
+func (w failingWriter) Write([]byte) (int, error) { return 0, w.err }
+
+// noAnswer fails the test if the approval reads stdin at all.
+type noAnswer struct{ t *testing.T }
+
+func (r noAnswer) Read([]byte) (int, error) {
+	r.t.Error("answer read although the prompt failed")
+	return 0, io.EOF
+}
+
+func TestTerminalApprovalPromptFailureFailsClosed(t *testing.T) {
+	cause := errors.New("stderr unavailable")
+	approvals := NewTerminalApproval(noAnswer{t}, failingWriter{err: cause})
+	granted, err := approvals.Approve(context.Background(), requestFor("read_file", `{"path":"secret.txt"}`))
+	if granted || !errors.Is(err, cause) {
+		t.Fatalf("granted=%v err=%v", granted, err)
+	}
+}
+
+// echoProbe observes executions while presenting the echo tool contract.
+type echoProbe struct{ calls int }
+
+func (p *echoProbe) Name() string                 { return "echo" }
+func (p *echoProbe) Description() string          { return "probe" }
+func (p *echoProbe) InputSchema() json.RawMessage { return tools.Echo{}.InputSchema() }
+func (p *echoProbe) Execute(context.Context, json.RawMessage) (tools.ToolResult, error) {
+	p.calls++
+	return tools.ToolResult{Content: "x"}, nil
+}
+
+func loopHarness(t *testing.T, authorizer agentloop.ToolAuthorizer) (agentloop.Result, error, *echoProbe, *agentloop.MemoryEventSink) {
+	t.Helper()
+	probe := &echoProbe{}
+	registry := &tools.Registry{}
+	if err := registry.Register(probe); err != nil {
+		t.Fatal(err)
+	}
+	scripted := model.NewScripted(
+		model.ScriptStep{Response: model.ModelResponse{ToolCalls: []model.ToolCall{{ID: "id-1", Name: "echo", Arguments: []byte(`{"text":"x"}`)}}}},
+		model.ScriptStep{Response: model.ModelResponse{FinalText: "never"}},
+	)
+	sink := &agentloop.MemoryEventSink{}
+	loop := agentloop.Loop{Model: scripted, Registry: registry, Budget: agentloop.DefaultBudget(), Sink: sink, Authorizer: authorizer}
+	result, err := loop.Run(context.Background(), "start")
+	return result, err, probe, sink
+}
+
+func assertLoopStopped(t *testing.T, sink *agentloop.MemoryEventSink, result agentloop.Result, want agentloop.StopReason) {
+	t.Helper()
+	events := sink.Events()
+	stopped := 0
+	for _, event := range events {
+		if event.Kind == agentloop.LoopStopped {
+			stopped++
+			if event.StopReason != want {
+				t.Fatalf("event reason=%s want=%s", event.StopReason, want)
+			}
+		}
+	}
+	if stopped != 1 || events[len(events)-1].Kind != agentloop.LoopStopped || result.StopReason != want {
+		t.Fatalf("result=%+v events=%+v", result, events)
+	}
+}
+
+func TestPromptFailureStopsLoopWithoutExecuting(t *testing.T) {
+	cause := errors.New("stderr unavailable")
+	authorizer := &Authorizer{
+		Policy:    StaticPolicy{Rules: map[string]Decision{"echo": RequireApproval}},
+		Approvals: NewTerminalApproval(noAnswer{t}, failingWriter{err: cause}),
+	}
+	result, err, probe, sink := loopHarness(t, authorizer)
+	var authErr *agentloop.AuthorizationError
+	if !errors.As(err, &authErr) || !errors.Is(err, cause) {
+		t.Fatalf("%+v %v", result, err)
+	}
+	if probe.calls != 0 || len(result.History) != 1 {
+		t.Fatalf("%+v calls=%d", result, probe.calls)
+	}
+	assertLoopStopped(t, sink, result, agentloop.StopReasonAuthorizationError)
+}
+
+func TestAuthorizerMissingDependenciesFailClosed(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		authorizer *Authorizer
+	}{
+		{"nil receiver", nil},
+		{"nil policy", &Authorizer{Approvals: &scriptedApprovals{granted: true}}},
+		{"require approval without provider", &Authorizer{Policy: StaticPolicy{Rules: map[string]Decision{"read_file": RequireApproval}}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			decision, err := tc.authorizer.Authorize(context.Background(), requestFor("read_file", `{"path":"x"}`))
+			if err == nil || decision != "" {
+				t.Fatalf("decision=%q err=%v", decision, err)
+			}
+		})
+	}
+}
+
+func TestMissingPolicyStopsLoopWithoutExecuting(t *testing.T) {
+	result, err, probe, sink := loopHarness(t, &Authorizer{})
+	var authErr *agentloop.AuthorizationError
+	if !errors.As(err, &authErr) {
+		t.Fatalf("%+v %v", result, err)
+	}
+	if probe.calls != 0 || len(result.History) != 1 {
+		t.Fatalf("%+v calls=%d", result, probe.calls)
+	}
+	assertLoopStopped(t, sink, result, agentloop.StopReasonAuthorizationError)
+}
+
+func TestSanitizeUnicodeControlAndFormat(t *testing.T) {
+	const input = "a\x1bb\u009bc\u202ed"
+	if got := sanitize(input, maxValueRunes); got != "a?b?c?d" {
+		t.Fatalf("sanitize=%q", got)
+	}
+	var out bytes.Buffer
+	approvals := NewTerminalApproval(strings.NewReader("n\n"), &out)
+	if _, err := approvals.Approve(context.Background(), requestFor("read_file", `{"path":"a`+"\u001b[31m"+`x`+"\u009b"+`y`+"\u202e"+`z"}`)); err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []rune{'\x1b', '\u009b', '\u202e'} {
+		if strings.ContainsRune(out.String(), forbidden) {
+			t.Fatalf("control reached stderr: %q", out.String())
+		}
 	}
 }

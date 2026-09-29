@@ -9,6 +9,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/netty-linux/daimon/internal/agentloop"
 )
@@ -33,7 +34,11 @@ func (t *TerminalApproval) Approve(ctx context.Context, request agentloop.ToolAu
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
-	t.print(request)
+	// A prompt that cannot be displayed fails closed: the error returns
+	// before any answer is read or accepted.
+	if err := t.print(request); err != nil {
+		return false, err
+	}
 	line, err := t.readLine(ctx)
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -50,12 +55,17 @@ func (t *TerminalApproval) Approve(ctx context.Context, request agentloop.ToolAu
 	}
 }
 
-func (t *TerminalApproval) print(request agentloop.ToolAuthorizationRequest) {
-	fmt.Fprintf(t.out, "DAIMON solicita:\n\n  Ferramenta: %s\n", sanitize(request.Call.Name, maxValueRunes))
-	for _, field := range argumentFields(request.Call.Arguments) {
-		fmt.Fprintf(t.out, "  %s\n", field)
+func (t *TerminalApproval) print(request agentloop.ToolAuthorizationRequest) error {
+	if _, err := fmt.Fprintf(t.out, "DAIMON solicita:\n\n  Ferramenta: %s\n", sanitize(request.Call.Name, maxValueRunes)); err != nil {
+		return err
 	}
-	fmt.Fprint(t.out, "\nPermitir uma vez? [y/N]: ")
+	for _, field := range argumentFields(request.Call.Arguments) {
+		if _, err := fmt.Fprintf(t.out, "  %s\n", field); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprint(t.out, "\nPermitir uma vez? [y/N]: ")
+	return err
 }
 
 // readLine races the buffered read against cancellation. The abandoned
@@ -80,8 +90,8 @@ func (t *TerminalApproval) readLine(ctx context.Context) (string, error) {
 }
 
 // argumentFields renders one display line per argument, deterministically
-// ordered, with control characters removed so nothing can shape the
-// terminal. File contents are never shown: only what the model asked for.
+// ordered, with control and formatting characters replaced so nothing can
+// shape the terminal. File contents are never shown: only what the model asked for.
 func argumentFields(arguments json.RawMessage) []string {
 	var fields map[string]any
 	if err := json.Unmarshal(arguments, &fields); err != nil || fields == nil {
@@ -120,8 +130,8 @@ func label(name string) string {
 	}
 }
 
-// sanitize replaces control characters, including ANSI escape introducers,
-// with '?' and caps the length.
+// sanitize replaces control and formatting characters, including ANSI
+// escape introducers and bidirectional overrides, with '?' and caps length.
 func sanitize(text string, maxRunes int) string {
 	var builder strings.Builder
 	runes := 0
@@ -130,7 +140,7 @@ func sanitize(text string, maxRunes int) string {
 			builder.WriteRune('…')
 			return builder.String()
 		}
-		if r < 0x20 || r == 0x7f {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
 			r = '?'
 		}
 		builder.WriteRune(r)

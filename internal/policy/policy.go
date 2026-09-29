@@ -71,9 +71,16 @@ type Authorizer struct {
 	Sink      agentloop.EventSink
 }
 
-var errUnknownPolicyDecision = errors.New("unknown policy decision")
+var (
+	errUnknownPolicyDecision = errors.New("unknown policy decision")
+	errMissingPolicy         = errors.New("missing tool policy")
+	errMissingApprovals      = errors.New("missing approval provider")
+)
 
 func (a *Authorizer) Authorize(ctx context.Context, request agentloop.ToolAuthorizationRequest) (agentloop.ToolDecision, error) {
+	if a == nil || a.Policy == nil {
+		return "", errMissingPolicy
+	}
 	switch a.Policy.Decide(request.Call.Name) {
 	case Allow:
 		return agentloop.ToolDecisionAllow, nil
@@ -83,6 +90,9 @@ func (a *Authorizer) Authorize(ctx context.Context, request agentloop.ToolAuthor
 	default:
 		// An invalid policy must fail closed, not fall through to approval.
 		return "", errUnknownPolicyDecision
+	}
+	if a.Approvals == nil {
+		return "", errMissingApprovals
 	}
 	a.record(ctx, agentloop.ApprovalRequested, request)
 	granted, err := a.Approvals.Approve(ctx, request)

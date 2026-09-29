@@ -246,8 +246,8 @@ A CLI compõe dois conceitos antes de responder `allow`/`deny` ao loop:
   Padrão do chat: `echo` → allow, `list_dir` e `read_file` → require approval,
   qualquer outra → deny. Política com fallback não configurado nega (zero value).
 - `ApprovalProvider`: pergunta ao humano quando necessário. A implementação de
-  terminal exibe o pedido no stderr, sanitiza argumentos (caracteres de controle
-  substituídos, valores limitados), assume `No` como padrão, nega em EOF ou
+  terminal exibe o pedido no stderr, sanitiza argumentos (controles e formatação
+  Unicode substituídos, valores limitados), assume `No` como padrão, nega em EOF ou
   entrada inválida, não persiste decisão, não oferece “sempre permitir” e vale
   para uma única chamada. Cancelamento interrompe a aprovação e retorna o erro
   de contexto. Erros não contextuais do provider falham fechado como

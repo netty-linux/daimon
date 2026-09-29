@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -99,18 +100,19 @@ func (l *ListDir) Execute(ctx context.Context, arguments json.RawMessage) (ToolR
 	if err := ctx.Err(); err != nil {
 		return ToolResult{}, err
 	}
-	// ReadDir reports Lstat-like entries: symlinks are labeled, never followed.
-	entries, err := f.ReadDir(-1)
-	if err != nil {
+	// ReadDir loads at most maxEntries+1 names: a single extra entry proves
+	// the listing is too large without ever loading the whole directory.
+	entries, err := f.ReadDir(l.maxEntries + 1)
+	if err != nil && !errors.Is(err, io.EOF) {
 		return ToolResult{}, errors.New("cannot read directory")
+	}
+	if len(entries) > l.maxEntries {
+		return ToolResult{}, ErrListTooLarge
 	}
 	if ctx.Err() != nil {
 		return ToolResult{}, ctx.Err()
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
-	if len(entries) > l.maxEntries {
-		return ToolResult{}, ErrListTooLarge
-	}
 	var builder strings.Builder
 	for _, entry := range entries {
 		kind := "file"
