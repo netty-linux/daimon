@@ -4,10 +4,12 @@ DAIMON é a fundação experimental de um **Sovereign Personal Agent** em Go:
 execução sob controle do usuário e contratos independentes de provedor.
 **Ainda não é um agente pessoal pronto.**
 
-O corte atual reúne Reliable Agent Loop e Execution Budget:
+O corte atual reúne Reliable Agent Loop, Execution Budget e um adapter
+OpenAI-compatible para Chat Completions sem streaming:
 mensagem → modelo → ferramentas opcionais → resultados → modelo → resposta final.
 Usa somente a biblioteca padrão, um modelo programável e as ferramentas
-`echo` e `read_file`. Não requer credenciais nem APIs externas.
+`echo` e `read_file`. O demo e os testes não requerem credenciais nem APIs externas;
+o comando chat se conecta ao endpoint escolhido pelo usuário.
 
 ## Execução e validação
 
@@ -25,7 +27,9 @@ go test -race -count=1 ./...
 `gofmt -l .` não deve listar arquivos. O demo recebe “repita DAIMON”, executa
 `echo({"text":"DAIMON"})` e retorna `DAIMON` em dois passos, com nove eventos.
 Registra também `read_file`, limitado a 64 KiB e ao diretório atual.
-A CLI aceita apenas `demo`; argumentos inválidos e falhas retornam código não zero.
+A CLI aceita `demo` e `chat "mensagem"`; argumentos inválidos, mensagem vazia e
+falhas retornam código não zero. Chat imprime resposta final, passos, tool calls,
+resultados truncados e StopReason, sem imprimir o histórico.
 
 No ambiente Windows inicial, o SDK foi instalado em
 `%LOCALAPPDATA%\DAIMON\toolchains\go1.27.1\go`:
@@ -46,10 +50,12 @@ docker run --rm --network none --mount "type=bind,source=$((Get-Location).Path),
 
 ## Arquitetura
 
-- `cmd/daimon`: monta Registry, modelo programável, Budget e sink; imprime o demo.
+- `cmd/daimon`: escolhe Scripted ou provider, monta Registry, Budget e sink; lê ambiente.
 - `internal/model`: mensagens, descrições de ferramentas, `Model.Generate` e `Scripted`.
 - `internal/tools`: `Tool.Execute`, Registry determinístico, echo e read_file.
 - `internal/agentloop`: loop síncrono, Budget, limites de histórico, erros e eventos tipados.
+- `internal/providers/openai`: configuração, HTTP e tradução privada do protocolo.
+  Implementa `model.Model`; não executa ferramentas. Model e agentloop não importam providers.
 
 O modelo recebe `ModelRequest` com cópias do histórico e descrições de ferramentas;
 não recebe Registry nem implementações. `ToolCall.Arguments` é `json.RawMessage`.
@@ -59,6 +65,111 @@ Configure os componentes antes de executar; não há suporte a uso concorrente.
 O loop recebe explicitamente `Budget: agentloop.DefaultBudget()`.
 A configuração anterior `Loop.MaxSteps` foi substituída por `Loop.Budget.MaxSteps`.
 Não há default implícito para um budget vazio.
+
+## Chat OpenAI-compatible — non-streaming
+
+O adapter envia `POST {base_url}/chat/completions`, preservando o prefixo configurado,
+como `/v1`. Usa o formato de [Chat Completions](https://developers.openai.com/api/reference/cli/resources/chat),
+sem SDK: `model`, `messages`, `tools` quando presentes e `stream: false`.
+Este suporte é ao protocolo, não uma garantia de compatibilidade com todo serviço.
+
+Somente a CLI lê:
+
+| Variável | Uso |
+|---|---|
+| `DAIMON_BASE_URL` | Obrigatória; prefixo da API, sem `/chat/completions` |
+| `DAIMON_MODEL` | Obrigatória; nome disponível no serviço escolhido |
+| `DAIMON_API_KEY` | Credencial; pode ser omitida para provider local sem autenticação |
+
+Exemplo local em PowerShell, com o servidor compatível já em execução:
+
+```powershell
+$env:DAIMON_BASE_URL = "http://127.0.0.1:11434/v1"
+$env:DAIMON_MODEL = "modelo-local"
+Remove-Item Env:DAIMON_API_KEY -ErrorAction SilentlyContinue
+go run ./cmd/daimon chat "Responda apenas DAIMON"
+```
+
+Exemplo remoto genérico em PowerShell 7 (substitua URL/modelo pelos do serviço):
+
+```powershell
+$env:DAIMON_BASE_URL = "https://provider.example/v1"
+$env:DAIMON_MODEL = "modelo-disponivel-no-servico"
+$env:DAIMON_API_KEY = Read-Host -Prompt "API key" -MaskInput
+go run ./cmd/daimon chat "Responda apenas DAIMON"
+Remove-Item Env:DAIMON_API_KEY
+```
+
+A chave vazia destina-se a serviços locais sem autenticação; para uso remoto,
+configure a credencial exigida pelo serviço. O adapter só envia Authorization
+quando há chave. Não há argumento CLI para chave, armazenamento de secrets ou
+impressão da configuração. A CLI também oculta a chave se ela for ecoada na resposta.
+
+**Enviar a um provider remoto transmite a mensagem e todo o histórico aceito,
+incluindo resultados de ferramentas e conteúdo de arquivos lidos.** O chat registra
+read_file no diretório atual: execute somente em um workspace apropriado e com um
+serviço confiável. O confinamento ao workspace não é uma política de privacidade
+para os arquivos que estão dentro dele. O adapter não pede aprovação por chamada.
+
+### Tradução e semântica
+
+- Preserva ordem de mensagens, ferramentas, calls, nomes, IDs e correlação.
+- `user` e assistant final enviam content string. Assistant com calls omite content.
+  Resultados usam `role: tool`, `tool_call_id` e content, sem campo IsError.
+- Ferramentas são `type: function`; parameters conserva o schema como JSON objeto.
+  Nomes vazios e schemas inválidos são rejeitados antes de HTTP.
+- Arguments são strings no protocolo externo. O adapter não interpreta seu JSON;
+  até argumentos malformados são preservados para que o loop produza erro controlado
+  e envie a conversa na chamada seguinte. Arguments ausentes/null são inválidos.
+- Mensagens internas incompatíveis, roles desconhecidas, ausência de ToolCallID,
+  assistant vazio ou misturando texto/calls são rejeitados antes do envio.
+- Respostas usam a primeira choice. Content pode ser string ou null com tool calls.
+  Campos desconhecidos e finish_reason são ignorados; a forma da mensagem define
+  texto final versus ferramentas. Conteúdo multimodal, tool types diferentes de
+  function, resposta vazia/ambígua e campos obrigatórios ausentes são recusados.
+- Nenhuma ferramenta é executada no adapter. Não há retry, fallback ou streaming.
+
+### Transporte, limites e erros
+
+BaseURL não aceita userinfo, query, fragment, host vazio ou schemes fora de HTTP/HTTPS.
+HTTP é permitido apenas para localhost, 127.0.0.0/8 e ::1; destinos remotos exigem HTTPS.
+Não há resolução DNS para tentar tornar um hostname remoto elegível a HTTP local.
+O cliente padrão não segue redirects (nem no mesmo host), tem headers limitados a
+64 KiB e usa verificação TLS padrão. Envia Content-Type/Accept application/json,
+User-Agent daimon/0.3 e, quando configurado, Bearer Authorization.
+
+`Config.HTTPClient` permite injeção. Sua política de redirects, proxy, TLS e timeout
+é responsabilidade do chamador; preserve a restrição de redirects ao usar credenciais.
+O adapter não altera o cliente recebido, não usa http.DefaultClient e não define
+Client.Timeout. O request usa exatamente o contexto recebido do Budget. Ctrl+C
+cancela o contexto da CLI. Configure cliente/transporte antes do uso.
+
+`MaxResponseBytes` é obrigatório e positivo no adapter; a CLI usa **2 MiB**. A leitura
+é limitada a esse valor + 1, independentemente de Content-Length, antes de decodificar.
+O limite é inclusivo e também se aplica a bodies de erro e ao conteúdo descomprimido
+pelo transporte. Bodies são fechados em sucesso e falha. O maior int64 é rejeitado
+para evitar overflow ao somar 1.
+
+Esse é um limite do body HTTP. O Execution Budget continua aplicando limites próprios
+ao texto final, argumentos, ferramentas e histórico após a tradução. Um body grande
+gera erro de tamanho antes da validação de status/JSON; o erro conserva o StatusCode.
+
+| Erro do pacote openai | Significado |
+|---|---|
+| `ConfigError` | Configuração inválida, sem ecoar seu valor |
+| `RequestError` | Mensagem/schema ou codificação interna inválida; não envia HTTP |
+| `TransportError` | Falha HTTP/leitura; Unwrap preserva a causa |
+| `HTTPError` | Status fora de 2xx; StatusCode e metadados limitados |
+| `ResponseTooLargeError` | Body acima de MaxResponseBytes |
+| `JSONError` | Body vazio, JSON malformado ou valores JSON concatenados |
+| `ProtocolError` | JSON válido com estrutura/conteúdo não suportado |
+
+Todos permitem `errors.As`. Cancelamento/deadline continuam verificáveis com
+`errors.Is`. Error() não inclui URL, chave ou corpo. HTTPError conserva x-request-id,
+code, type e Retry-After como metadados ASCII sanitizados, com no máximo 128 bytes
+por campo; não usa a mensagem livre do servidor. Não há espera nem retry por status.
+A causa original de transporte fica acessível via Unwrap para diagnóstico: não a
+registre indiscriminadamente, pois erros de net/http podem conter URLs.
 
 ## Execution Budget
 
@@ -175,12 +286,15 @@ O check `Go / Linux` pode ser exigido nas regras de proteção do repositório.
 Os testes preservam os cenários da v0.1 e acrescentam budget inválido, limites
 exatos/excedidos, pré-validação de lotes, reserva com IDs, overflow, UTF-8, marcadores,
 erros tipados, StopReason e timeouts de execução/modelo/ferramenta. Testes de deadline
-aguardam ctx.Done; não dependem de corrida contra sleeps arbitrários. Não usam rede.
+aguardam ctx.Done; não dependem de corrida contra sleeps arbitrários.
+Os testes do provider e do chat usam httptest.Server local para validar protocolo,
+headers, erros, cancelamento, redirects, limites e o ciclo com ferramentas.
+Nenhum teste acessa internet ou depende de um provider externo.
 
 ## Limites e próximo passo
 
 Esta fundação não oferece sandbox de processo, limite rígido de alocação de memória,
-tokenização, sumarização, persistência ou provider real. Um componente pode alocar
+tokenização, sumarização ou persistência. Um componente pode alocar
 uma resposta grande antes de devolvê-la; o budget limita o que o loop aceita e armazena.
 Cancelamento é cooperativo e não interrompe um componente que ignora o contexto.
 Valores padrão são pontos de partida experimentais, não garantias de produção.
@@ -190,6 +304,8 @@ Implementações fornecidas devem respeitar os contratos; não há recuperação
 de código arbitrário nem suporte a interfaces contendo ponteiros nil tipados.
 
 Não existem banco, memória vetorial, gateway, subagentes, MCP, servidor, UI,
-streaming, shell ou escrita/edição de arquivos. Nenhuma API é necessária para validar
-o loop. Próximo corte possível, após revisão: um único provider compatível com OpenAI,
-respeitando o budget. Não implementado nesta entrega.
+streaming/SSE, Responses API, retry, fallback, múltiplos providers simultâneos, shell
+ou escrita/edição de arquivos. A compatibilidade foi testada com servidores locais
+simulados, sem chamadas a provedores reais. Nenhuma credencial é necessária para
+validar o projeto. Próximo passo recomendado: revisar este adapter e realizar um
+smoke test opt-in com um endpoint local real. Não executado nesta entrega.

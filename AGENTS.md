@@ -1,7 +1,8 @@
 # DAIMON
 
 Visão: fundação experimental de um Sovereign Personal Agent sob controle do usuário.
-Escopo atual: Reliable Agent Loop + Execution Budget, em Go, com Scripted, echo e read_file.
+Escopo atual: Reliable Agent Loop + Execution Budget + OpenAI-compatible non-streaming,
+em Go, com Scripted, echo e read_file.
 
 ## Arquitetura
 
@@ -42,10 +43,30 @@ Escopo atual: Reliable Agent Loop + Execution Budget, em Go, com Scripted, echo 
 - read_file permanece confinado com os.Root, somente caminhos relativos, limite de bytes,
   validação estrita e bloqueio de traversal/symlink externo/diretórios.
 - Testes de symlink devem executar; falta de permissão é falha explícita.
-- Não adicionar prematuramente banco, memória longa/vetorial, gateway, provedores reais,
+- Não adicionar prematuramente banco, memória longa/vetorial, gateway, múltiplos providers,
   subagentes, MCP, servidor HTTP, Telegram/Discord, TUI/web, event sourcing completo,
   shell, escrita/edição de arquivos, streaming ou abstrações especulativas.
 - Não anunciar garantias de sandbox ou limite rígido de memória: o budget limita dados aceitos.
+
+## Provider HTTP
+
+- Providers implementam model.Model sem modificar os contratos do loop.
+- HTTP e structs privadas do protocolo pertencem a internal/providers; agentloop e model
+  não importam providers. Somente cmd/daimon escolhe Scripted ou o adapter.
+- Secrets entram pela configuração explícita. Somente cmd lê DAIMON_BASE_URL,
+  DAIMON_MODEL e DAIMON_API_KEY; nunca imprimir/gravar chave ou aceitá-la em argumento CLI.
+- Provider traduz mensagens e descrições; não executa ferramentas, não faz retry,
+  não implementa streaming/SSE, Responses API, fallback ou SDK externo.
+- Preserve argumentos como string/raw bytes, inclusive JSON inválido, para recuperação
+  pelo loop. Valide presença/tipos do envelope e schema JSON antes de enviar.
+- HTTPS remoto; HTTP somente localhost, 127.0.0.0/8 e ::1. Sem userinfo/query/fragment.
+- Cliente padrão recusa redirects. Cliente injetado tem política do chamador;
+  não configure timeout próprio que concorra com o Budget nem substitua o contexto recebido.
+- Limite body antes de decodificar, incluindo bodies de erro, e feche-o em todos os caminhos.
+- Error() não inclui chave, URL, corpo ou mensagem livre do servidor. Preserve causa de
+  transporte por Unwrap e identidade de erros de contexto. Metadados precisam ser limitados.
+- Demo permanece offline. Testes de provider/chat usam httptest.Server; nenhum teste toca
+  a internet e o CI não usa credenciais ou provedores externos.
 
 ## Processo e validação
 
