@@ -90,12 +90,16 @@ func (p *Provider) metadata(value string) string {
 	// Normalize before redaction so removing control characters cannot recreate
 	// a secret which was split across them in an untrusted metadata value.
 	value = strings.Map(func(c rune) rune {
-		if c >= 0x20 && c <= 0x7e { return c }
+		if c >= 0x20 && c <= 0x7e {
+			return c
+		}
 		return -1
 	}, value)
 	if p.apiKey != "" {
 		value = strings.ReplaceAll(value, p.apiKey, "[REDACTED]")
 	}
-	if len(value) > 128 { value = value[:128] }
+	if len(value) > 128 {
+		value = value[:128]
+	}
 	return value
 }

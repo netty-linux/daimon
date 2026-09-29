@@ -300,7 +300,9 @@ func TestTransportCauseAndTLSClient(t *testing.T) {
 	if strings.Contains(err.Error(), s.URL) {
 		t.Fatal("URL exposed")
 	}
-	if strings.Contains(err.Error(), key) { t.Fatal("key exposed in transport error") }
+	if strings.Contains(err.Error(), key) {
+		t.Fatal("key exposed in transport error")
+	}
 }
 
 // The wrapper observes real httptest traffic rather than replacing HTTP responses.
@@ -341,7 +343,9 @@ func TestBodyClosedAndBoundedOnEveryResponsePath(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				if tc.name == "read error" { w.Header().Set("Content-Length", "500") }
+				if tc.name == "read error" {
+					w.Header().Set("Content-Length", "500")
+				}
 				w.WriteHeader(tc.status)
 				io.WriteString(w, tc.body)
 			}))
@@ -357,7 +361,9 @@ func TestBodyClosedAndBoundedOnEveryResponsePath(t *testing.T) {
 			_, generateErr := p.Generate(ctx, userRequest())
 			if tc.name == "read error" {
 				var transport *TransportError
-				if !errors.As(generateErr, &transport) || !errors.Is(generateErr, io.ErrUnexpectedEOF) { t.Fatal(generateErr) }
+				if !errors.As(generateErr, &transport) || !errors.Is(generateErr, io.ErrUnexpectedEOF) {
+					t.Fatal(generateErr)
+				}
 			}
 			if !observer.contextMatched || len(observer.bodies) != 1 || !observer.bodies[0].closed || observer.bodies[0].bytes > 1025 {
 				t.Fatal("context, close, or read bound violated")

@@ -233,7 +233,9 @@ func TestResponseProtocol(t *testing.T) {
 					t.Fatal(got, err)
 				}
 				if tc.calls == 2 {
-					if string(got.ToolCalls[0].Arguments) != ` {"x": 1} ` { t.Fatal("argument bytes changed") }
+					if string(got.ToolCalls[0].Arguments) != ` {"x": 1} ` {
+						t.Fatal("argument bytes changed")
+					}
 					if got.ToolCalls[0].ID != "a" || got.ToolCalls[1].ID != "b" || got.ToolCalls[0].Name != "echo" || got.ToolCalls[1].Name != "other" || string(got.ToolCalls[1].Arguments) != "{" {
 						t.Fatal(got)
 					}
