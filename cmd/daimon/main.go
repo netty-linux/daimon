@@ -38,7 +38,7 @@ func run(args []string, out io.Writer) error {
 		model.ScriptStep{Response: model.ModelResponse{FinalText: "DAIMON"}},
 	)
 	sink := &agentloop.MemoryEventSink{}
-	loop := agentloop.Loop{Model: m, Registry: registry, MaxSteps: 4, Sink: sink}
+	loop := agentloop.Loop{Model: m, Registry: registry, Budget: agentloop.DefaultBudget(), Sink: sink}
 	result, err := loop.Run(context.Background(), "repita DAIMON")
 	if err != nil {
 		return err
@@ -47,7 +47,7 @@ func run(args []string, out io.Writer) error {
 		return err
 	}
 	for _, event := range sink.Events() {
-		if _, err := fmt.Fprintf(out, "  %s (step=%d, tool=%d)\n", event.Kind, event.Step, event.ToolIndex); err != nil {
+		if _, err := fmt.Fprintf(out, "  %s (step=%d, tool=%d, stop_reason=%s)\n", event.Kind, event.Step, event.ToolIndex, event.StopReason); err != nil {
 			return err
 		}
 	}

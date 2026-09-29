@@ -9,7 +9,7 @@ import (
 type Loop struct {
 	Model    model.Model
 	Registry *tools.Registry
-	MaxSteps int
+	Budget   Budget
 	Sink     EventSink
 }
 
@@ -17,4 +17,9 @@ type Result struct {
 	FinalAnswer string
 	History     []model.Message
 	Steps       int
+	// ToolCalls counts attempted calls, including controlled failures and
+	// interrupted executions, but excludes rejected batches.
+	ToolCalls            int
+	TruncatedToolResults int
+	StopReason           StopReason
 }

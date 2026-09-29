@@ -18,9 +18,10 @@ const (
 // Event intentionally excludes names, IDs, arguments, output and error text.
 // ToolIndex is one-based within its model step; zero means no tool.
 type Event struct {
-	Kind      EventKind
-	Step      int
-	ToolIndex int
+	Kind       EventKind
+	Step       int
+	ToolIndex  int
+	StopReason StopReason // Populated only for loop_stopped.
 }
 
 // Record should be a prompt, local operation, including on canceled contexts.

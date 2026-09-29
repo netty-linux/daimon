@@ -1,168 +1,195 @@
 # DAIMON
 
-DAIMON é a fundação experimental de um **Sovereign Personal Agent**: um agente pessoal
-sob controle do usuário, com modelos, ferramentas, memória e canais substituíveis como
-direção futura. **Esta versão não é um agente pessoal pronto.**
+DAIMON é a fundação experimental de um **Sovereign Personal Agent** em Go:
+execução sob controle do usuário e contratos independentes de provedor.
+**Ainda não é um agente pessoal pronto.**
 
-O primeiro corte vertical implementa somente **Tiny Agent Loop → Reliable Agent Loop**:
+O corte atual reúne Reliable Agent Loop e Execution Budget:
+mensagem → modelo → ferramentas opcionais → resultados → modelo → resposta final.
+Usa somente a biblioteca padrão, um modelo programável e as ferramentas
+`echo` e `read_file`. Não requer credenciais nem APIs externas.
 
-```text
-mensagem → modelo → chamadas de ferramenta → resultados → modelo → resposta final
-```
+## Execução e validação
 
-Tudo roda localmente, sem credenciais, rede, API externa ou dependências fora da biblioteca
-padrão. O modelo é um roteiro programável: a demonstração não comprova inteligência de
-um modelo real, mas comprova a coordenação do ciclo.
-
-## Execução
-
-Requisito: Go 1.27.1 ou posterior. O demo e a análise estática foram validados em
-Windows/amd64; a suíte completa, incluindo symlinks, em Linux/amd64 com Go 1.27.1.
+Requisito: Go 1.27.1 ou posterior. Na raiz do projeto:
 
 ```sh
 go run ./cmd/daimon demo
-gofmt -w cmd internal
+gofmt -w .
+gofmt -l .
 go vet ./...
-go test ./...
-gofmt -l cmd internal
+go test -count=1 ./...
+go test -race -count=1 ./...
 ```
 
-O último comando não deve listar arquivos. A CLI aceita apenas `demo`; argumentos
-inválidos e falhas retornam exit code diferente de zero.
+`gofmt -l .` não deve listar arquivos. O demo recebe “repita DAIMON”, executa
+`echo({"text":"DAIMON"})` e retorna `DAIMON` em dois passos, com nove eventos.
+Registra também `read_file`, limitado a 64 KiB e ao diretório atual.
+A CLI aceita apenas `demo`; argumentos inválidos e falhas retornam código não zero.
 
-No ambiente inicial o Go não estava no PATH. Foi instalado o arquivo oficial, com SHA-256
-verificado, em `%LOCALAPPDATA%\DAIMON\toolchains\go1.27.1\go`. Para usá-lo no PowerShell:
+No ambiente Windows inicial, o SDK foi instalado em
+`%LOCALAPPDATA%\DAIMON\toolchains\go1.27.1\go`:
 
 ```powershell
 $env:PATH = "$env:LOCALAPPDATA\DAIMON\toolchains\go1.27.1\go\bin;$env:PATH"
 go run ./cmd/daimon demo
 ```
 
-O demo registra `echo` e `read_file` (workspace = diretório atual, limite = 64 KiB), recebe
-“repita DAIMON”, solicita `echo({"text":"DAIMON"})` e retorna `DAIMON` no segundo passo.
-Imprime a resposta, dois passos e nove eventos, incluindo `tool_completed` e `loop_stopped`.
+Os testes de symlink precisam de permissão para criá-los. No Windows, sem modo de
+desenvolvedor ou privilégio apropriado, falham explicitamente. Para executar a
+suíte inteira em Linux com Docker Desktop (download inicial requer rede):
 
-## Integração contínua
-
-O workflow `.github/workflows/ci.yml` executa em Ubuntu a cada push e pull request,
-usando a versão de Go definida em `go.mod`:
-
-- `gofmt -l .`, com falha se qualquer arquivo precisar de formatação;
-- `go vet ./...`;
-- `go test -count=1 ./...`;
-- `go test -race -count=1 ./...`, com CGO habilitado.
-
-As duas execuções de testes incluem os casos de symlink e não reutilizam resultados
-de testes em cache. O workflow tem permissão somente de leitura e limite de 15 minutos.
-Para tornar o resultado obrigatório antes de merge, configure o check `Go / Linux`
-nas regras de proteção do repositório.
+```powershell
+docker pull golang:1.27.1
+docker run --rm --network none --mount "type=bind,source=$((Get-Location).Path),target=/workspace,readonly" -w /workspace golang:1.27.1 bash -c 'go vet ./... && go test -count=1 ./... && go test -race -count=1 ./... && go run ./cmd/daimon demo'
+```
 
 ## Arquitetura
 
-```text
-cmd/daimon/           montagem e saída da CLI
-internal/agentloop/   coordenação, limites, erros e eventos
-internal/model/       protocolo neutro e Scripted Model
-internal/tools/       contratos, Registry, echo e read_file
-```
+- `cmd/daimon`: monta Registry, modelo programável, Budget e sink; imprime o demo.
+- `internal/model`: mensagens, descrições de ferramentas, `Model.Generate` e `Scripted`.
+- `internal/tools`: `Tool.Execute`, Registry determinístico, echo e read_file.
+- `internal/agentloop`: loop síncrono, Budget, limites de histórico, erros e eventos tipados.
 
-`model.Model` recebe apenas mensagens e descrições de ferramentas (nome, descrição e
-schema). Não recebe o Registry nem ferramentas concretas. O loop conhece contratos;
-somente a CLI escolhe implementações. Os requests são copiados para que um modelo não
-altere o histórico pertencente ao loop. `Scripted` também copia roteiro e requests e
-permite injetar erros por chamada usando `ScriptStep.Err`.
+O modelo recebe `ModelRequest` com cópias do histórico e descrições de ferramentas;
+não recebe Registry nem implementações. `ToolCall.Arguments` é `json.RawMessage`.
+O Registry preserva a ordem de registro e rejeita duplicatas.
+Configure os componentes antes de executar; não há suporte a uso concorrente.
 
-`ToolResult` contém conteúdo e `IsError`. O Registry preserva ordem de registro e rejeita
-duplicatas. Configuração e execução são sequenciais; não há suporte a uso concorrente.
-O proprietário de `ReadFile` deve chamar `Close` ao terminar.
+O loop recebe explicitamente `Budget: agentloop.DefaultBudget()`.
+A configuração anterior `Loop.MaxSteps` foi substituída por `Loop.Budget.MaxSteps`.
+Não há default implícito para um budget vazio.
 
-## Semântica e invariantes
+## Execution Budget
 
-- Uma chamada ao modelo conta como um passo, inclusive se retornar erro. As ferramentas
-  da resposta pertencem a esse passo, executadas na ordem recebida. MaxSteps deve ser positivo.
-- Uma resposta válida contém texto final não vazio/não branco **ou** uma lista não vazia de
-  tool calls. Texto (inclusive espaços) junto a calls é ambíguo e retorna `ErrInvalidResponse`.
-- IDs devem ser não vazios e únicos em toda a execução; nomes devem ser não vazios.
-  Valida-se o lote completo antes de executar qualquer ferramenta.
-- O histórico inclui user, assistant com suas calls, tool com `ToolCallID` e `IsError`, e
-  assistant final. Todo resultado referencia uma call existente. A resposta final encerra uma vez.
-- Nunca são feitas mais de MaxSteps chamadas ao modelo. `ErrMaxSteps` preserva o histórico,
-  incluindo ferramentas executadas no último passo. Não existe nova tentativa automática.
-- Contexto é verificado antes e depois das chamadas externas. Um contexto já cancelado
-  impede chamadas. Cancelamento/deadline permanecem verificáveis com `errors.Is`.
-- Falhas do modelo retornam `*ModelError` com passo e causa (`errors.As`/`errors.Is`).
-  Roteiro esgotado retorna `model.ErrScriptExhausted`, preservado pelo loop.
-- Ferramenta desconhecida, JSON inválido, validação ou erro normal de execução geram
-  resultado controlado para o modelo, permitindo recuperação. Erros de contexto encerram.
-- Erros controláveis não causam panic. Implementações fornecidas devem cumprir os contratos;
-  não há recuperação de panics de código arbitrário nem suporte a interfaces com ponteiro nil tipado.
-- `Result` preserva histórico e contador também em falhas. Cancelamento pode deixar calls
-  sem resultado: a execução foi interrompida, e nenhum resultado fictício é criado.
+| Campo | Padrão |
+|---|---|
+| MaxSteps | 8 chamadas ao modelo |
+| MaxToolCallsPerStep | 4 |
+| MaxTotalToolCalls | 16 |
+| MaxUserMessageBytes | 32 KiB |
+| MaxFinalAnswerBytes | 256 KiB |
+| MaxToolArgumentBytes | 64 KiB por chamada |
+| MaxToolResultBytes | 64 KiB por resultado |
+| MaxHistoryMessages | 128 |
+| MaxHistoryBytes | 2 MiB |
+| MaxRunDuration | 5 minutos |
+| MaxModelCallDuration | 2 minutos |
+| MaxToolCallDuration | 30 segundos |
 
-## Observabilidade
+Todos os campos precisam ser positivos. Zero e valores negativos são inválidos.
+Budget inválido falha antes da primeira chamada ao modelo.
 
-EventSink tem implementações Noop e Memory. Para o ciclo do demo:
+Uma chamada ao modelo é um passo, inclusive em falha. Chamadas de ferramenta são
+sequenciais e pertencem ao passo que as solicitou. `Result.ToolCalls` conta
+tentativas iniciadas, incluindo ferramenta desconhecida, argumentos inválidos,
+erros controlados e chamadas interrompidas. Lotes rejeitados não consomem chamadas.
+
+IDs e nomes precisam ser não vazios/não brancos. IDs são únicos durante toda a
+execução. O lote inteiro é validado antes da primeira ferramenta: quantidade por
+passo, total, argumentos individuais e capacidade de histórico. Falha em qualquer
+limite impede todas as ferramentas daquele lote.
+
+O histórico conta bytes usando `len`: Content, ToolCallID e IDs, nomes e argumentos
+das calls. Conta bytes do protocolo, não memória da struct, JSON serializado ou tokens.
+Antes do lote, reserva-se a mensagem assistant e um recibo por call contendo
+`len(ID) + MaxToolResultBytes`. A reserva é conservadora mesmo para ferramentas que
+normalmente retornam pouco. A aritmética de capacidade evita overflow; valores de
+diagnóstico saturam no maior int da plataforma.
+
+A mensagem inicial também precisa caber no histórico. Uma resposta final deve ser
+não branca, sem calls, respeitar seu limite e caber integralmente no histórico.
+Texto junto de calls é inválido. Respostas finais grandes falham sem truncamento
+e sem serem adicionadas ao histórico.
+
+Resultados de ferramentas, inclusive erros controlados, são normalizados para UTF-8
+válido e limitados em bytes. Toda alteração recebe um marcador:
+`\n[truncated: original_bytes=N]`; se não couber, `[truncated]`; para limites menores
+que esse marcador, `~`. O marcador está incluído no limite. Original_bytes mede a
+entrada antes da normalização. `TruncatedToolResults` conta resultados modificados,
+inclusive normalização de bytes inválidos abaixo do limite.
+
+## Cancelamento, erros e encerramento
+
+Timeouts usam `context.WithTimeoutCause`, mantendo deadlines anteriores do pai.
+O contexto é verificado antes e depois de cada chamada, inclusive se o componente
+retornar sucesso depois de expirar. Não há goroutine para interromper chamadas.
+
+O cancelamento/deadline externo já observado tem precedência. Caso contrário,
+a causa herdada identifica timeout do budget total, do modelo ou da ferramenta.
+Timeouts do budget retornam `LimitError` e preservam
+`errors.Is(err, context.DeadlineExceeded)`. Erros de contexto retornados diretamente
+por ferramentas também encerram: cancelamento gera `canceled`; deadline próprio da
+ferramenta gera `tool_timeout`, mesmo com contexto recebido ainda ativo.
+
+Falhas normais do modelo retornam `*ModelError`, preservando passo e causa.
+Ferramenta desconhecida, JSON inválido e erro normal de ferramenta retornam uma
+mensagem tool com `IsError`, permitindo recuperação pelo modelo.
+`ErrInvalidConfig`, `ErrInvalidResponse` e `ErrMaxSteps` continuam verificáveis com
+`errors.Is`. `LimitError` expõe Kind, Limit e Actual por `errors.As`.
+`errors.Is(err, LimitError{Kind: ...})` distingue o limite; Kind vazio aceita qualquer
+limite. Em timeout, Actual registra a duração limite alcançada.
+
+Todo retorno define `Result.StopReason` e emite exatamente um `loop_stopped` com
+a mesma razão, inclusive configuração inválida e mensagem inicial rejeitada:
+
+- `completed`, `invalid_config`, `invalid_response`, `model_error`;
+- `canceled`, `external_deadline`, `run_timeout`, `model_timeout`, `tool_timeout`;
+- `max_steps`, `max_tool_calls`, `user_message_limit`, `argument_limit`,
+  `final_answer_limit`, `history_limit`.
+
+O resultado preserva o histórico já aceito, também em falhas. Interrupção durante
+um lote pode deixar calls sem recibo; não se inventam resultados nem se executam
+as chamadas restantes. A reserva garante espaço, não conclusão após cancelamento.
+
+## Observabilidade e ferramentas
+
+EventSink tem implementações Noop e Memory, sem emissor global. O demo emite:
 
 ```text
 loop_started → model_requested → model_responded → tool_requested
 → tool_completed → model_requested → model_responded → final_answer → loop_stopped
 ```
 
-Falhas recuperáveis emitem `tool_failed` no lugar de `tool_completed`. Erro no modelo
-não emite `model_responded`. Há um único `loop_stopped` em toda saída normal ou com erro,
-inclusive contexto já cancelado ou configuração inválida. Uma interrupção durante chamada
-pode deixar um evento requested sem responded/completed.
+Erros controlados usam `tool_failed`. Interrupção pode deixar requested sem conclusão.
+Eventos contêm somente tipo, passo, posição de ferramenta e razão de encerramento;
+não incluem mensagens, nomes/IDs fornecidos pelo modelo, argumentos, outputs ou erros.
+O sink deve ser local, rápido e aceitar encerramento com contexto cancelado.
+O histórico e os requests, ao contrário, contêm dados potencialmente sensíveis.
 
-Eventos contêm apenas tipo, número do passo e índice da ferramenta: sem timestamps,
-texto, argumentos, nomes/IDs fornecidos pelo modelo ou mensagens de erro. O sink deve ser
-local, rápido e aceitar registros de encerramento com contexto cancelado. Memory preserva
-os eventos em ordem e retorna cópias para inspeção; não há event sourcing.
+`echo` exige um objeto com text string. `read_file` exige path relativo e usa
+`os.Root` para confinar a resolução de symlinks ao workspace; symlinks internos são
+permitidos. Bloqueia caminhos absolutos, traversal, diretórios, arquivos não regulares
+e arquivos acima do limite. Ambos rejeitam campos desconhecidos/duplicados,
+campos obrigatórios ausentes, null e tipos inválidos. O proprietário de ReadFile
+deve chamar Close.
 
-O histórico e os requests de teste, por outro lado, contêm dados de usuário e de arquivos;
-devem ser tratados como sensíveis. Mensagens de erro de ferramentas vão ao modelo e
-implementações futuras devem evitar incluir segredos nessas mensagens.
+## CI e testes
 
-## Ferramentas e segurança
+`.github/workflows/ci.yml` roda em Ubuntu 24.04 a cada push e pull request, usando
+o Go de go.mod. Verifica formatação (falha se houver arquivos listados), vet,
+testes e race detector, sem cache de resultados dos testes. Tem timeout de
+15 minutos, permissões de leitura e Actions fixadas por SHA.
+O check `Go / Linux` pode ser exigido nas regras de proteção do repositório.
 
-- `echo`: objeto com `text` obrigatório e string (string vazia é válida).
-- `read_file`: objeto com `path` obrigatório e string. Somente caminhos relativos ao
-  workspace; bloqueia caminhos absolutos, segmentos `..`, prefixos de unidade, UNC e ADS.
-  Abertura usa `os.Root`, que resolve symlinks sem permitir escape do diretório raiz.
-  Symlinks internos são permitidos. Diretórios e arquivos não regulares são recusados.
-  O tamanho é verificado antes de ler e a leitura é limitada a limite + 1 byte, detectando
-  também crescimento. Campos desconhecidos, duplicados, null e valores extras são rejeitados.
+Os testes preservam os cenários da v0.1 e acrescentam budget inválido, limites
+exatos/excedidos, pré-validação de lotes, reserva com IDs, overflow, UTF-8, marcadores,
+erros tipados, StopReason e timeouts de execução/modelo/ferramenta. Testes de deadline
+aguardam ctx.Done; não dependem de corrida contra sleeps arbitrários. Não usam rede.
 
-Os testes usam diretórios temporários. Os testes de symlink precisam de permissão para
-criá-los (no Windows, modo de desenvolvedor ou privilégio apropriado); falham explicitamente
-se indisponível. Não usam rede nem APIs externas.
+## Limites e próximo passo
 
-Alternativa para Windows sem esse privilégio, com Docker Desktop em execução
-(o download inicial da imagem requer rede, mas a execução dos testes não):
+Esta fundação não oferece sandbox de processo, limite rígido de alocação de memória,
+tokenização, sumarização, persistência ou provider real. Um componente pode alocar
+uma resposta grande antes de devolvê-la; o budget limita o que o loop aceita e armazena.
+Cancelamento é cooperativo e não interrompe um componente que ignora o contexto.
+Valores padrão são pontos de partida experimentais, não garantias de produção.
 
-```powershell
-docker pull golang:1.27.1
-docker run --rm --network none --mount "type=bind,source=$((Get-Location).Path),target=/workspace,readonly" -w /workspace golang:1.27.1 go test ./...
-```
+os.Root não impede hard links nem transforma um workspace hostil em sandbox.
+Implementações fornecidas devem respeitar os contratos; não há recuperação de panics
+de código arbitrário nem suporte a interfaces contendo ponteiros nil tipados.
 
-## Testes e limites atuais
-
-Os testes cobrem resposta direta, uma e múltiplas chamadas, ordem, correlação, recuperação
-de falhas, JSON estrito, respostas ambíguas, IDs inválidos/duplicados, erro do modelo,
-MaxSteps, contexto cancelado antes/durante chamadas, deadline expirado, eventos, Registry,
-cópias defensivas, roteiro esgotado, CLI e segurança de read_file.
-
-Cancelamento é cooperativo: não interrompe à força um modelo/ferramenta que ignora contexto
-nem uma chamada de sistema bloqueada. Não há goroutines de timeout. MaxSteps limita chamadas
-ao modelo, mas não o tamanho das respostas, quantidade de ferramentas em um lote ou memória
-total do histórico. O workspace deve ser confiável: os.Root não é um sandbox de processo e
-não bloqueia hard links ou todos os efeitos de alterações concorrentes no filesystem.
-Os testes não simulam corridas de filesystem, dispositivos ou montagens especiais.
-
-Ainda não existem provedores reais, persistência, memória longa/vetorial, banco, gateway,
-subagentes, MCP, servidor, canais de mensagens, interface visual, shell, edição de arquivos
-ou frameworks de agentes. Não são criadas pastas para funcionalidades futuras.
-
-A soberania nesta fase é a independência técnica de provedores: contratos pequenos,
-execução local, nenhuma credencial obrigatória e nenhuma transmissão de dados.
-Próximo passo recomendado: definir e testar limites de volume por execução (tamanho de
-resposta, calls por passo e histórico) antes de integrar um provedor real. Não implementado aqui.
+Não existem banco, memória vetorial, gateway, subagentes, MCP, servidor, UI,
+streaming, shell ou escrita/edição de arquivos. Nenhuma API é necessária para validar
+o loop. Próximo corte possível, após revisão: um único provider compatível com OpenAI,
+respeitando o budget. Não implementado nesta entrega.
