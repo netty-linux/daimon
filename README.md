@@ -1,168 +1,165 @@
 # DAIMON
 
-DAIMON é a fundação experimental de um **Sovereign Personal Agent**: um agente pessoal
-sob controle do usuário, com modelos, ferramentas, memória e canais substituíveis como
-direção futura. **Esta versão não é um agente pessoal pronto.**
+**DAIMON** é a fundação de um **Sovereign Personal Agent** escrito em Go.
 
-O primeiro corte vertical implementa somente **Tiny Agent Loop → Reliable Agent Loop**:
+## Visão Geral
 
-```text
-mensagem → modelo → chamadas de ferramenta → resultados → modelo → resposta final
+DAIMON é um agent loop determinístico que:
+- Executa ferramentas de forma controlada
+- Mantém histórico de mensagens
+- Respeita limites explícitos de execução (Execution Budget)
+- É testável de forma determinística
+- Não depende de providers externos na versão atual
+
+## Estado Atual
+
+| Versão | Status | Descrição |
+|--------|--------|-----------|
+| v0.1 | ✅ Concluído | Reliable Agent Loop |
+| v0.2 | ✅ Concluído | Execution Budget |
+| v0.3 | 🔄 Próximo | Provider OpenAI-compatible |
+| v0.4 | ⏳ Pendente | Streaming |
+| v0.5 | ⏳ Pendente | Sessions e persistência |
+| v0.6 | ⏳ Pendente | Context Compiler |
+
+## Execution Budget
+
+O DAIMON v0.2 introduz limites explícitos e verificáveis para tornar cada execução **finita, mensurável e segura**.
+
+### Limites Padrão
+
+| Limite | Valor | Unidade |
+|--------|-------|--------|
+| `MaxSteps` | 8 | quantidade |
+| `MaxToolCallsPerStep` | 4 | quantidade |
+| `MaxTotalToolCalls` | 16 | quantidade |
+| `MaxUserMessageBytes` | 32 KiB | bytes |
+| `MaxFinalAnswerBytes` | 256 KiB | bytes |
+| `MaxToolArgumentBytes` | 64 KiB | bytes |
+| `MaxToolResultBytes` | 64 KiB | bytes |
+| `MaxHistoryMessages` | 128 | quantidade |
+| `MaxHistoryBytes` | 2 MiB | bytes |
+| `MaxRunDuration` | 5 minutos | duração |
+| `MaxModelCallDuration` | 2 minutos | duração |
+| `MaxToolCallDuration` | 30 segundos | duração |
+
+### Semântica em Bytes
+
+- Contagem de bytes usa `len()` sobre UTF-8, não runes.
+- Inclui: `Message.Content`, `Message.ToolCallID`, IDs de tool calls, nomes de ferramentas, argumentos JSON, resultados armazenados no histórico.
+- Não estima memória real da struct e não implementa tokenização de provedor.
+
+### Timeouts Cooperativos
+
+- `MaxRunDuration`, `MaxModelCallDuration`, `MaxToolCallDuration` são aplicados via `context.WithTimeout`.
+- Deadlines externos menores são preservados (não ampliados).
+- Cancelamento é cooperativo: Model e Tool devem respeitar `context.Context`.
+
+### Truncamento de Tool Results
+
+- Resultados de ferramentas que excedem `MaxToolResultBytes` são:
+  1. Normalizados para UTF-8 válido
+  2. Truncados em fronteira UTF-8 válida
+  3. Marcados com indicador: `\n[truncated: original_bytes=N]`
+  4. O indicador também respeita o limite final
+- O contador `Result.TruncatedToolResults` registra quantos resultados foram truncados.
+- Erros de ferramentas convertidos em conteúdo também passam pelo mesmo limite.
+
+### StopReason
+
+Todo retorno de `Loop.Run` define `StopReason` de forma determinística:
+
+| StopReason | Descrição |
+|------------|----------|
+| `completed` | Execução completou com sucesso |
+| `invalid_config` | Budget ou configuração inválida |
+| `canceled` | Contexto cancelado externamente |
+| `external_deadline` | Deadline externo atingido |
+| `run_timeout` | Timeout de execução total |
+| `model_timeout` | Timeout de chamada ao modelo |
+| `tool_timeout` | Timeout de ferramenta |
+| `model_error` | Erro do modelo |
+| `invalid_response` | Resposta inválida do modelo |
+| `max_steps` | Limite de steps atingido |
+| `max_tool_calls` | Limite de tool calls atingido |
+| `argument_limit` | Argumento de tool call excedeu limite |
+| `final_answer_limit` | Resposta final excedeu limite |
+| `history_limit` | Histórico atingiu limite |
+
+### Limitações Conhecidas
+
+- Não há sandbox de segurança para ferramentas.
+- Não há tokenização específica de provedor (contagem é em bytes UTF-8).
+- Não há summarization ou descarte de histórico antigo.
+- Timeouts dependem de cooperação (context.Context).
+- Valores padrão são conservadores, mas não garantias de produção.
+
+## Estrutura do Projeto
+
+```
+.
+├── cmd/
+│   └── daimon/
+│       └── main.go          # CLI demo
+├── internal/
+│   ├── agentloop/
+│   │   ├── budget.go        # Budget, LimitError, StopReason
+│   │   ├── budget_test.go
+│   │   ├── size.go          # Medições de tamanho
+│   │   ├── size_test.go
+│   │   ├── loop.go          # Agent loop principal
+│   │   ├── loop_test.go
+│   │   ├── errors.go        # Erros tipados
+│   │   ├── types.go         # Types: Result, Options
+│   │   └── events.go        # Eventos de observabilidade
+│   ├── model/
+│   │   ├── model.go         # Interface Model
+│   │   ├── scripted.go      # Modelo scripted para testes
+│   │   └── scripted_test.go
+│   └── tools/
+│       ├── tool.go          # Interface Tool
+│       ├── registry.go      # Registry de ferramentas
+│       ├── echo.go          # Ferramenta echo
+│       ├── read_file.go     # Ferramenta read_file
+│       └── tools_test.go
+├── .github/
+│   └── workflows/
+│       └── ci.yml           # CI com vet, testes, race detector
+├── go.mod
+├── README.md
+└── AGENTS.md
 ```
 
-Tudo roda localmente, sem credenciais, rede, API externa ou dependências fora da biblioteca
-padrão. O modelo é um roteiro programável: a demonstração não comprova inteligência de
-um modelo real, mas comprova a coordenação do ciclo.
+## Uso
 
-## Execução
-
-Requisito: Go 1.27.1 ou posterior. O demo e a análise estática foram validados em
-Windows/amd64; a suíte completa, incluindo symlinks, em Linux/amd64 com Go 1.27.1.
-
-```sh
+```bash
+# Demo
 go run ./cmd/daimon demo
-gofmt -w cmd internal
+
+# Testes
+go test -count=1 ./...
+go test -race -count=1 ./...
+
+# Lint
+gofmt -w .
+gofmt -l .
 go vet ./...
-go test ./...
-gofmt -l cmd internal
 ```
 
-O último comando não deve listar arquivos. A CLI aceita apenas `demo`; argumentos
-inválidos e falhas retornam exit code diferente de zero.
+## Ferramentas Incluídas
 
-No ambiente inicial o Go não estava no PATH. Foi instalado o arquivo oficial, com SHA-256
-verificado, em `%LOCALAPPDATA%\DAIMON\toolchains\go1.27.1\go`. Para usá-lo no PowerShell:
+| Ferramenta | Descrição |
+|------------|----------|
+| `echo` | Retorna o argumento recebido (para testes) |
+| `read_file` | Lê o conteúdo de um arquivo local |
 
-```powershell
-$env:PATH = "$env:LOCALAPPDATA\DAIMON\toolchains\go1.27.1\go\bin;$env:PATH"
-go run ./cmd/daimon demo
-```
+## Próximos Passos
 
-O demo registra `echo` e `read_file` (workspace = diretório atual, limite = 64 KiB), recebe
-“repita DAIMON”, solicita `echo({"text":"DAIMON"})` e retorna `DAIMON` no segundo passo.
-Imprime a resposta, dois passos e nove eventos, incluindo `tool_completed` e `loop_stopped`.
+1. **v0.3 — Provider OpenAI-compatible**: Conectar um único provider compatível com a API OpenAI.
+2. **v0.4 — Streaming**: Suporte a streaming de respostas.
+3. **v0.5 — Sessions e persistência**: Persistência de histórico e sessões.
+4. **v0.6 — Context Compiler**: Otimização de contexto (summarization, etc.).
 
-## Integração contínua
+## Licença
 
-O workflow `.github/workflows/ci.yml` executa em Ubuntu a cada push e pull request,
-usando a versão de Go definida em `go.mod`:
-
-- `gofmt -l .`, com falha se qualquer arquivo precisar de formatação;
-- `go vet ./...`;
-- `go test -count=1 ./...`;
-- `go test -race -count=1 ./...`, com CGO habilitado.
-
-As duas execuções de testes incluem os casos de symlink e não reutilizam resultados
-de testes em cache. O workflow tem permissão somente de leitura e limite de 15 minutos.
-Para tornar o resultado obrigatório antes de merge, configure o check `Go / Linux`
-nas regras de proteção do repositório.
-
-## Arquitetura
-
-```text
-cmd/daimon/           montagem e saída da CLI
-internal/agentloop/   coordenação, limites, erros e eventos
-internal/model/       protocolo neutro e Scripted Model
-internal/tools/       contratos, Registry, echo e read_file
-```
-
-`model.Model` recebe apenas mensagens e descrições de ferramentas (nome, descrição e
-schema). Não recebe o Registry nem ferramentas concretas. O loop conhece contratos;
-somente a CLI escolhe implementações. Os requests são copiados para que um modelo não
-altere o histórico pertencente ao loop. `Scripted` também copia roteiro e requests e
-permite injetar erros por chamada usando `ScriptStep.Err`.
-
-`ToolResult` contém conteúdo e `IsError`. O Registry preserva ordem de registro e rejeita
-duplicatas. Configuração e execução são sequenciais; não há suporte a uso concorrente.
-O proprietário de `ReadFile` deve chamar `Close` ao terminar.
-
-## Semântica e invariantes
-
-- Uma chamada ao modelo conta como um passo, inclusive se retornar erro. As ferramentas
-  da resposta pertencem a esse passo, executadas na ordem recebida. MaxSteps deve ser positivo.
-- Uma resposta válida contém texto final não vazio/não branco **ou** uma lista não vazia de
-  tool calls. Texto (inclusive espaços) junto a calls é ambíguo e retorna `ErrInvalidResponse`.
-- IDs devem ser não vazios e únicos em toda a execução; nomes devem ser não vazios.
-  Valida-se o lote completo antes de executar qualquer ferramenta.
-- O histórico inclui user, assistant com suas calls, tool com `ToolCallID` e `IsError`, e
-  assistant final. Todo resultado referencia uma call existente. A resposta final encerra uma vez.
-- Nunca são feitas mais de MaxSteps chamadas ao modelo. `ErrMaxSteps` preserva o histórico,
-  incluindo ferramentas executadas no último passo. Não existe nova tentativa automática.
-- Contexto é verificado antes e depois das chamadas externas. Um contexto já cancelado
-  impede chamadas. Cancelamento/deadline permanecem verificáveis com `errors.Is`.
-- Falhas do modelo retornam `*ModelError` com passo e causa (`errors.As`/`errors.Is`).
-  Roteiro esgotado retorna `model.ErrScriptExhausted`, preservado pelo loop.
-- Ferramenta desconhecida, JSON inválido, validação ou erro normal de execução geram
-  resultado controlado para o modelo, permitindo recuperação. Erros de contexto encerram.
-- Erros controláveis não causam panic. Implementações fornecidas devem cumprir os contratos;
-  não há recuperação de panics de código arbitrário nem suporte a interfaces com ponteiro nil tipado.
-- `Result` preserva histórico e contador também em falhas. Cancelamento pode deixar calls
-  sem resultado: a execução foi interrompida, e nenhum resultado fictício é criado.
-
-## Observabilidade
-
-EventSink tem implementações Noop e Memory. Para o ciclo do demo:
-
-```text
-loop_started → model_requested → model_responded → tool_requested
-→ tool_completed → model_requested → model_responded → final_answer → loop_stopped
-```
-
-Falhas recuperáveis emitem `tool_failed` no lugar de `tool_completed`. Erro no modelo
-não emite `model_responded`. Há um único `loop_stopped` em toda saída normal ou com erro,
-inclusive contexto já cancelado ou configuração inválida. Uma interrupção durante chamada
-pode deixar um evento requested sem responded/completed.
-
-Eventos contêm apenas tipo, número do passo e índice da ferramenta: sem timestamps,
-texto, argumentos, nomes/IDs fornecidos pelo modelo ou mensagens de erro. O sink deve ser
-local, rápido e aceitar registros de encerramento com contexto cancelado. Memory preserva
-os eventos em ordem e retorna cópias para inspeção; não há event sourcing.
-
-O histórico e os requests de teste, por outro lado, contêm dados de usuário e de arquivos;
-devem ser tratados como sensíveis. Mensagens de erro de ferramentas vão ao modelo e
-implementações futuras devem evitar incluir segredos nessas mensagens.
-
-## Ferramentas e segurança
-
-- `echo`: objeto com `text` obrigatório e string (string vazia é válida).
-- `read_file`: objeto com `path` obrigatório e string. Somente caminhos relativos ao
-  workspace; bloqueia caminhos absolutos, segmentos `..`, prefixos de unidade, UNC e ADS.
-  Abertura usa `os.Root`, que resolve symlinks sem permitir escape do diretório raiz.
-  Symlinks internos são permitidos. Diretórios e arquivos não regulares são recusados.
-  O tamanho é verificado antes de ler e a leitura é limitada a limite + 1 byte, detectando
-  também crescimento. Campos desconhecidos, duplicados, null e valores extras são rejeitados.
-
-Os testes usam diretórios temporários. Os testes de symlink precisam de permissão para
-criá-los (no Windows, modo de desenvolvedor ou privilégio apropriado); falham explicitamente
-se indisponível. Não usam rede nem APIs externas.
-
-Alternativa para Windows sem esse privilégio, com Docker Desktop em execução
-(o download inicial da imagem requer rede, mas a execução dos testes não):
-
-```powershell
-docker pull golang:1.27.1
-docker run --rm --network none --mount "type=bind,source=$((Get-Location).Path),target=/workspace,readonly" -w /workspace golang:1.27.1 go test ./...
-```
-
-## Testes e limites atuais
-
-Os testes cobrem resposta direta, uma e múltiplas chamadas, ordem, correlação, recuperação
-de falhas, JSON estrito, respostas ambíguas, IDs inválidos/duplicados, erro do modelo,
-MaxSteps, contexto cancelado antes/durante chamadas, deadline expirado, eventos, Registry,
-cópias defensivas, roteiro esgotado, CLI e segurança de read_file.
-
-Cancelamento é cooperativo: não interrompe à força um modelo/ferramenta que ignora contexto
-nem uma chamada de sistema bloqueada. Não há goroutines de timeout. MaxSteps limita chamadas
-ao modelo, mas não o tamanho das respostas, quantidade de ferramentas em um lote ou memória
-total do histórico. O workspace deve ser confiável: os.Root não é um sandbox de processo e
-não bloqueia hard links ou todos os efeitos de alterações concorrentes no filesystem.
-Os testes não simulam corridas de filesystem, dispositivos ou montagens especiais.
-
-Ainda não existem provedores reais, persistência, memória longa/vetorial, banco, gateway,
-subagentes, MCP, servidor, canais de mensagens, interface visual, shell, edição de arquivos
-ou frameworks de agentes. Não são criadas pastas para funcionalidades futuras.
-
-A soberania nesta fase é a independência técnica de provedores: contratos pequenos,
-execução local, nenhuma credencial obrigatória e nenhuma transmissão de dados.
-Próximo passo recomendado: definir e testar limites de volume por execução (tamanho de
-resposta, calls por passo e histórico) antes de integrar um provedor real. Não implementado aqui.
+MIT
