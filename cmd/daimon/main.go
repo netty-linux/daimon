@@ -31,16 +31,19 @@ const maxResponseBytes int64 = 2 * 1024 * 1024
 
 func runWithContext(ctx context.Context, args []string, out io.Writer, getenv func(string) string) (err error) {
 	var selected model.Model
+	var authorizer agentloop.ToolAuthorizer
 	var message, apiKey string
 	demo := len(args) == 1 && args[0] == "demo"
 	switch {
 	case demo:
+		authorizer = agentloop.AllowAllAuthorizer{}
 		selected = model.NewScripted(
 			model.ScriptStep{Response: model.ModelResponse{ToolCalls: []model.ToolCall{{ID: "echo-1", Name: "echo", Arguments: []byte(`{"text":"DAIMON"}`)}}}},
 			model.ScriptStep{Response: model.ModelResponse{FinalText: "DAIMON"}},
 		)
 		message = "repita DAIMON"
 	case len(args) == 2 && args[0] == "chat" && strings.TrimSpace(args[1]) != "":
+		authorizer = chatAuthorizer{}
 		apiKey = getenv("DAIMON_API_KEY")
 		// Redact even provider-echoed secrets or downstream writer errors.
 		defer func() {
@@ -74,7 +77,7 @@ func runWithContext(ctx context.Context, args []string, out io.Writer, getenv fu
 		}
 	}
 	sink := &agentloop.MemoryEventSink{}
-	loop := agentloop.Loop{Model: selected, Registry: registry, Budget: agentloop.DefaultBudget(), Sink: sink}
+	loop := agentloop.Loop{Model: selected, Registry: registry, Budget: agentloop.DefaultBudget(), Sink: sink, Authorizer: authorizer}
 	result, err := loop.Run(ctx, message)
 	if err != nil {
 		return err
@@ -98,6 +101,16 @@ func runWithContext(ctx context.Context, args []string, out io.Writer, getenv fu
 		}
 	}
 	return nil
+}
+
+// chatAuthorizer keeps chat runs offline-safe: only the local echo tool runs.
+type chatAuthorizer struct{}
+
+func (chatAuthorizer) Authorize(_ context.Context, request agentloop.ToolAuthorizationRequest) (agentloop.ToolDecision, error) {
+	if request.Call.Name == "echo" {
+		return agentloop.ToolDecisionAllow, nil
+	}
+	return agentloop.ToolDecisionDeny, nil
 }
 
 type outputError struct {

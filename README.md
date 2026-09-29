@@ -25,7 +25,7 @@ go test -race -count=1 ./...
 ```
 
 `gofmt -l .` não deve listar arquivos. O demo recebe “repita DAIMON”, executa
-`echo({"text":"DAIMON"})` e retorna `DAIMON` em dois passos, com nove eventos.
+`echo({"text":"DAIMON"})` e retorna `DAIMON` em dois passos, com dez eventos.
 Registra também `read_file`, limitado a 64 KiB e ao diretório atual.
 A CLI aceita `demo` e `chat "mensagem"`; argumentos inválidos, mensagem vazia e
 falhas retornam código não zero. Chat imprime resposta final, passos, tool calls,
@@ -53,7 +53,8 @@ docker run --rm --network none --mount "type=bind,source=$((Get-Location).Path),
 - `cmd/daimon`: escolhe Scripted ou provider, monta Registry, Budget e sink; lê ambiente.
 - `internal/model`: mensagens, descrições de ferramentas, `Model.Generate` e `Scripted`.
 - `internal/tools`: `Tool.Execute`, Registry determinístico, echo e read_file.
-- `internal/agentloop`: loop síncrono, Budget, limites de histórico, erros e eventos tipados.
+- `internal/agentloop`: loop síncrono, Budget, autorização, limites de histórico,
+  erros e eventos tipados.
 - `internal/providers/openai`: configuração, HTTP e tradução privada do protocolo.
   Implementa `model.Model`; não executa ferramentas. Model e agentloop não importam providers.
 
@@ -106,10 +107,12 @@ quando há chave. Não há argumento CLI para chave, armazenamento de secrets ou
 impressão da configuração. A CLI também oculta a chave se ela for ecoada na resposta.
 
 **Enviar a um provider remoto transmite a mensagem e todo o histórico aceito,
-incluindo resultados de ferramentas e conteúdo de arquivos lidos.** O chat registra
-read_file no diretório atual: execute somente em um workspace apropriado e com um
-serviço confiável. O confinamento ao workspace não é uma política de privacidade
-para os arquivos que estão dentro dele. O adapter não pede aprovação por chamada.
+incluindo resultados de ferramentas.** O chat registra `read_file` no diretório
+atual, porém o autorizador nega `read_file` por padrão e permite apenas `echo`;
+nesta versão nenhum arquivo é lido. Execute somente em um workspace apropriado e
+com um serviço confiável. O confinamento ao workspace não é uma política de
+privacidade para os arquivos que estão dentro dele. O adapter não pede aprovação
+por chamada.
 
 ### Tradução e semântica
 
@@ -220,6 +223,30 @@ que esse marcador, `~`. O marcador está incluído no limite. Original_bytes med
 entrada antes da normalização. `TruncatedToolResults` conta resultados modificados,
 inclusive normalização de bytes inválidos abaixo do limite.
 
+## Autorização de ferramentas
+
+Toda execução exige um `ToolAuthorizer` explícito. Configuração sem autorizador
+falha antes da primeira chamada ao modelo.
+
+O lote completo de ferramentas válidas é autorizado antes da execução da primeira
+ferramenta. As decisões possíveis nesta versão são:
+
+- `allow`: a ferramenta pode ser executada;
+- `deny`: a ferramenta não é executada e recebe um resultado controlado `tool denied`.
+
+Sequências de eventos:
+
+```text
+permitida:
+ToolAllowed → ToolRequested → ToolCompleted/ToolFailed
+
+negada:
+ToolDenied → receipt controlado
+
+ferramenta desconhecida ou argumentos JSON inválidos:
+ToolRequested → ToolFailed
+```
+
 ## Cancelamento, erros e encerramento
 
 Timeouts usam `context.WithTimeoutCause`, mantendo deadlines anteriores do pai.
@@ -244,7 +271,8 @@ limite. Em timeout, Actual registra a duração limite alcançada.
 Todo retorno define `Result.StopReason` e emite exatamente um `loop_stopped` com
 a mesma razão, inclusive configuração inválida e mensagem inicial rejeitada:
 
-- `completed`, `invalid_config`, `invalid_response`, `model_error`;
+- `completed`, `invalid_config`, `authorization_error`, `invalid_response`,
+  `model_error`;
 - `canceled`, `external_deadline`, `run_timeout`, `model_timeout`, `tool_timeout`;
 - `max_steps`, `max_tool_calls`, `user_message_limit`, `argument_limit`,
   `final_answer_limit`, `history_limit`.
@@ -258,7 +286,7 @@ as chamadas restantes. A reserva garante espaço, não conclusão após cancelam
 EventSink tem implementações Noop e Memory, sem emissor global. O demo emite:
 
 ```text
-loop_started → model_requested → model_responded → tool_requested
+loop_started → model_requested → model_responded → tool_allowed → tool_requested
 → tool_completed → model_requested → model_responded → final_answer → loop_stopped
 ```
 

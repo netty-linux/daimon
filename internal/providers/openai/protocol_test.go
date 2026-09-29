@@ -271,7 +271,7 @@ func TestLoopCanRecoverFromMalformedArguments(t *testing.T) {
 	if err := registry.Register(tools.Echo{}); err != nil {
 		t.Fatal(err)
 	}
-	loop := agentloop.Loop{Model: p, Registry: registry, Budget: agentloop.DefaultBudget()}
+	loop := agentloop.Loop{Model: p, Registry: registry, Budget: agentloop.DefaultBudget(), Authorizer: agentloop.AllowAllAuthorizer{}}
 	got, err := loop.Run(context.Background(), "hello")
 	if err != nil || got.FinalAnswer != "DAIMON" || got.Steps != 2 || calls.Load() != 2 {
 		t.Fatal(got, err)
@@ -287,7 +287,7 @@ func TestLoopBudgetGovernsHTTP(t *testing.T) {
 	p := newProvider(t, s, "", 4096)
 	budget := agentloop.DefaultBudget()
 	budget.MaxModelCallDuration = 50 * time.Millisecond
-	loop := agentloop.Loop{Model: p, Registry: &tools.Registry{}, Budget: budget}
+	loop := agentloop.Loop{Model: p, Registry: &tools.Registry{}, Budget: budget, Authorizer: agentloop.AllowAllAuthorizer{}}
 	result, err := loop.Run(context.Background(), "hello")
 	if !errors.Is(err, context.DeadlineExceeded) || result.StopReason != agentloop.StopReasonModelTimeout {
 		t.Fatalf("%+v %v", result, err)

@@ -27,6 +27,18 @@ func (e *ModelError) Error() string {
 }
 func (e *ModelError) Unwrap() error { return e.Cause }
 
+// The cause is never included in the message: it may hold sensitive detail.
+type AuthorizationError struct {
+	Step      int
+	ToolIndex int
+	Cause     error
+}
+
+func (e *AuthorizationError) Error() string {
+	return fmt.Sprintf("authorization failed at step %d tool %d", e.Step, e.ToolIndex)
+}
+func (e *AuthorizationError) Unwrap() error { return e.Cause }
+
 // A tool may report its own deadline before the supplied context expires.
 // Keep that cause distinct from a caller deadline or a budget expiration.
 type toolDeadlineError struct{ cause error }
