@@ -1,0 +1,30 @@
+﻿# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Go build artifacts
+bin/
+dist/
+*.exe
+*.test
+*.out
+*.prof
+coverage.out
+
+# DAIMON local state
+.daimon/
+*.db
+*.db-shm
+*.db-wal
+
+# Editors
+.vscode/
+.idea/
+
+# Operating system
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
