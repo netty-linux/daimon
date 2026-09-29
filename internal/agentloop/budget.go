@@ -11,21 +11,22 @@ import (
 type StopReason string
 
 const (
-	StopReasonCompleted        StopReason = "completed"
-	StopReasonInvalidConfig    StopReason = "invalid_config"
-	StopReasonCanceled         StopReason = "canceled"
-	StopReasonExternalDeadline StopReason = "external_deadline"
-	StopReasonRunTimeout       StopReason = "run_timeout"
-	StopReasonModelTimeout     StopReason = "model_timeout"
-	StopReasonToolTimeout      StopReason = "tool_timeout"
-	StopReasonModelError       StopReason = "model_error"
-	StopReasonInvalidResponse  StopReason = "invalid_response"
-	StopReasonMaxSteps         StopReason = "max_steps"
-	StopReasonMaxToolCalls     StopReason = "max_tool_calls"
-	StopReasonUserMessageLimit StopReason = "user_message_limit"
-	StopReasonArgumentLimit    StopReason = "argument_limit"
-	StopReasonFinalAnswerLimit StopReason = "final_answer_limit"
-	StopReasonHistoryLimit     StopReason = "history_limit"
+	StopReasonCompleted          StopReason = "completed"
+	StopReasonInvalidConfig      StopReason = "invalid_config"
+	StopReasonCanceled           StopReason = "canceled"
+	StopReasonExternalDeadline   StopReason = "external_deadline"
+	StopReasonRunTimeout         StopReason = "run_timeout"
+	StopReasonModelTimeout       StopReason = "model_timeout"
+	StopReasonToolTimeout        StopReason = "tool_timeout"
+	StopReasonModelError         StopReason = "model_error"
+	StopReasonInvalidResponse    StopReason = "invalid_response"
+	StopReasonMaxSteps           StopReason = "max_steps"
+	StopReasonMaxToolCalls       StopReason = "max_tool_calls"
+	StopReasonUserMessageLimit   StopReason = "user_message_limit"
+	StopReasonArgumentLimit      StopReason = "argument_limit"
+	StopReasonFinalAnswerLimit   StopReason = "final_answer_limit"
+	StopReasonHistoryLimit       StopReason = "history_limit"
+	StopReasonAuthorizationError StopReason = "authorization_error"
 )
 
 type LimitKind string

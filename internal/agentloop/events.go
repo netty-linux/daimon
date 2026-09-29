@@ -8,6 +8,8 @@ const (
 	LoopStarted    EventKind = "loop_started"
 	ModelRequested EventKind = "model_requested"
 	ModelResponded EventKind = "model_responded"
+	ToolAllowed    EventKind = "tool_allowed"
+	ToolDenied     EventKind = "tool_denied"
 	ToolRequested  EventKind = "tool_requested"
 	ToolCompleted  EventKind = "tool_completed"
 	ToolFailed     EventKind = "tool_failed"

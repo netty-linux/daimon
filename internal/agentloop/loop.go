@@ -10,6 +10,22 @@ import (
 	"github.com/netty-linux/daimon/internal/tools"
 )
 
+// callOutcome is the pass-1 result for one call: the resolved tool is
+// carried into pass 2 so the registry is consulted exactly once.
+type callOutcome struct {
+	class callClass
+	tool  tools.Tool
+}
+
+type callClass uint8
+
+const (
+	classUnknownTool callClass = iota
+	classInvalidArguments
+	classAllowed
+	classDenied
+)
+
 func (l Loop) Run(ctx context.Context, userMessage string) (result Result, err error) {
 	sink := l.Sink
 	if sink == nil {
@@ -27,7 +43,7 @@ func (l Loop) Run(ctx context.Context, userMessage string) (result Result, err e
 	if err := b.Validate(); err != nil {
 		return result, err
 	}
-	if l.Model == nil || l.Registry == nil {
+	if l.Model == nil || l.Registry == nil || l.Authorizer == nil {
 		return result, ErrInvalidConfig
 	}
 	runCtx, cancelRun := b.ApplyRunTimeout(ctx)
@@ -115,25 +131,91 @@ func (l Loop) Run(ctx context.Context, userMessage string) (result Result, err e
 		if err := interruption(ctx, runCtx); err != nil {
 			return result, err
 		}
+		// Pass 1: classify and authorize the whole batch before any event or
+		// effect, so no tool executes before every decision is collected.
+		outcomes := make([]callOutcome, len(calls))
+		for i, call := range calls {
+			tool, exists := l.Registry.Find(call.Name)
+			switch {
+			case !exists:
+				outcomes[i] = callOutcome{class: classUnknownTool}
+				continue
+			case !json.Valid(call.Arguments):
+				outcomes[i] = callOutcome{class: classInvalidArguments, tool: tool}
+				continue
+			}
+			if err := interruption(ctx, runCtx); err != nil {
+				return result, err
+			}
+			request := ToolAuthorizationRequest{
+				Call: model.ToolCall{
+					ID: call.ID, Name: call.Name,
+					Arguments: append(json.RawMessage(nil), call.Arguments...),
+				},
+				Step: result.Steps, ToolIndex: i + 1,
+			}
+			decision, authErr := l.Authorizer.Authorize(runCtx, request)
+			// An interruption ends the batch before the result is inspected:
+			// the deadline that stopped the call is the reason, not its error.
+			if err := interruption(ctx, runCtx); err != nil {
+				return result, err
+			}
+			if authErr != nil {
+				if errors.Is(authErr, context.Canceled) || errors.Is(authErr, context.DeadlineExceeded) {
+					return result, authErr
+				}
+				return result, &AuthorizationError{Step: result.Steps, ToolIndex: i + 1, Cause: authErr}
+			}
+			if decision != ToolDecisionAllow && decision != ToolDecisionDeny {
+				return result, &AuthorizationError{Step: result.Steps, ToolIndex: i + 1, Cause: errInvalidDecision}
+			}
+			outcomes[i] = callOutcome{class: classAllowed, tool: tool}
+			if decision == ToolDecisionDeny {
+				outcomes[i].class = classDenied
+			}
+		}
+		if err := interruption(ctx, runCtx); err != nil {
+			return result, err
+		}
 		result.History = append(result.History, assistant)
+		// Pass 2: emit events and effects in call order.
 		for i, call := range calls {
 			if err := interruption(ctx, runCtx); err != nil {
 				return result, err
 			}
-			sink.Record(ctx, Event{Kind: ToolRequested, Step: result.Steps, ToolIndex: i + 1})
-			if err := interruption(ctx, runCtx); err != nil {
-				return result, err
-			}
+			outcome := outcomes[i]
 			toolResult := tools.ToolResult{}
-			tool, exists := l.Registry.Find(call.Name)
-			switch {
-			case !exists:
+			switch outcome.class {
+			case classUnknownTool:
+				sink.Record(ctx, Event{Kind: ToolRequested, Step: result.Steps, ToolIndex: i + 1})
+				if err := interruption(ctx, runCtx); err != nil {
+					return result, err
+				}
 				result.ToolCalls++
 				toolResult = tools.ToolResult{Content: "unknown tool", IsError: true}
-			case !json.Valid(call.Arguments):
+			case classInvalidArguments:
+				sink.Record(ctx, Event{Kind: ToolRequested, Step: result.Steps, ToolIndex: i + 1})
+				if err := interruption(ctx, runCtx); err != nil {
+					return result, err
+				}
 				result.ToolCalls++
 				toolResult = tools.ToolResult{Content: "invalid JSON arguments", IsError: true}
+			case classDenied:
+				sink.Record(ctx, Event{Kind: ToolDenied, Step: result.Steps, ToolIndex: i + 1})
+				if err := interruption(ctx, runCtx); err != nil {
+					return result, err
+				}
+				result.ToolCalls++
+				toolResult = tools.ToolResult{Content: "tool denied", IsError: true}
 			default:
+				sink.Record(ctx, Event{Kind: ToolAllowed, Step: result.Steps, ToolIndex: i + 1})
+				if err := interruption(ctx, runCtx); err != nil {
+					return result, err
+				}
+				sink.Record(ctx, Event{Kind: ToolRequested, Step: result.Steps, ToolIndex: i + 1})
+				if err := interruption(ctx, runCtx); err != nil {
+					return result, err
+				}
 				toolCtx, cancelTool := b.ApplyToolTimeout(runCtx)
 				if err := interruption(ctx, toolCtx); err != nil {
 					cancelTool()
@@ -141,7 +223,7 @@ func (l Loop) Run(ctx context.Context, userMessage string) (result Result, err e
 				}
 				result.ToolCalls++
 				var toolErr error
-				toolResult, toolErr = tool.Execute(toolCtx, call.Arguments)
+				toolResult, toolErr = outcome.tool.Execute(toolCtx, call.Arguments)
 				interrupted := interruption(ctx, toolCtx)
 				cancelTool()
 				if interrupted != nil {
@@ -171,11 +253,15 @@ func (l Loop) Run(ctx context.Context, userMessage string) (result Result, err e
 			receipt := model.Message{Role: model.RoleTool, Content: toolResult.Content, ToolCallID: call.ID, IsError: toolResult.IsError}
 			// Capacity was reserved with this ID and the maximum normalized content.
 			result.History = append(result.History, receipt)
-			kind := ToolCompleted
-			if toolResult.IsError {
-				kind = ToolFailed
+			// A denial already reported ToolDenied: it never executed, so no
+			// completion or failure event follows its receipt.
+			if outcome.class != classDenied {
+				kind := ToolCompleted
+				if toolResult.IsError {
+					kind = ToolFailed
+				}
+				sink.Record(ctx, Event{Kind: kind, Step: result.Steps, ToolIndex: i + 1})
 			}
-			sink.Record(ctx, Event{Kind: kind, Step: result.Steps, ToolIndex: i + 1})
 		}
 	}
 	if err := interruption(ctx, runCtx); err != nil {
@@ -206,6 +292,10 @@ func reasonFor(err error) StopReason {
 	var modelErr *ModelError
 	if errors.As(err, &modelErr) {
 		return StopReasonModelError
+	}
+	var authErr *AuthorizationError
+	if errors.As(err, &authErr) {
+		return StopReasonAuthorizationError
 	}
 	var toolDeadline *toolDeadlineError
 	if errors.As(err, &toolDeadline) {

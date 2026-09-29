@@ -36,6 +36,26 @@ em Go, com Scripted, echo e read_file.
 - StopReason deve existir em todo retorno e no único loop_stopped correspondente.
 - Evento não contém mensagens, nomes/IDs do modelo, argumentos, resultados ou texto de erro.
 
+## Invariantes de autorização
+
+- Loop.Authorizer é obrigatório; nil é ErrInvalidConfig antes da primeira chamada ao modelo.
+- Autorização é fail-closed: nenhuma chamada executa sem decisão Allow explícita.
+- O lote inteiro é autorizado antes do primeiro Execute, em passagem única por chamada,
+  sem eventos nem efeitos; o lote rejeitado pelo budget nunca chega ao Authorize.
+- Authorize recebe runCtx e continua governado por MaxRunDuration e deadlines externos.
+- ToolAuthorizationRequest recebe os argumentos copiados defensivamente.
+- Somente allow e deny são decisões válidas; qualquer outro valor falha fechado.
+- Erros do authorizer impedem todo Execute daquele lote.
+- Erros de contexto voltam diretamente; erros não de contexto viram AuthorizationError,
+  cuja mensagem só nomeia passo e ferramenta e preserva a causa por Unwrap.
+- Permitido: ToolAllowed → ToolRequested → ToolCompleted/ToolFailed.
+- Negado: ToolDenied → recibo controlado correlato, sem execução.
+- Desconhecido ou JSON inválido: ToolRequested → ToolFailed, sem evento de autorização.
+- Eventos nunca contêm nomes, IDs, argumentos, motivos de decisão ou resultados.
+- O comando chat real permite echo e nega read_file por padrão.
+- Não adicionar aprovação interativa, permissões persistentes ou novas ferramentas
+  neste corte.
+
 ## Segurança e escopo
 
 - Ferramentas desconhecidas, JSON inválido e erros normais viram resultados controlados.

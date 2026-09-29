@@ -31,7 +31,7 @@ func setup(t *testing.T, script ...model.ScriptStep) (Loop, *model.Scripted, *Me
 	sink := &MemoryEventSink{}
 	b := DefaultBudget()
 	b.MaxSteps = 3
-	return Loop{Model: m, Registry: r, Budget: b, Sink: sink}, m, sink
+	return Loop{Model: m, Registry: r, Budget: b, Sink: sink, Authorizer: AllowAllAuthorizer{}}, m, sink
 }
 
 func TestFinalWithoutTool(t *testing.T) {
@@ -49,13 +49,13 @@ func TestFinalWithoutTool(t *testing.T) {
 func TestToolRecovery(t *testing.T) {
 	for _, tc := range []struct {
 		name, tool, args, content string
-		failed                    bool
+		failed, authorized        bool
 	}{
-		{"echo", "echo", `{"text":"DAIMON"}`, "DAIMON", false},
-		{"unknown", "missing", `{}`, "unknown tool", true},
-		{"bad JSON", "echo", `{`, "invalid JSON arguments", true},
-		{"missing field", "echo", `{}`, "", true},
-		{"unknown field", "echo", `{"text":"x","other":1}`, "", true},
+		{"echo", "echo", `{"text":"DAIMON"}`, "DAIMON", false, true},
+		{"unknown", "missing", `{}`, "unknown tool", true, false},
+		{"bad JSON", "echo", `{`, "invalid JSON arguments", true, false},
+		{"missing field", "echo", `{}`, "", true, true},
+		{"unknown field", "echo", `{"text":"x","other":1}`, "", true, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			l, m, sink := setup(t, toolStep(call("id-1", tc.tool, tc.args)), final("recovered"))
@@ -80,7 +80,12 @@ func TestToolRecovery(t *testing.T) {
 			if tc.failed {
 				kind = ToolFailed
 			}
-			assertKinds(t, sink, LoopStarted, ModelRequested, ModelResponded, ToolRequested, kind, ModelRequested, ModelResponded, FinalAnswer, LoopStopped)
+			want := []EventKind{LoopStarted, ModelRequested, ModelResponded}
+			if tc.authorized {
+				want = append(want, ToolAllowed)
+			}
+			want = append(want, ToolRequested, kind, ModelRequested, ModelResponded, FinalAnswer, LoopStopped)
+			assertKinds(t, sink, want...)
 		})
 	}
 }
@@ -118,9 +123,10 @@ func TestMultipleToolsSequentialAndCorrelated(t *testing.T) {
 	if r.History[2].ToolCallID != "a" || r.History[3].ToolCallID != "b" {
 		t.Fatal(r.History)
 	}
-	assertKinds(t, sink, LoopStarted, ModelRequested, ModelResponded, ToolRequested, ToolCompleted, ToolRequested, ToolCompleted, ModelRequested, ModelResponded, FinalAnswer, LoopStopped)
-	if sink.Events()[5].ToolIndex != 2 || sink.Events()[6].Step != 1 {
-		t.Fatal(sink.Events())
+	assertKinds(t, sink, LoopStarted, ModelRequested, ModelResponded, ToolAllowed, ToolRequested, ToolCompleted, ToolAllowed, ToolRequested, ToolCompleted, ModelRequested, ModelResponded, FinalAnswer, LoopStopped)
+	events := sink.Events()
+	if events[7].ToolIndex != 2 || events[8].Step != 1 || events[7].Kind != ToolRequested || events[8].Kind != ToolCompleted {
+		t.Fatal(events)
 	}
 }
 
@@ -136,7 +142,7 @@ func TestToolErrorsRecover(t *testing.T) {
 			t.Fatal(err)
 		}
 		r, err := l.Run(context.Background(), "start")
-		if err != nil || !r.History[2].IsError || sink.Events()[4].Kind != ToolFailed {
+		if err != nil || !r.History[2].IsError || sink.Events()[5].Kind != ToolFailed {
 			t.Fatalf("%+v %v", r, err)
 		}
 	}
@@ -157,7 +163,7 @@ func TestModelErrorAndMaxSteps(t *testing.T) {
 	if !errors.Is(err, ErrMaxSteps) || r.Steps != 1 || len(m.Requests()) != 1 || len(r.History) != 3 {
 		t.Fatalf("%+v %v", r, err)
 	}
-	assertKinds(t, sink, LoopStarted, ModelRequested, ModelResponded, ToolRequested, ToolCompleted, LoopStopped)
+	assertKinds(t, sink, LoopStarted, ModelRequested, ModelResponded, ToolAllowed, ToolRequested, ToolCompleted, LoopStopped)
 }
 
 func TestInvalidResponses(t *testing.T) {
@@ -215,7 +221,7 @@ func TestCancellationDuringTool(t *testing.T) {
 	if !errors.Is(err, context.Canceled) || len(p.inputs) != 1 || len(m.Requests()) != 1 || len(r.History) != 2 {
 		t.Fatalf("%+v %v", r, err)
 	}
-	assertKinds(t, sink, LoopStarted, ModelRequested, ModelResponded, ToolRequested, LoopStopped)
+	assertKinds(t, sink, LoopStarted, ModelRequested, ModelResponded, ToolAllowed, ToolRequested, LoopStopped)
 }
 
 type cancelModel struct{ cancel context.CancelFunc }
@@ -237,7 +243,12 @@ func TestCancellationDuringModel(t *testing.T) {
 }
 
 func TestInvalidConfigAndNoop(t *testing.T) {
-	for _, l := range []Loop{{}, {Model: model.NewScripted(), Registry: &tools.Registry{}, Budget: Budget{MaxSteps: -1}}} {
+	authorizer := AllowAllAuthorizer{}
+	for _, l := range []Loop{
+		{},
+		{Model: model.NewScripted(), Registry: &tools.Registry{}, Budget: Budget{MaxSteps: -1}, Authorizer: authorizer},
+		{Model: model.NewScripted(), Registry: &tools.Registry{}, Budget: DefaultBudget(), Authorizer: nil},
+	} {
 		if _, err := l.Run(context.Background(), "start"); !errors.Is(err, ErrInvalidConfig) {
 			t.Fatal(err)
 		}

@@ -7,10 +7,11 @@ import (
 )
 
 type Loop struct {
-	Model    model.Model
-	Registry *tools.Registry
-	Budget   Budget
-	Sink     EventSink
+	Model      model.Model
+	Registry   *tools.Registry
+	Budget     Budget
+	Sink       EventSink
+	Authorizer ToolAuthorizer
 }
 
 type Result struct {
