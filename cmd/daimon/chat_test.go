@@ -34,13 +34,13 @@ func chatEnvironment(base, model, key string) func(string) string {
 func TestChatUsageAndConfig(t *testing.T) {
 	for _, args := range [][]string{{"chat"}, {"chat", ""}, {"chat", " "}, {"chat", "a", "extra"}, {"chat", "a", "--api-key", "secret"}} {
 		var out bytes.Buffer
-		err := runWithContext(context.Background(), args, &out, func(string) string { t.Error("environment read for invalid usage"); return "" })
+		err := runWithContext(context.Background(), args, strings.NewReader(""), &out, io.Discard, func(string) string { t.Error("environment read for invalid usage"); return "" })
 		if err == nil || !strings.Contains(err.Error(), "usage:") || strings.Contains(err.Error(), "secret") || out.Len() != 0 {
 			t.Fatal(err, &out)
 		}
 	}
 	for _, env := range []func(string) string{chatEnvironment("", "m", "secret"), chatEnvironment("http://localhost/v1", "", "secret")} {
-		err := runWithContext(context.Background(), []string{"chat", "hello"}, io.Discard, env)
+		err := runWithContext(context.Background(), []string{"chat", "hello"}, strings.NewReader(""), io.Discard, io.Discard, env)
 		var config *openai.ConfigError
 		if !errors.As(err, &config) || strings.Contains(err.Error(), "secret") {
 			t.Fatal(err)
@@ -49,7 +49,7 @@ func TestChatUsageAndConfig(t *testing.T) {
 }
 func TestDemoDoesNotReadEnvironment(t *testing.T) {
 	var out bytes.Buffer
-	err := runWithContext(context.Background(), []string{"demo"}, &out, func(string) string { t.Fatal("demo read environment"); return "" })
+	err := runWithContext(context.Background(), []string{"demo"}, strings.NewReader(""), &out, io.Discard, func(string) string { t.Fatal("demo read environment"); return "" })
 	if err != nil || !strings.Contains(out.String(), "Resposta final: DAIMON") || !strings.Contains(out.String(), "loop_stopped") {
 		t.Fatal(err, &out)
 	}
@@ -87,7 +87,7 @@ func TestChatToolCycle(t *testing.T) {
 			w.WriteHeader(500)
 			return
 		}
-		if len(request.Tools) != 2 || request.Tools[0].Function.Name != "echo" || request.Tools[1].Function.Name != "read_file" {
+		if len(request.Tools) != 3 || request.Tools[0].Function.Name != "echo" || request.Tools[1].Function.Name != "list_dir" || request.Tools[2].Function.Name != "read_file" {
 			t.Error("tools not registered")
 		}
 		if calls.Add(1) == 1 {
@@ -101,7 +101,7 @@ func TestChatToolCycle(t *testing.T) {
 	}))
 	defer s.Close()
 	var out bytes.Buffer
-	err := runWithContext(context.Background(), []string{"chat", "use tools"}, &out, chatEnvironment(s.URL+"/v1", "test-model", ""))
+	err := runWithContext(context.Background(), []string{"chat", "use tools"}, strings.NewReader(""), &out, io.Discard, chatEnvironment(s.URL+"/v1", "test-model", ""))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,8 +152,9 @@ func TestChatDeniesReadFileByDefault(t *testing.T) {
 		io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":"bloqueado"}}]}`)
 	}))
 	defer s.Close()
-	var out bytes.Buffer
-	err := runWithContext(context.Background(), []string{"chat", "read it"}, &out, chatEnvironment(s.URL+"/v1", "test-model", ""))
+	var out, stderr bytes.Buffer
+	// EOF on stdin denies the requested approval.
+	err := runWithContext(context.Background(), []string{"chat", "read it"}, strings.NewReader(""), &out, &stderr, chatEnvironment(s.URL+"/v1", "test-model", ""))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,8 +163,13 @@ func TestChatDeniesReadFileByDefault(t *testing.T) {
 			t.Fatalf("missing %q: %s", want, &out)
 		}
 	}
-	if strings.Contains(out.String(), "internal secret") || calls.Load() != 2 {
-		t.Fatal("unexpected output or requests", &out)
+	for _, want := range []string{"DAIMON solicita:", "Ferramenta: read_file", "Caminho: secret.txt", "Permitir uma vez? [y/N]:"} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Fatalf("missing %q in prompt: %s", want, stderr.String())
+		}
+	}
+	if strings.Contains(out.String(), "internal secret") || strings.Contains(stderr.String(), "internal secret") || calls.Load() != 2 {
+		t.Fatal("unexpected output or requests", &out, &stderr)
 	}
 }
 func TestChatRedactsErrorsAndAnswers(t *testing.T) {
@@ -181,7 +187,7 @@ func TestChatRedactsErrorsAndAnswers(t *testing.T) {
 			}
 		}))
 		var out bytes.Buffer
-		err := runWithContext(context.Background(), []string{"chat", "hello"}, &out, chatEnvironment(s.URL, "m", key))
+		err := runWithContext(context.Background(), []string{"chat", "hello"}, strings.NewReader(""), &out, io.Discard, chatEnvironment(s.URL, "m", key))
 		s.Close()
 		if strings.Contains(out.String(), key) || (err != nil && strings.Contains(err.Error(), key)) {
 			t.Fatal("secret exposed")
@@ -215,7 +221,7 @@ func TestChatUsesCallerContext(t *testing.T) {
 	}))
 	defer s.Close()
 	defer cancel()
-	err := runWithContext(ctx, []string{"chat", "hello"}, io.Discard, chatEnvironment(s.URL, "m", ""))
+	err := runWithContext(ctx, []string{"chat", "hello"}, strings.NewReader(""), io.Discard, io.Discard, chatEnvironment(s.URL, "m", ""))
 	if !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
 	}
@@ -225,7 +231,7 @@ func TestChatUsesCallerContext(t *testing.T) {
 		t.Fatal("server did not finish")
 	}
 	// The same canceled context must not start a second request.
-	err = runWithContext(ctx, []string{"chat", "hello"}, io.Discard, chatEnvironment(s.URL, "m", ""))
+	err = runWithContext(ctx, []string{"chat", "hello"}, strings.NewReader(""), io.Discard, io.Discard, chatEnvironment(s.URL, "m", ""))
 	if !errors.Is(err, context.Canceled) || calls.Load() != 1 {
 		t.Fatal(err, calls.Load())
 	}

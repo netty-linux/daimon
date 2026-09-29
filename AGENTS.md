@@ -1,8 +1,9 @@
 # DAIMON
 
 Visão: fundação experimental de um Sovereign Personal Agent sob controle do usuário.
-Escopo atual: Reliable Agent Loop + Execution Budget + OpenAI-compatible non-streaming,
-em Go, com Scripted, echo e read_file.
+Escopo atual: Reliable Agent Loop + Execution Budget + OpenAI-compatible
+non-streaming + Human Approval + Workspace Read-Only, em Go, com Scripted,
+echo, read_file e list_dir.
 
 ## Arquitetura
 
@@ -41,27 +42,46 @@ em Go, com Scripted, echo e read_file.
 - Loop.Authorizer é obrigatório; nil é ErrInvalidConfig antes da primeira chamada ao modelo.
 - Autorização é fail-closed: nenhuma chamada executa sem decisão Allow explícita.
 - O lote inteiro é autorizado antes do primeiro Execute, em passagem única por chamada,
-  sem eventos nem efeitos; o lote rejeitado pelo budget nunca chega ao Authorize.
+  sem execução nem efeitos; o lote rejeitado pelo budget nunca chega ao Authorize.
+  Eventos de aprovação podem ser emitidos durante essa passagem; nenhum efeito de
+  ferramenta ocorre antes de todas as decisões.
+- ToolPolicy e ApprovalProvider são conceitos fora do loop: um authorizer composto
+  implementa ToolAuthorizer e resolve política e aprovação antes de responder.
+  O loop não conhece terminal, política ou motivos.
+- Política estática nega por padrão; fallback não configurado nega (zero value).
+  Decisão de política inválida falha fechado, sem consultar aprovação.
+- ApprovalProvider: uma aprovação vale para uma única call; não persiste decisão,
+  não oferece "sempre permitir". Padrão é No; EOF e entrada inválida negam sem
+  falhar o run. Cancelamento interrompe a aprovação e retorna o erro de contexto.
+- Argumentos exibidos são sanitizados: caracteres de controle não chegam ao
+  terminal; conteúdo de arquivo nunca é exibido. Prompts vão ao stderr injetado;
+  nada lê os.Stdin dentro da política.
 - Authorize recebe runCtx e continua governado por MaxRunDuration e deadlines externos.
 - ToolAuthorizationRequest recebe os argumentos copiados defensivamente.
 - Somente allow e deny são decisões válidas; qualquer outro valor falha fechado.
-- Erros do authorizer impedem todo Execute daquele lote.
-- Erros de contexto voltam diretamente; erros não de contexto viram AuthorizationError,
-  cuja mensagem só nomeia passo e ferramenta e preserva a causa por Unwrap.
-- Permitido: ToolAllowed → ToolRequested → ToolCompleted/ToolFailed.
-- Negado: ToolDenied → recibo controlado correlato, sem execução.
+- Erros do authorizer impedem todo Execute daquele lote; erros de contexto voltam
+  diretamente; erros não de contexto viram AuthorizationError, cuja mensagem só
+  nomeia passo e ferramenta e preserva a causa por Unwrap.
+- Permitido direto: ToolAllowed → ToolRequested → ToolCompleted/ToolFailed.
+- Aprovado: ApprovalRequested → ApprovalGranted → ToolAllowed → ToolRequested →
+  ToolCompleted.
+- Negado: (ApprovalRequested → ApprovalDenied quando passa por aprovação) →
+  ToolDenied → recibo controlado correlato, sem execução.
 - Desconhecido ou JSON inválido: ToolRequested → ToolFailed, sem evento de autorização.
 - Eventos nunca contêm nomes, IDs, argumentos, motivos de decisão ou resultados.
-- O comando chat real permite echo e nega read_file por padrão.
-- Não adicionar aprovação interativa, permissões persistentes ou novas ferramentas
-  neste corte.
+- A política padrão do CLI permite echo, exige aprovação para list_dir e read_file
+  e nega qualquer outra ferramenta; não existe opção global de aprovar tudo.
+- Não adicionar aprovação permanente, wildcards de permissão, configuração de
+  política em arquivo ou novas ferramentas neste corte.
 
 ## Segurança e escopo
 
 - Ferramentas desconhecidas, JSON inválido e erros normais viram resultados controlados.
 - Não usar panic, log.Fatal ou os.Exit no loop.
-- read_file permanece confinado com os.Root, somente caminhos relativos, limite de bytes,
-  validação estrita e bloqueio de traversal/symlink externo/diretórios.
+- read_file e list_dir permanecem confinados com os.Root, somente caminhos
+  relativos, limites de bytes, validação estrita e bloqueio de traversal/symlink
+  externo/diretórios; list_dir é não recursivo, ordenado, rotula symlink sem
+  seguir e falha integralmente ao exceder limites, sem corte silencioso.
 - Testes de symlink devem executar; falta de permissão é falha explícita.
 - Não adicionar prematuramente banco, memória longa/vetorial, gateway, múltiplos providers,
   subagentes, MCP, servidor HTTP, Telegram/Discord, TUI/web, event sourcing completo,

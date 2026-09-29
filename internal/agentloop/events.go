@@ -13,8 +13,13 @@ const (
 	ToolRequested  EventKind = "tool_requested"
 	ToolCompleted  EventKind = "tool_completed"
 	ToolFailed     EventKind = "tool_failed"
-	FinalAnswer    EventKind = "final_answer"
-	LoopStopped    EventKind = "loop_stopped"
+	// Approval events are emitted by composite authorizers, never by the loop,
+	// and follow the same no-secrets rule: step and tool index only.
+	ApprovalRequested EventKind = "approval_requested"
+	ApprovalGranted   EventKind = "approval_granted"
+	ApprovalDenied    EventKind = "approval_denied"
+	FinalAnswer       EventKind = "final_answer"
+	LoopStopped       EventKind = "loop_stopped"
 )
 
 // Event intentionally excludes names, IDs, arguments, output and error text.

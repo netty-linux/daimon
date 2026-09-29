@@ -4,12 +4,13 @@ DAIMON é a fundação experimental de um **Sovereign Personal Agent** em Go:
 execução sob controle do usuário e contratos independentes de provedor.
 **Ainda não é um agente pessoal pronto.**
 
-O corte atual reúne Reliable Agent Loop, Execution Budget e um adapter
-OpenAI-compatible para Chat Completions sem streaming:
+O corte atual reúne Reliable Agent Loop, Execution Budget, um adapter
+OpenAI-compatible para Chat Completions sem streaming e a primeira capacidade
+real de exploração de workspace com aprovação humana:
 mensagem → modelo → ferramentas opcionais → resultados → modelo → resposta final.
 Usa somente a biblioteca padrão, um modelo programável e as ferramentas
-`echo` e `read_file`. O demo e os testes não requerem credenciais nem APIs externas;
-o comando chat se conecta ao endpoint escolhido pelo usuário.
+`echo`, `read_file` e `list_dir`. O demo e os testes não requerem credenciais
+nem APIs externas; o comando chat se conecta ao endpoint escolhido pelo usuário.
 
 ## Execução e validação
 
@@ -26,7 +27,8 @@ go test -race -count=1 ./...
 
 `gofmt -l .` não deve listar arquivos. O demo recebe “repita DAIMON”, executa
 `echo({"text":"DAIMON"})` e retorna `DAIMON` em dois passos, com dez eventos.
-Registra também `read_file`, limitado a 64 KiB e ao diretório atual.
+Registra também `read_file`, limitado a 64 KiB e ao diretório atual, e `list_dir`,
+limitado a 256 entradas e 32 KiB por listagem.
 A CLI aceita `demo` e `chat "mensagem"`; argumentos inválidos, mensagem vazia e
 falhas retornam código não zero. Chat imprime resposta final, passos, tool calls,
 resultados truncados e StopReason, sem imprimir o histórico.
@@ -50,9 +52,12 @@ docker run --rm --network none --mount "type=bind,source=$((Get-Location).Path),
 
 ## Arquitetura
 
-- `cmd/daimon`: escolhe Scripted ou provider, monta Registry, Budget e sink; lê ambiente.
+- `cmd/daimon`: escolhe Scripted ou provider, monta Registry, Budget, sink,
+  política e aprovação; lê ambiente e conecta stdin/stdout/stderr.
 - `internal/model`: mensagens, descrições de ferramentas, `Model.Generate` e `Scripted`.
-- `internal/tools`: `Tool.Execute`, Registry determinístico, echo e read_file.
+- `internal/tools`: `Tool.Execute`, Registry determinístico, echo, read_file e list_dir.
+- `internal/policy`: `ToolPolicy` estática, `ApprovalProvider`, authorizer composto
+  e aprovação de terminal. Implementa o `ToolAuthorizer` que o loop conhece.
 - `internal/agentloop`: loop síncrono, Budget, autorização, limites de histórico,
   erros e eventos tipados.
 - `internal/providers/openai`: configuração, HTTP e tradução privada do protocolo.
@@ -107,12 +112,13 @@ quando há chave. Não há argumento CLI para chave, armazenamento de secrets ou
 impressão da configuração. A CLI também oculta a chave se ela for ecoada na resposta.
 
 **Enviar a um provider remoto transmite a mensagem e todo o histórico aceito,
-incluindo resultados de ferramentas.** O chat registra `read_file` no diretório
-atual, porém o autorizador nega `read_file` por padrão e permite apenas `echo`;
-nesta versão nenhum arquivo é lido. Execute somente em um workspace apropriado e
-com um serviço confiável. O confinamento ao workspace não é uma política de
-privacidade para os arquivos que estão dentro dele. O adapter não pede aprovação
-por chamada.
+incluindo resultados de ferramentas.** O chat registra `read_file` e `list_dir`
+no diretório atual; ambos exigem aprovação humana por chamada, exibida no stderr
+com os argumentos sanitizados. `echo` executa automaticamente; qualquer outra
+ferramenta é negada. Execute somente em um workspace apropriado e com um serviço
+confiável. O confinamento ao workspace não é uma política de privacidade para os
+arquivos que estão dentro dele. Não existe opção de aprovar tudo nem de lembrar
+decisões.
 
 ### Tradução e semântica
 
@@ -234,14 +240,31 @@ ferramenta. As decisões possíveis nesta versão são:
 - `allow`: a ferramenta pode ser executada;
 - `deny`: a ferramenta não é executada e recebe um resultado controlado `tool denied`.
 
+A CLI compõe dois conceitos antes de responder `allow`/`deny` ao loop:
+
+- `ToolPolicy`: decide `allow`, `deny` ou `require approval` por nome de ferramenta.
+  Padrão do chat: `echo` → allow, `list_dir` e `read_file` → require approval,
+  qualquer outra → deny. Política com fallback não configurado nega (zero value).
+- `ApprovalProvider`: pergunta ao humano quando necessário. A implementação de
+  terminal exibe o pedido no stderr, sanitiza argumentos (caracteres de controle
+  substituídos, valores limitados), assume `No` como padrão, nega em EOF ou
+  entrada inválida, não persiste decisão, não oferece “sempre permitir” e vale
+  para uma única chamada. Cancelamento interrompe a aprovação e retorna o erro
+  de contexto. Erros não contextuais do provider falham fechado como
+  `AuthorizationError`, com mensagem limitada a passo e ferramenta.
+
 Sequências de eventos:
 
 ```text
-permitida:
+permitida diretamente pela política:
 ToolAllowed → ToolRequested → ToolCompleted/ToolFailed
 
-negada:
-ToolDenied → receipt controlado
+aprovada pelo humano:
+ApprovalRequested → ApprovalGranted → ToolAllowed → ToolRequested → ToolCompleted
+
+negada (pela política ou pelo humano):
+ApprovalRequested → ApprovalDenied → ToolDenied → receipt controlado
+  (sem Approval* quando a política nega diretamente)
 
 ferramenta desconhecida ou argumentos JSON inválidos:
 ToolRequested → ToolFailed
@@ -290,18 +313,24 @@ loop_started → model_requested → model_responded → tool_allowed → tool_r
 → tool_completed → model_requested → model_responded → final_answer → loop_stopped
 ```
 
-Erros controlados usam `tool_failed`. Interrupção pode deixar requested sem conclusão.
-Eventos contêm somente tipo, passo, posição de ferramenta e razão de encerramento;
-não incluem mensagens, nomes/IDs fornecidos pelo modelo, argumentos, outputs ou erros.
+Eventos de aprovação (`approval_requested`, `approval_granted`, `approval_denied`)
+são emitidos pelo authorizer composto, não pelo loop, e obedecem à mesma regra
+de conteúdo. Erros controlados usam `tool_failed`. Interrupção pode deixar
+requested sem conclusão. Eventos contêm somente tipo, passo, posição de ferramenta
+e razão de encerramento; não incluem mensagens, nomes/IDs fornecidos pelo modelo,
+argumentos, motivos de decisão, outputs ou erros.
 O sink deve ser local, rápido e aceitar encerramento com contexto cancelado.
 O histórico e os requests, ao contrário, contêm dados potencialmente sensíveis.
 
 `echo` exige um objeto com text string. `read_file` exige path relativo e usa
 `os.Root` para confinar a resolução de symlinks ao workspace; symlinks internos são
 permitidos. Bloqueia caminhos absolutos, traversal, diretórios, arquivos não regulares
-e arquivos acima do limite. Ambos rejeitam campos desconhecidos/duplicados,
-campos obrigatórios ausentes, null e tipos inválidos. O proprietário de ReadFile
-deve chamar Close.
+e arquivos acima do limite. `list_dir` compartilha o mesmo confinamento e rejeita
+os mesmos caminhos; a listagem é não recursiva, ordenada por nome, rotula
+arquivo/diretório/symlink sem seguir links, e falha integralmente quando excede
+os limites de entradas ou de bytes, sem cortes silenciosos. Ambos rejeitam campos
+desconhecidos/duplicados, campos obrigatórios ausentes, null e tipos inválidos.
+O proprietário de ReadFile e ListDir deve chamar Close.
 
 ## CI e testes
 
@@ -332,8 +361,9 @@ Implementações fornecidas devem respeitar os contratos; não há recuperação
 de código arbitrário nem suporte a interfaces contendo ponteiros nil tipados.
 
 Não existem banco, memória vetorial, gateway, subagentes, MCP, servidor, UI,
-streaming/SSE, Responses API, retry, fallback, múltiplos providers simultâneos, shell
-ou escrita/edição de arquivos. A compatibilidade foi testada com servidores locais
+streaming/SSE, Responses API, retry, fallback, múltiplos providers simultâneos,
+shell, escrita/edição de arquivos, aprovação permanente ou configuração de
+política em arquivo. A compatibilidade foi testada com servidores locais
 simulados, sem chamadas a provedores reais. Nenhuma credencial é necessária para
-validar o projeto. Próximo passo recomendado: revisar este adapter e realizar um
-smoke test opt-in com um endpoint local real. Não executado nesta entrega.
+validar o projeto. Próximo passo recomendado: revisar este corte de aprovação e
+realizar um smoke test opt-in com um endpoint local real e uma listagem aprovada.
