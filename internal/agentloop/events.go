@@ -1,33 +1,37 @@
 package agentloop
 
-// Event representa um evento emitido pelo agent loop.
+import "context"
+
+type EventKind string
+
+const (
+	LoopStarted    EventKind = "loop_started"
+	ModelRequested EventKind = "model_requested"
+	ModelResponded EventKind = "model_responded"
+	ToolRequested  EventKind = "tool_requested"
+	ToolCompleted  EventKind = "tool_completed"
+	ToolFailed     EventKind = "tool_failed"
+	FinalAnswer    EventKind = "final_answer"
+	LoopStopped    EventKind = "loop_stopped"
+)
+
+// Event intentionally excludes names, IDs, arguments, output and error text.
+// ToolIndex is one-based within its model step; zero means no tool.
 type Event struct {
-	Type string
-	Data map[string]interface{}
+	Kind       EventKind
+	Step       int
+	ToolIndex  int
+	StopReason StopReason // Populated only for loop_stopped.
 }
 
-// eventEmitter permite emitir eventos de forma controlada.
-type eventEmitter interface {
-	emit(Event)
-}
+// Record should be a prompt, local operation, including on canceled contexts.
+type EventSink interface{ Record(context.Context, Event) }
+type NoopEventSink struct{}
 
-// defaultEmitter é o emissor padrão (no-op por enquanto).
-type defaultEmitter struct{}
+func (NoopEventSink) Record(context.Context, Event) {}
 
-func (defaultEmitter) emit(e Event) {
-	// Por enquanto, eventos são apenas para observabilidade futura
-	// Em produção, isso pode enviar para um sistema de logs ou tracing
-}
+// MemoryEventSink is intended for sequential use.
+type MemoryEventSink struct{ events []Event }
 
-var emitter eventEmitter = defaultEmitter{}
-
-// emitEvent emite um evento para observabilidade.
-// Eventos não devem conter:
-//   - prompts ou respostas completas
-//   - argumentos ou resultados de ferramentas
-//   - nomes de arquivos ou IDs fornecidos pelo modelo
-//   - mensagens de erro detalhadas
-//   - secrets ou chain-of-thought
-func emitEvent(e Event) {
-	emitter.emit(e)
-}
+func (s *MemoryEventSink) Record(_ context.Context, event Event) { s.events = append(s.events, event) }
+func (s *MemoryEventSink) Events() []Event                       { return append([]Event(nil), s.events...) }

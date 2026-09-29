@@ -3,210 +3,154 @@ package agentloop
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
-
-	"github.com/netty-linux/daimon/internal/model"
+	"unicode/utf8"
 )
 
 func TestDefaultBudgetValid(t *testing.T) {
-	b := DefaultBudget()
-	if err := b.Validate(); err != nil {
-		t.Fatalf("DefaultBudget() should be valid: %v", err)
+	if err := DefaultBudget().Validate(); err != nil {
+		t.Fatal(err)
 	}
 }
-
-func TestBudgetZeroFields(t *testing.T) {
-	tests := []struct {
-		name   string
-		budget Budget
+func TestBudgetValidation(t *testing.T) {
+	b := DefaultBudget()
+	counts := []struct {
+		name  string
+		field *int
+		kind  LimitKind
 	}{
-		{"zero MaxSteps", Budget{MaxSteps: 0, MaxToolCallsPerStep: 1, MaxTotalToolCalls: 1, MaxUserMessageBytes: 1, MaxFinalAnswerBytes: 1, MaxToolArgumentBytes: 1, MaxToolResultBytes: 1, MaxHistoryMessages: 1, MaxHistoryBytes: 1, MaxRunDuration: time.Second, MaxModelCallDuration: time.Second, MaxToolCallDuration: time.Second}},
-		{"zero MaxToolCallsPerStep", Budget{MaxSteps: 1, MaxToolCallsPerStep: 0, MaxTotalToolCalls: 1, MaxUserMessageBytes: 1, MaxFinalAnswerBytes: 1, MaxToolArgumentBytes: 1, MaxToolResultBytes: 1, MaxHistoryMessages: 1, MaxHistoryBytes: 1, MaxRunDuration: time.Second, MaxModelCallDuration: time.Second, MaxToolCallDuration: time.Second}},
-		{"zero MaxTotalToolCalls", Budget{MaxSteps: 1, MaxToolCallsPerStep: 1, MaxTotalToolCalls: 0, MaxUserMessageBytes: 1, MaxFinalAnswerBytes: 1, MaxToolArgumentBytes: 1, MaxToolResultBytes: 1, MaxHistoryMessages: 1, MaxHistoryBytes: 1, MaxRunDuration: time.Second, MaxModelCallDuration: time.Second, MaxToolCallDuration: time.Second}},
-		{"zero MaxUserMessageBytes", Budget{MaxSteps: 1, MaxToolCallsPerStep: 1, MaxTotalToolCalls: 1, MaxUserMessageBytes: 0, MaxFinalAnswerBytes: 1, MaxToolArgumentBytes: 1, MaxToolResultBytes: 1, MaxHistoryMessages: 1, MaxHistoryBytes: 1, MaxRunDuration: time.Second, MaxModelCallDuration: time.Second, MaxToolCallDuration: time.Second}},
-		{"zero MaxFinalAnswerBytes", Budget{MaxSteps: 1, MaxToolCallsPerStep: 1, MaxTotalToolCalls: 1, MaxUserMessageBytes: 1, MaxFinalAnswerBytes: 0, MaxToolArgumentBytes: 1, MaxToolResultBytes: 1, MaxHistoryMessages: 1, MaxHistoryBytes: 1, MaxRunDuration: time.Second, MaxModelCallDuration: time.Second, MaxToolCallDuration: time.Second}},
-		{"zero MaxToolArgumentBytes", Budget{MaxSteps: 1, MaxToolCallsPerStep: 1, MaxTotalToolCalls: 1, MaxUserMessageBytes: 1, MaxFinalAnswerBytes: 1, MaxToolArgumentBytes: 0, MaxToolResultBytes: 1, MaxHistoryMessages: 1, MaxHistoryBytes: 1, MaxRunDuration: time.Second, MaxModelCallDuration: time.Second, MaxToolCallDuration: time.Second}},
-		{"zero MaxToolResultBytes", Budget{MaxSteps: 1, MaxToolCallsPerStep: 1, MaxTotalToolCalls: 1, MaxUserMessageBytes: 1, MaxFinalAnswerBytes: 1, MaxToolArgumentBytes: 1, MaxToolResultBytes: 0, MaxHistoryMessages: 1, MaxHistoryBytes: 1, MaxRunDuration: time.Second, MaxModelCallDuration: time.Second, MaxToolCallDuration: time.Second}},
-		{"zero MaxHistoryMessages", Budget{MaxSteps: 1, MaxToolCallsPerStep: 1, MaxTotalToolCalls: 1, MaxUserMessageBytes: 1, MaxFinalAnswerBytes: 1, MaxToolArgumentBytes: 1, MaxToolResultBytes: 1, MaxHistoryMessages: 0, MaxHistoryBytes: 1, MaxRunDuration: time.Second, MaxModelCallDuration: time.Second, MaxToolCallDuration: time.Second}},
-		{"zero MaxHistoryBytes", Budget{MaxSteps: 1, MaxToolCallsPerStep: 1, MaxTotalToolCalls: 1, MaxUserMessageBytes: 1, MaxFinalAnswerBytes: 1, MaxToolArgumentBytes: 1, MaxToolResultBytes: 1, MaxHistoryMessages: 1, MaxHistoryBytes: 0, MaxRunDuration: time.Second, MaxModelCallDuration: time.Second, MaxToolCallDuration: time.Second}},
-		{"zero MaxRunDuration", Budget{MaxSteps: 1, MaxToolCallsPerStep: 1, MaxTotalToolCalls: 1, MaxUserMessageBytes: 1, MaxFinalAnswerBytes: 1, MaxToolArgumentBytes: 1, MaxToolResultBytes: 1, MaxHistoryMessages: 1, MaxHistoryBytes: 1, MaxRunDuration: 0, MaxModelCallDuration: time.Second, MaxToolCallDuration: time.Second}},
-		{"zero MaxModelCallDuration", Budget{MaxSteps: 1, MaxToolCallsPerStep: 1, MaxTotalToolCalls: 1, MaxUserMessageBytes: 1, MaxFinalAnswerBytes: 1, MaxToolArgumentBytes: 1, MaxToolResultBytes: 1, MaxHistoryMessages: 1, MaxHistoryBytes: 1, MaxRunDuration: time.Second, MaxModelCallDuration: 0, MaxToolCallDuration: time.Second}},
-		{"zero MaxToolCallDuration", Budget{MaxSteps: 1, MaxToolCallsPerStep: 1, MaxTotalToolCalls: 1, MaxUserMessageBytes: 1, MaxFinalAnswerBytes: 1, MaxToolArgumentBytes: 1, MaxToolResultBytes: 1, MaxHistoryMessages: 1, MaxHistoryBytes: 1, MaxRunDuration: time.Second, MaxModelCallDuration: time.Second, MaxToolCallDuration: 0}},
+		{"steps", &b.MaxSteps, LimitMaxSteps},
+		{"calls per step", &b.MaxToolCallsPerStep, LimitMaxToolCallsPerStep},
+		{"total calls", &b.MaxTotalToolCalls, LimitMaxTotalToolCalls},
+		{"user bytes", &b.MaxUserMessageBytes, LimitMaxUserMessageBytes},
+		{"final bytes", &b.MaxFinalAnswerBytes, LimitMaxFinalAnswerBytes},
+		{"argument bytes", &b.MaxToolArgumentBytes, LimitMaxToolArgumentBytes},
+		{"result bytes", &b.MaxToolResultBytes, LimitMaxToolResultBytes},
+		{"history messages", &b.MaxHistoryMessages, LimitMaxHistoryMessages},
+		{"history bytes", &b.MaxHistoryBytes, LimitMaxHistoryBytes},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := tt.budget.Validate()
-			if err == nil {
-				t.Errorf("expected error for %s", tt.name)
+	for _, field := range counts {
+		original := *field.field
+		for _, value := range []int{0, -1} {
+			*field.field = value
+			assertInvalidBudget(t, b, field.kind)
+		}
+		*field.field = original
+	}
+	durations := []struct {
+		field *time.Duration
+		kind  LimitKind
+	}{
+		{&b.MaxRunDuration, LimitMaxRunDuration},
+		{&b.MaxModelCallDuration, LimitMaxModelCallDuration},
+		{&b.MaxToolCallDuration, LimitMaxToolCallDuration},
+	}
+	for _, field := range durations {
+		original := *field.field
+		for _, value := range []time.Duration{0, -1} {
+			*field.field = value
+			assertInvalidBudget(t, b, field.kind)
+		}
+		*field.field = original
+	}
+	if err := (Budget{}).Validate(); err == nil {
+		t.Fatal("zero budget accepted")
+	}
+}
+func assertInvalidBudget(t *testing.T, b Budget, kind LimitKind) {
+	t.Helper()
+	err := b.Validate()
+	var config InvalidConfigError
+	var limit LimitError
+	if !errors.Is(err, ErrInvalidConfig) || !errors.As(err, &config) || !errors.As(err, &limit) || limit.Kind != kind {
+		t.Fatalf("%s: %v", kind, err)
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("invalid duration mistaken for expired deadline")
+	}
+	l, m, sink := setup(t, final("never"))
+	l.Budget = b
+	r, err := l.Run(context.Background(), "user")
+	if !errors.Is(err, ErrInvalidConfig) || len(m.Requests()) != 0 || len(r.History) != 0 {
+		t.Fatalf("%+v %v", r, err)
+	}
+	assertStopped(t, sink, r, StopReasonInvalidConfig)
+}
+func TestTruncateResult(t *testing.T) {
+	for _, tc := range []struct {
+		name, input string
+		limit       int
+		changed     bool
+	}{
+		{"exact", "1234567890", 10, false},
+		{"empty", "", 1, false},
+		{"one over", "12345678901", 10, true},
+		{"normal marker", strings.Repeat("x", 100), 50, true},
+		{"utf8 boundary", strings.Repeat("é界🙂", 20), 40, true},
+		{"minimum", "abc", 1, true},
+		{"short marker", strings.Repeat("a", 20), 11, true},
+		{"invalid below limit", "a\xffb", 100, true},
+		{"invalid at limit", "\xff", 1, true},
+		{"invalid above limit", strings.Repeat("\xffa", 50), 40, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b := DefaultBudget()
+			b.MaxToolResultBytes = tc.limit
+			got, changed := b.truncateResult(tc.input)
+			if changed != tc.changed || len(got) > tc.limit || !utf8.ValidString(got) {
+				t.Fatalf("%q changed=%v", got, changed)
 			}
-			var icErr InvalidConfigError
-			if !errors.As(err, &icErr) {
-				t.Errorf("expected InvalidConfigError, got %T: %v", err, err)
+			if !changed && got != tc.input {
+				t.Fatal("unchanged result changed")
+			}
+			if changed && !strings.Contains(got, "truncated") && !strings.HasSuffix(got, "~") {
+				t.Fatalf("missing complete marker: %q", got)
+			}
+			if tc.name == "normal marker" && !strings.HasSuffix(got, "\n[truncated: original_bytes=100]") {
+				t.Fatal(got)
 			}
 		})
 	}
 }
-
-func TestBudgetNegativeFields(t *testing.T) {
-	b := Budget{
-		MaxSteps: -1, MaxToolCallsPerStep: 1, MaxTotalToolCalls: 1,
-		MaxUserMessageBytes: 1, MaxFinalAnswerBytes: 1, MaxToolArgumentBytes: 1,
-		MaxToolResultBytes: 1, MaxHistoryMessages: 1, MaxHistoryBytes: 1,
-		MaxRunDuration: time.Second, MaxModelCallDuration: time.Second, MaxToolCallDuration: time.Second,
+func TestLimitErrorMatching(t *testing.T) {
+	err := LimitError{Kind: LimitMaxSteps, Limit: 3, Actual: 3}
+	var got LimitError
+	if !errors.Is(err, ErrMaxSteps) || !errors.Is(err, LimitError{}) || !errors.Is(err, LimitError{Kind: LimitMaxSteps}) || !errors.As(err, &got) || got != err {
+		t.Fatal(err)
 	}
-	err := b.Validate()
-	if err == nil {
-		t.Error("expected error for negative MaxSteps")
+	if errors.Is(err, LimitError{Kind: LimitMaxHistoryBytes}) || errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("matched different limit")
 	}
-}
-
-func TestTruncateResultExactLimit(t *testing.T) {
-	b := Budget{MaxToolResultBytes: 10}
-	result := "1234567890" // exatamente 10 bytes
-	truncated, wasTruncated := b.truncateResult(result)
-	if wasTruncated {
-		t.Error("should not truncate when exactly at limit")
-	}
-	if truncated != result {
-		t.Errorf("expected %q, got %q", result, truncated)
-	}
-}
-
-func TestTruncateResultOneByteOver(t *testing.T) {
-	b := Budget{MaxToolResultBytes: 10}
-	result := "12345678901" // 11 bytes
-	truncated, wasTruncated := b.truncateResult(result)
-	if !wasTruncated {
-		t.Error("should truncate when one byte over")
-	}
-	if len([]byte(truncated)) > 10 {
-		t.Errorf("truncated result exceeds limit: %d bytes", len([]byte(truncated)))
-	}
-}
-
-func TestTruncateResultPreservesUTF8(t *testing.T) {
-	b := Budget{MaxToolResultBytes: 10}
-	// "héllo" = 6 bytes (h=1, é=2, l=1, l=1, o=1)
-	result := "héllo world" // 11 bytes
-	truncated, wasTruncated := b.truncateResult(result)
-	if !wasTruncated {
-		t.Error("should truncate")
-	}
-	if !utf8ValidString(truncated) {
-		t.Errorf("truncated result is not valid UTF-8: %q", truncated)
-	}
-}
-
-func utf8ValidString(s string) bool {
-	for _, r := range s {
-		_ = r
-	}
-	return true
-}
-
-func TestTruncateResultIndicator(t *testing.T) {
-	b := Budget{MaxToolResultBytes: 50}
-	longResult := string(make([]byte, 100)) // 100 bytes
-	truncated, wasTruncated := b.truncateResult(longResult)
-	if !wasTruncated {
-		t.Error("should truncate long result")
-	}
-	if len([]byte(truncated)) > 50 {
-		t.Errorf("truncated exceeds limit: %d bytes", len([]byte(truncated)))
-	}
-	if !contains(truncated, "truncated") {
-		t.Errorf("truncated result should contain indicator: %q", truncated)
-	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && findSubstring(s, substr))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
+	for _, kind := range []LimitKind{LimitMaxRunDuration, LimitMaxModelCallDuration, LimitMaxToolCallDuration} {
+		if !errors.Is(LimitError{Kind: kind, Limit: 1, Actual: 1}, context.DeadlineExceeded) {
+			t.Fatal(kind)
 		}
 	}
-	return false
 }
-
-func TestTruncateResultSmallLimit(t *testing.T) {
-	b := Budget{MaxToolResultBytes: 5}
-	longResult := "this is a very long result"
-	truncated, wasTruncated := b.truncateResult(longResult)
-	if !wasTruncated {
-		t.Error("should truncate")
-	}
-	if len([]byte(truncated)) > 5 {
-		t.Errorf("truncated exceeds limit: %d bytes", len([]byte(truncated)))
-	}
-}
-
-func TestApplyRunTimeoutPreservesExternalDeadline(t *testing.T) {
+func TestTimeoutHelpersPreserveParent(t *testing.T) {
 	b := DefaultBudget()
-	externalDeadline := time.Now().Add(100 * time.Millisecond)
-	parent := context.WithValue(context.Background(), "key", "value")
-	parent, cancel := context.WithDeadline(parent, externalDeadline)
+	parent, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Hour))
 	defer cancel()
-
-	ctx, cancelFunc := b.ApplyRunTimeout(parent)
-	defer cancelFunc()
-
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		t.Fatal("expected deadline")
+	want, _ := parent.Deadline()
+	// Own deadlines deliberately longer than the parent.
+	b.MaxRunDuration = 2 * time.Hour
+	b.MaxModelCallDuration = 2 * time.Hour
+	b.MaxToolCallDuration = 2 * time.Hour
+	for _, apply := range []func(context.Context) (context.Context, context.CancelFunc){b.ApplyRunTimeout, b.ApplyModelTimeout, b.ApplyToolTimeout} {
+		child, cleanup := apply(parent)
+		got, ok := child.Deadline()
+		if !ok || !got.Equal(want) {
+			t.Fatalf("deadline=%v want=%v", got, want)
+		}
+		cleanup()
 	}
-	// O deadline deve ser o externo (menor)
-	if deadline.After(externalDeadline.Add(time.Millisecond)) {
-		t.Errorf("deadline should be external or earlier: got %v, external %v", deadline, externalDeadline)
-	}
-}
-
-func TestApplyModelTimeout(t *testing.T) {
-	b := Budget{MaxModelCallDuration: 100 * time.Millisecond}
-	ctx, cancel := b.ApplyModelTimeout(context.Background())
-	defer cancel()
-
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		t.Fatal("expected deadline")
-	}
-
-	// Aguarda um pouco e verifica se o contexto expira
-	select {
-	case <-time.After(200 * time.Millisecond):
-		t.Error("context should have timed out")
-	case <-ctx.Done():
-		// OK
-	}
-
-	// Verifica que o deadline está próximo do esperado
-	expectedDeadline := time.Now().Add(100 * time.Millisecond)
-	if deadline.After(expectedDeadline.Add(10 * time.Millisecond)) {
-		t.Errorf("deadline too far: got %v, expected ~%v", deadline, expectedDeadline)
-	}
-}
-
-func TestLimitErrorIs(t *testing.T) {
-	err1 := LimitError{Kind: LimitMaxSteps, Limit: 10, Actual: 11}
-	err2 := LimitError{Kind: LimitMaxSteps, Limit: 10, Actual: 11}
-
-	if !errors.Is(err1, err2) {
-		t.Error("LimitError should be comparable with errors.Is")
-	}
-}
-
-func TestLimitErrorAs(t *testing.T) {
-	err := LimitError{Kind: LimitMaxToolResultBytes, Limit: 100, Actual: 150}
-	var target LimitError
-	if !errors.As(err, &target) {
-		t.Error("errors.As should work for LimitError")
-	}
-	if target.Kind != LimitMaxToolResultBytes || target.Limit != 100 || target.Actual != 150 {
-		t.Errorf("LimitError not properly extracted: %+v", target)
+	expired, cancelExpired := context.WithDeadline(context.Background(), time.Unix(1, 0))
+	defer cancelExpired()
+	child, cleanup := b.ApplyRunTimeout(expired)
+	defer cleanup()
+	if !errors.Is(child.Err(), context.DeadlineExceeded) {
+		t.Fatal(child.Err())
 	}
 }

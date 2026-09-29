@@ -1,61 +1,35 @@
 package agentloop
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
-// InvalidConfigError é retornado quando a configuração inicial é inválida.
-type InvalidConfigError struct {
-	Err error
-}
+var (
+	ErrMaxSteps        = errors.New("maximum model steps reached")
+	ErrInvalidResponse = errors.New("invalid model response")
+	ErrInvalidConfig   = errors.New("invalid loop configuration")
+)
 
-func (e InvalidConfigError) Error() string {
-	if e.Err == nil {
-		return "invalid configuration"
-	}
-	return fmt.Sprintf("invalid configuration: %v", e.Err)
-}
+type InvalidConfigError struct{ Err error }
 
-func (e InvalidConfigError) Unwrap() error {
-	return e.Err
-}
+func (e InvalidConfigError) Error() string        { return fmt.Sprintf("%v: %v", ErrInvalidConfig, e.Err) }
+func (e InvalidConfigError) Unwrap() error        { return e.Err }
+func (e InvalidConfigError) Is(target error) bool { return target == ErrInvalidConfig }
 
-// InvalidResponseError é retornado quando o modelo retorna uma resposta inválida.
-type InvalidResponseError struct {
-	Err error
-}
-
-func (e InvalidResponseError) Error() string {
-	if e.Err == nil {
-		return "invalid response from model"
-	}
-	return fmt.Sprintf("invalid response: %v", e.Err)
-}
-
-func (e InvalidResponseError) Unwrap() error {
-	return e.Err
-}
-
-// MaxStepsError é retornado quando MaxSteps é atingido.
-// Mantido para compatibilidade, mas novo código deve usar LimitError.
-type MaxStepsError struct {
-	Max int
-}
-
-func (e MaxStepsError) Error() string {
-	return fmt.Sprintf("max steps reached (%d)", e.Max)
-}
-
-// ModelError é retornado quando o modelo falha.
 type ModelError struct {
-	Err error
+	Step  int
+	Cause error
 }
 
-func (e ModelError) Error() string {
-	if e.Err == nil {
-		return "model error"
-	}
-	return fmt.Sprintf("model error: %v", e.Err)
+func (e *ModelError) Error() string {
+	return fmt.Sprintf("model failed at step %d: %v", e.Step, e.Cause)
 }
+func (e *ModelError) Unwrap() error { return e.Cause }
 
-func (e ModelError) Unwrap() error {
-	return e.Err
-}
+// A tool may report its own deadline before the supplied context expires.
+// Keep that cause distinct from a caller deadline or a budget expiration.
+type toolDeadlineError struct{ cause error }
+
+func (e *toolDeadlineError) Error() string { return e.cause.Error() }
+func (e *toolDeadlineError) Unwrap() error { return e.cause }

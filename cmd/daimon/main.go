@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/netty-linux/daimon/internal/agentloop"
@@ -11,66 +12,44 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: daimon <command>")
-		fmt.Println("Commands:")
-		fmt.Println("  demo    Run a demonstration of the agent loop")
-		os.Exit(1)
-	}
-
-	switch os.Args[1] {
-	case "demo":
-		runDemo()
-	default:
-		fmt.Printf("Unknown command: %s\n", os.Args[1])
+	if err := run(os.Args[1:], os.Stdout); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func runDemo() {
-	// Registry de ferramentas
-	registry := tools.NewRegistry()
-	registry.Register(tools.NewEcho())
-	registry.Register(tools.NewReadFile())
-
-	// Modelo scripted para demo
-	scriptedModel := model.NewScriptedModel([]model.ScriptedResponse{
-		{
-			Content: "Vou listar o conteúdo do arquivo.",
-			ToolCalls: []model.ToolCall{
-				{
-					ID:        "call-1",
-					Name:      "read_file",
-					Arguments: `{"path":"README.md"}`,
-				},
-			},
-		},
-		{
-			Content: "DAIMON",
-		},
-	})
-
-	// Cria loop com budget padrão
-	loop, err := agentloop.NewLoop(agentloop.Options{
-		Model:  scriptedModel,
-		Tools:  registry.Tools(),
-		Budget: agentloop.DefaultBudget(),
-	})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create loop: %v\n", err)
-		os.Exit(1)
+func run(args []string, out io.Writer) error {
+	if len(args) != 1 || args[0] != "demo" {
+		return fmt.Errorf("usage: daimon demo")
 	}
-
-	// Executa
-	result, err := loop.Run(context.Background(), "Leia o arquivo README.md e me diga o que está escrito.")
+	reader, err := tools.NewReadFile(".", 64*1024)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Loop error: %v\n", err)
+		return err
 	}
-
-	fmt.Println("=== DAIMON Agent Demo ===")
-	fmt.Printf("Final Answer: %s\n", result.FinalAnswer)
-	fmt.Printf("Steps: %d\n", result.Steps)
-	fmt.Printf("Tool Calls: %d\n", result.ToolCalls)
-	fmt.Printf("Truncated Tool Results: %d\n", result.TruncatedToolResults)
-	fmt.Printf("Stop Reason: %s\n", result.StopReason)
+	defer reader.Close()
+	registry := &tools.Registry{}
+	for _, tool := range []tools.Tool{tools.Echo{}, reader} {
+		if err := registry.Register(tool); err != nil {
+			return err
+		}
+	}
+	m := model.NewScripted(
+		model.ScriptStep{Response: model.ModelResponse{ToolCalls: []model.ToolCall{{ID: "echo-1", Name: "echo", Arguments: []byte(`{"text":"DAIMON"}`)}}}},
+		model.ScriptStep{Response: model.ModelResponse{FinalText: "DAIMON"}},
+	)
+	sink := &agentloop.MemoryEventSink{}
+	loop := agentloop.Loop{Model: m, Registry: registry, Budget: agentloop.DefaultBudget(), Sink: sink}
+	result, err := loop.Run(context.Background(), "repita DAIMON")
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(out, "Resposta final: %s\nPassos do modelo: %d\nEventos:\n", result.FinalAnswer, result.Steps); err != nil {
+		return err
+	}
+	for _, event := range sink.Events() {
+		if _, err := fmt.Fprintf(out, "  %s (step=%d, tool=%d, stop_reason=%s)\n", event.Kind, event.Step, event.ToolIndex, event.StopReason); err != nil {
+			return err
+		}
+	}
+	return nil
 }

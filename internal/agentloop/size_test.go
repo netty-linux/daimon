@@ -1,105 +1,59 @@
 package agentloop
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/netty-linux/daimon/internal/model"
 )
 
-func TestMessageBytes(t *testing.T) {
-	msg := model.Message{
-		Role:    "user",
-		Content: "hello",
+func TestMessageAndHistoryBytes(t *testing.T) {
+	msg := model.Message{Content: "é", ToolCallID: "result-id", ToolCalls: []model.ToolCall{call("call", "echo", `{"text":"🙂"}`)}}
+	want := len("é") + len("result-id") + len("call") + len("echo") + len(`{"text":"🙂"}`)
+	if messageBytes(msg) != want {
+		t.Fatal(messageBytes(msg), want)
 	}
-	size := messageBytes(msg)
-	if size != 5 {
-		t.Errorf("expected 5 bytes, got %d", size)
+	if historyBytes([]model.Message{msg, {Content: "abc"}}) != want+3 {
+		t.Fatal("history byte count")
 	}
-}
-
-func TestMessageBytesWithToolCalls(t *testing.T) {
-	msg := model.Message{
-		Role:    "assistant",
-		Content: "calling tool",
-		ToolCalls: []model.ToolCall{
-			{ID: "call1", Name: "echo", Arguments: "arg1"},
-			{ID: "call2", Name: "read_file", Arguments: "arg2"},
-		},
-	}
-	size := messageBytes(msg)
-	// Content (12) + ToolCalls: ID+Name+Arguments para cada
-	// call1: 5 + 4 + 4 = 13
-	// call2: 5 + 9 + 4 = 18
-	// Total: 12 + 13 + 18 = 43
-	if size != 43 {
-		t.Errorf("expected 43 bytes, got %d", size)
+	// Malformed JSON still occupies bytes and cannot bypass the argument budget.
+	if messageBytes(model.Message{ToolCalls: []model.ToolCall{call("id", "echo", "{")}}) != 7 {
+		t.Fatal("invalid JSON not counted")
 	}
 }
-
-func TestToolCallArgumentsBytes(t *testing.T) {
-	calls := []model.ToolCall{
-		{ID: "1", Name: "echo", Arguments: "hello"},
-		{ID: "2", Name: "read_file", Arguments: "world"},
+func TestHistoryReservation(t *testing.T) {
+	history := []model.Message{{Content: "user"}}
+	calls := []model.ToolCall{call("long-id", "echo", `{}`), call("other-id", "echo", `{}`)}
+	assistant := model.Message{ToolCalls: calls}
+	b := DefaultBudget()
+	b.MaxToolResultBytes = 10
+	exact := historyBytes(history) + messageBytes(assistant) + 2*10 + len("long-id") + len("other-id")
+	b.MaxHistoryMessages = 4
+	b.MaxHistoryBytes = exact
+	if err := historyLimit(history, assistant, calls, b); err != nil {
+		t.Fatal(err)
 	}
-	size := toolCallArgumentsBytes(calls)
-	if size != 10 {
-		t.Errorf("expected 10 bytes, got %d", size)
+	b.MaxHistoryBytes--
+	var limit LimitError
+	if err := historyLimit(history, assistant, calls, b); !errors.As(err, &limit) || limit.Kind != LimitMaxHistoryBytes || limit.Actual != int64(exact) {
+		t.Fatal(err)
 	}
-}
-
-func TestHistoryBytes(t *testing.T) {
-	history := []model.Message{
-		{Role: "user", Content: "hello"},
-		{Role: "assistant", Content: "hi"},
-	}
-	size := historyBytes(history)
-	if size != 7 {
-		t.Errorf("expected 7 bytes, got %d", size)
-	}
-}
-
-func TestCanFitInHistory(t *testing.T) {
-	history := []model.Message{
-		{Role: "user", Content: "hello"},
-	}
-	newMsg := model.Message{Role: "assistant", Content: "hi"}
-
-	if !canFitInHistory(history, newMsg, 10, 100) {
-		t.Error("should fit")
-	}
-
-	if canFitInHistory(history, newMsg, 1, 100) {
-		t.Error("should not fit (max messages)")
-	}
-
-	if canFitInHistory(history, newMsg, 10, 5) {
-		t.Error("should not fit (max bytes)")
+	b.MaxHistoryBytes = exact
+	b.MaxHistoryMessages = 3
+	if err := historyLimit(history, assistant, calls, b); !errors.As(err, &limit) || limit.Kind != LimitMaxHistoryMessages || limit.Actual != 4 {
+		t.Fatal(err)
 	}
 }
-
-func TestReserveHistoryForResults(t *testing.T) {
-	history := []model.Message{
-		{Role: "user", Content: "hello"},
+func TestReservationCannotOverflow(t *testing.T) {
+	b := DefaultBudget()
+	b.MaxHistoryBytes = maxInt
+	b.MaxToolResultBytes = maxInt
+	calls := []model.ToolCall{call("a", "echo", `{}`), call("b", "echo", `{}`)}
+	var limit LimitError
+	if err := historyLimit(nil, model.Message{ToolCalls: calls}, calls, b); !errors.As(err, &limit) || limit.Kind != LimitMaxHistoryBytes || limit.Actual != int64(maxInt) {
+		t.Fatal(err)
 	}
-	assistantMsg := model.Message{
-		Role:    "assistant",
-		Content: "calling",
-		ToolCalls: []model.ToolCall{
-			{ID: "1", Name: "echo", Arguments: "arg"},
-		},
-	}
-
-	if !reserveHistoryForResults(history, assistantMsg, 1, 10, 1000, 64*1024) {
-		t.Error("should reserve successfully")
-	}
-
-	// Testa limite de mensagens
-	if reserveHistoryForResults(history, assistantMsg, 100, 5, 1000, 64*1024) {
-		t.Error("should not reserve (too many messages)")
-	}
-
-	// Testa limite de bytes
-	if reserveHistoryForResults(history, assistantMsg, 1, 10, 10, 64*1024) {
-		t.Error("should not reserve (not enough bytes)")
+	if sizeSum(maxInt, 1) != maxInt {
+		t.Fatal("overflow did not saturate")
 	}
 }

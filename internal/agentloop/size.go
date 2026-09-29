@@ -1,87 +1,69 @@
 package agentloop
 
-import (
-	"encoding/json"
+import "github.com/netty-linux/daimon/internal/model"
 
-	"github.com/netty-linux/daimon/internal/model"
-)
+const maxInt = int(^uint(0) >> 1)
 
-// messageBytes mede o tamanho em bytes de uma Message.
-// Inclui Content, ToolCallID, e para tool calls: IDs, nomes, argumentos JSON.
-// Conta bytes usando len() sobre UTF-8, não runes.
+// Sums saturate, and capacity checks subtract from the remaining budget so
+// overflow can never make an oversized batch look small enough to execute.
+func sizeSum(a, b int) int {
+	if b > maxInt-a {
+		return maxInt
+	}
+	return a + b
+}
 func messageBytes(msg model.Message) int {
-	total := len(msg.Content) + len(msg.ToolCallID)
-
-	for _, tc := range msg.ToolCalls {
-		total += len(tc.ID) + len(tc.Name)
-		if tc.Arguments != nil {
-			// Argumentos já são []byte ou string; assumimos que são JSON válido
-			if argStr, ok := tc.Arguments.(string); ok {
-				total += len(argStr)
-			} else if argBytes, ok := tc.Arguments.([]byte); ok {
-				total += len(argBytes)
-			} else {
-				// Fallback: marshal
-				if b, err := json.Marshal(tc.Arguments); err == nil {
-					total += len(b)
-				}
-			}
-		}
-	}
-
-	return total
-}
-
-// toolCallArgumentsBytes mede o tamanho total dos argumentos de tool calls.
-func toolCallArgumentsBytes(calls []model.ToolCall) int {
-	total := 0
-	for _, tc := range calls {
-		if tc.Arguments != nil {
-			if argStr, ok := tc.Arguments.(string); ok {
-				total += len(argStr)
-			} else if argBytes, ok := tc.Arguments.([]byte); ok {
-				total += len(argBytes)
-			} else {
-				if b, err := json.Marshal(tc.Arguments); err == nil {
-					total += len(b)
-				}
-			}
-		}
+	total := sizeSum(len(msg.Content), len(msg.ToolCallID))
+	for _, call := range msg.ToolCalls {
+		total = sizeSum(total, len(call.ID))
+		total = sizeSum(total, len(call.Name))
+		total = sizeSum(total, len(call.Arguments))
 	}
 	return total
 }
-
-// historyBytes mede o tamanho total de um histórico de mensagens.
 func historyBytes(history []model.Message) int {
 	total := 0
 	for _, msg := range history {
-		total += messageBytes(msg)
+		total = sizeSum(total, messageBytes(msg))
 	}
 	return total
 }
 
-// canFitInHistory verifica se adicionar uma mensagem excederia os limites.
-func canFitInHistory(history []model.Message, newMsg model.Message, maxMessages, maxBytes int) bool {
-	if len(history)+1 > maxMessages {
-		return false
+// historyLimit checks one new message plus reserved receipts for calls.
+func historyLimit(history []model.Message, next model.Message, calls []model.ToolCall, b Budget) error {
+	count := sizeSum(sizeSum(len(history), 1), len(calls))
+	if len(history) >= b.MaxHistoryMessages || len(calls) > b.MaxHistoryMessages-len(history)-1 {
+		return LimitError{Kind: LimitMaxHistoryMessages, Limit: int64(b.MaxHistoryMessages), Actual: int64(count)}
 	}
-	currentBytes := historyBytes(history)
-	newBytes := messageBytes(newMsg)
-	return currentBytes+newBytes <= maxBytes
-}
-
-// reserveHistoryForResults verifica se há espaço para reservar recibos de tool results.
-// Cada resultado é considerado até maxResultBytes.
-func reserveHistoryForResults(history []model.Message, assistantMsg model.Message, toolCallsCount, maxMessages, maxBytes, maxResultBytes int) bool {
-	// Mensagem assistant com tool calls
-	assistantBytes := messageBytes(assistantMsg)
-
-	// Espaço para cada resultado (conservador: maxResultBytes cada)
-	resultsSpace := toolCallsCount * maxResultBytes
-
-	// Mensagens totais necessárias: 1 (assistant) + toolCallsCount (results)
-	totalMessagesNeeded := len(history) + 1 + toolCallsCount
-	totalBytesNeeded := historyBytes(history) + assistantBytes + resultsSpace
-
-	return totalMessagesNeeded <= maxMessages && totalBytesNeeded <= maxBytes
+	used := historyBytes(history)
+	remaining := b.MaxHistoryBytes
+	var exceeded bool
+	for _, n := range []int{used, messageBytes(next)} {
+		if n > remaining {
+			exceeded = true
+			break
+		}
+		remaining -= n
+	}
+	actual := sizeSum(used, messageBytes(next))
+	// Correlation IDs occupy bytes in both the assistant call and its receipt.
+	for _, call := range calls {
+		actual = sizeSum(sizeSum(actual, len(call.ID)), b.MaxToolResultBytes)
+		if !exceeded {
+			if len(call.ID) > remaining {
+				exceeded = true
+				continue
+			}
+			remaining -= len(call.ID)
+			if b.MaxToolResultBytes > remaining {
+				exceeded = true
+				continue
+			}
+			remaining -= b.MaxToolResultBytes
+		}
+	}
+	if exceeded {
+		return LimitError{Kind: LimitMaxHistoryBytes, Limit: int64(b.MaxHistoryBytes), Actual: int64(actual)}
+	}
+	return nil
 }

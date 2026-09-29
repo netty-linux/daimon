@@ -29,7 +29,9 @@ func setup(t *testing.T, script ...model.ScriptStep) (Loop, *model.Scripted, *Me
 	}
 	m := model.NewScripted(script...)
 	sink := &MemoryEventSink{}
-	return Loop{Model: m, Registry: r, MaxSteps: 3, Sink: sink}, m, sink
+	b := DefaultBudget()
+	b.MaxSteps = 3
+	return Loop{Model: m, Registry: r, Budget: b, Sink: sink}, m, sink
 }
 
 func TestFinalWithoutTool(t *testing.T) {
@@ -58,7 +60,7 @@ func TestToolRecovery(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			l, m, sink := setup(t, toolStep(call("id-1", tc.tool, tc.args)), final("recovered"))
 			r, err := l.Run(context.Background(), "hello")
-			if err != nil || r.Steps != 2 || len(r.History) != 4 {
+			if err != nil || r.Steps != 2 || r.ToolCalls != 1 || len(r.History) != 4 {
 				t.Fatalf("%+v %v", r, err)
 			}
 			msg := r.History[2]
@@ -150,7 +152,7 @@ func TestModelErrorAndMaxSteps(t *testing.T) {
 	}
 	assertKinds(t, sink, LoopStarted, ModelRequested, LoopStopped)
 	l, m, sink := setup(t, toolStep(call("1", "echo", `{"text":"x"}`)), final("not reached"))
-	l.MaxSteps = 1
+	l.Budget.MaxSteps = 1
 	r, err = l.Run(context.Background(), "start")
 	if !errors.Is(err, ErrMaxSteps) || r.Steps != 1 || len(m.Requests()) != 1 || len(r.History) != 3 {
 		t.Fatalf("%+v %v", r, err)
@@ -235,7 +237,7 @@ func TestCancellationDuringModel(t *testing.T) {
 }
 
 func TestInvalidConfigAndNoop(t *testing.T) {
-	for _, l := range []Loop{{}, {Model: model.NewScripted(), Registry: &tools.Registry{}, MaxSteps: -1}} {
+	for _, l := range []Loop{{}, {Model: model.NewScripted(), Registry: &tools.Registry{}, Budget: Budget{MaxSteps: -1}}} {
 		if _, err := l.Run(context.Background(), "start"); !errors.Is(err, ErrInvalidConfig) {
 			t.Fatal(err)
 		}
