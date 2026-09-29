@@ -13,6 +13,7 @@ programável, ferramentas `echo` e `read_file`, histórico local à execução e
 - Chamadas de ferramenta sequenciais, IDs não vazios e únicos, resultados correlacionados.
 - Cubra comportamentos importantes com testes determinísticos, sem rede.
 - Execute `gofmt -w cmd internal`, `go vet ./...` e `go test ./...`.
+- Execute também `go test -race ./...` em Linux; o CI verifica formatação, vet e ambas as suítes a cada push e pull request.
 - Verifique `gofmt -l cmd internal` e `go run ./cmd/daimon demo`.
 
 ## Segurança

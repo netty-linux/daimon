@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"daimon/internal/model"
+	"github.com/netty-linux/daimon/internal/model"
 )
 
 var (

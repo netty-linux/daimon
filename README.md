@@ -42,6 +42,21 @@ O demo registra `echo` e `read_file` (workspace = diretório atual, limite = 64 
 “repita DAIMON”, solicita `echo({"text":"DAIMON"})` e retorna `DAIMON` no segundo passo.
 Imprime a resposta, dois passos e nove eventos, incluindo `tool_completed` e `loop_stopped`.
 
+## Integração contínua
+
+O workflow `.github/workflows/ci.yml` executa em Ubuntu a cada push e pull request,
+usando a versão de Go definida em `go.mod`:
+
+- `gofmt -l .`, com falha se qualquer arquivo precisar de formatação;
+- `go vet ./...`;
+- `go test -count=1 ./...`;
+- `go test -race -count=1 ./...`, com CGO habilitado.
+
+As duas execuções de testes incluem os casos de symlink e não reutilizam resultados
+de testes em cache. O workflow tem permissão somente de leitura e limite de 15 minutos.
+Para tornar o resultado obrigatório antes de merge, configure o check `Go / Linux`
+nas regras de proteção do repositório.
+
 ## Arquitetura
 
 ```text

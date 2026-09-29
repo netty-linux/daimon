@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"daimon/internal/model"
-	"daimon/internal/tools"
+	"github.com/netty-linux/daimon/internal/model"
+	"github.com/netty-linux/daimon/internal/tools"
 )
 
 func call(id, name, args string) model.ToolCall {

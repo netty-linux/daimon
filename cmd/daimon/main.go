@@ -6,9 +6,9 @@ import (
 	"io"
 	"os"
 
-	"daimon/internal/agentloop"
-	"daimon/internal/model"
-	"daimon/internal/tools"
+	"github.com/netty-linux/daimon/internal/agentloop"
+	"github.com/netty-linux/daimon/internal/model"
+	"github.com/netty-linux/daimon/internal/tools"
 )
 
 func main() {

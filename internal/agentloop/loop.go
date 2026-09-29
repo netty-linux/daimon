@@ -6,8 +6,8 @@ import (
 	"errors"
 	"strings"
 
-	"daimon/internal/model"
-	"daimon/internal/tools"
+	"github.com/netty-linux/daimon/internal/model"
+	"github.com/netty-linux/daimon/internal/tools"
 )
 
 func (l Loop) Run(ctx context.Context, userMessage string) (result Result, err error) {
