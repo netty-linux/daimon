@@ -27,7 +27,8 @@ func TestDefaultCLIPolicy(t *testing.T) {
 	policy := DefaultCLIPolicy()
 	for name, want := range map[string]Decision{
 		"echo": Allow, "list_dir": RequireApproval, "read_file": RequireApproval,
-		"write_file": Deny, "bash": Deny, "": Deny,
+		"replace_file": RequireApproval,
+		"write_file":   Deny, "bash": Deny, "": Deny,
 	} {
 		if got := policy.Decide(name); got != want {
 			t.Fatalf("%s=%d want=%d", name, got, want)

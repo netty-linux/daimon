@@ -8,6 +8,8 @@ import (
 	"errors"
 
 	"github.com/netty-linux/daimon/internal/agentloop"
+	"github.com/netty-linux/daimon/internal/editcontract"
+	"github.com/netty-linux/daimon/internal/tools"
 )
 
 // Decision is what the static policy says about a tool name before any human
@@ -40,15 +42,16 @@ func (p StaticPolicy) Decide(toolName string) Decision {
 	return p.Fallback
 }
 
-// DefaultCLIPolicy: echo runs automatically, the read-only workspace tools
+// DefaultCLIPolicy: echo runs automatically, workspace reads and replacement
 // need one-shot human approval, everything else is denied. There is no
 // global "approve everything" option.
 func DefaultCLIPolicy() StaticPolicy {
 	return StaticPolicy{
 		Rules: map[string]Decision{
-			"echo":      Allow,
-			"list_dir":  RequireApproval,
-			"read_file": RequireApproval,
+			"echo":         Allow,
+			"list_dir":     RequireApproval,
+			"read_file":    RequireApproval,
+			"replace_file": RequireApproval,
 		},
 		Fallback: Deny,
 	}
@@ -66,9 +69,11 @@ type ApprovalProvider interface {
 // recorded before the loop emits any ToolAllowed/ToolDenied event, so an
 // approved call yields: approval_requested, approval_granted, tool_allowed.
 type Authorizer struct {
-	Policy    ToolPolicy
-	Approvals ApprovalProvider
-	Sink      agentloop.EventSink
+	Policy       ToolPolicy
+	Approvals    ApprovalProvider
+	Sink         agentloop.EventSink
+	Replacements *tools.ReplaceFile
+	EditReviews  editcontract.Reviewer
 }
 
 var (
@@ -81,7 +86,32 @@ func (a *Authorizer) Authorize(ctx context.Context, request agentloop.ToolAuthor
 	if a == nil || a.Policy == nil {
 		return "", errMissingPolicy
 	}
-	switch a.Policy.Decide(request.Call.Name) {
+	decision := a.Policy.Decide(request.Call.Name)
+	if request.Call.Name == "replace_file" {
+		if decision == Deny {
+			return agentloop.ToolDecisionDeny, nil
+		}
+		if decision != RequireApproval {
+			return "", errUnknownPolicyDecision
+		}
+		if a.Replacements == nil || a.EditReviews == nil {
+			return "", errMissingApprovals
+		}
+		if err := a.Replacements.Prepare(ctx, request.Call.Arguments); err != nil {
+			return "", err
+		}
+		a.record(ctx, agentloop.ApprovalRequested, request)
+		if err := a.Replacements.Approve(ctx, a.EditReviews); err != nil {
+			if errors.Is(err, editcontract.ErrDenied) {
+				a.record(ctx, agentloop.ApprovalDenied, request)
+				return agentloop.ToolDecisionDeny, nil
+			}
+			return "", err
+		}
+		a.record(ctx, agentloop.ApprovalGranted, request)
+		return agentloop.ToolDecisionAllow, nil
+	}
+	switch decision {
 	case Allow:
 		return agentloop.ToolDecisionAllow, nil
 	case Deny:

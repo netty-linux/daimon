@@ -9,7 +9,7 @@ OpenAI-compatible para Chat Completions sem streaming e a primeira capacidade
 real de exploração de workspace com aprovação humana:
 mensagem → modelo → ferramentas opcionais → resultados → modelo → resposta final.
 Usa somente a biblioteca padrão, um modelo programável e as ferramentas
-`echo`, `read_file` e `list_dir`. O demo e os testes não requerem credenciais
+`echo`, `read_file`, `list_dir` e `replace_file`. O demo e os testes não requerem credenciais
 nem APIs externas; o comando chat se conecta ao endpoint escolhido pelo usuário.
 
 ## Execução e validação
@@ -55,7 +55,9 @@ docker run --rm --network none --mount "type=bind,source=$((Get-Location).Path),
 - `cmd/daimon`: escolhe Scripted ou provider, monta Registry, Budget, sink,
   política e aprovação; lê ambiente e conecta stdin/stdout/stderr.
 - `internal/model`: mensagens, descrições de ferramentas, `Model.Generate` e `Scripted`.
-- `internal/tools`: `Tool.Execute`, Registry determinístico, echo, read_file e list_dir.
+- `internal/tools`: `Tool.Execute`, Registry determinístico, echo, read_file, list_dir e replace_file.
+- `internal/editcontract`: proposta imutável, preview completo, aprovação de uso único
+  e substituição via temporário/rename em Linux.
 - `internal/policy`: `ToolPolicy` estática, `ApprovalProvider`, authorizer composto
   e aprovação de terminal. Implementa o `ToolAuthorizer` que o loop conhece.
 - `internal/agentloop`: loop síncrono, Budget, autorização, limites de histórico,
@@ -139,7 +141,9 @@ impressão da configuração. A CLI também oculta a chave se ela for ecoada na 
 **Enviar a um provider remoto transmite a mensagem e todo o histórico aceito,
 incluindo resultados de ferramentas.** O chat registra `read_file` e `list_dir`
 no diretório atual; ambos exigem aprovação humana por chamada, exibida no stderr
-com os argumentos sanitizados. `echo` executa automaticamente; qualquer outra
+com os argumentos sanitizados. `replace_file` também exige aprovação do preview
+completo; substitui um arquivo existente em Linux, com uma proposta por run.
+No Windows a escrita falha fechado, sem temporário. `echo` executa automaticamente; qualquer outra
 ferramenta é negada. Execute somente em um workspace apropriado e com um serviço
 confiável. O confinamento ao workspace não é uma política de privacidade para os
 arquivos que estão dentro dele. Não existe opção de aprovar tudo nem de lembrar
@@ -268,7 +272,7 @@ ferramenta. As decisões possíveis nesta versão são:
 A CLI compõe dois conceitos antes de responder `allow`/`deny` ao loop:
 
 - `ToolPolicy`: decide `allow`, `deny` ou `require approval` por nome de ferramenta.
-  Padrão do chat: `echo` → allow, `list_dir` e `read_file` → require approval,
+  Padrão do chat: `echo` → allow, `list_dir`, `read_file` e `replace_file` → require approval,
   qualquer outra → deny. Política com fallback não configurado nega (zero value).
 - `ApprovalProvider`: pergunta ao humano quando necessário. A implementação de
   terminal exibe o pedido no stderr, sanitiza argumentos (controles e formatação
@@ -375,11 +379,16 @@ Nenhum teste acessa internet ou depende de um provider externo.
 
 ## Limites e próximo passo
 
-Há um preview ASCII reversível em `internal/diffview` e um contrato somente leitura
+Há um preview ASCII reversível em `internal/diffview` e um contrato de edição
 em `internal/editcontract`: proposta imutável, display completo, aprovação de uso
-único e revalidação do arquivo. Nenhum deles está integrado ao loop ou habilita
-escrita. O [contrato de edição](docs/workspace-edit-contract.md) separa comportamento
-implementado, executor futuro e critérios de concorrência/atomicidade ainda não validados.
+único e revalidação do arquivo. `replace_file({"path":"arquivo.txt","content":"novo conteúdo"})`
+prepara e aprova antes do Execute; o executor substitui o original via temporário
+no mesmo diretório e rename. Entrada original e conteúdo final têm limites separados
+de 64 KiB na CLI, preview completo de 1 MiB e até 1000 linhas. O limite de argumentos
+JSON do loop também se aplica. Não cria um novo alvo, não edita em lote nem permite
+segunda tentativa de proposta na mesma execução.
+O [contrato de edição](docs/workspace-edit-contract.md) descreve erros, cleanup,
+cancelamento, Linux como plataforma de escrita e limitações de concorrência/durabilidade.
 
 Esta fundação não oferece sandbox de processo, limite rígido de alocação de memória,
 tokenização, sumarização ou persistência. Um componente pode alocar
@@ -393,8 +402,10 @@ de código arbitrário nem suporte a interfaces contendo ponteiros nil tipados.
 
 Não existem banco, memória vetorial, gateway, subagentes, MCP, servidor, UI,
 streaming/SSE, Responses API, retry, fallback, múltiplos providers simultâneos,
-shell, escrita/edição de arquivos, aprovação permanente ou configuração de
+shell, edição em lote, criação/exclusão/movimentação de arquivos do usuário,
+aprovação permanente ou configuração de
 política em arquivo. A compatibilidade foi testada com servidores locais
-simulados, sem chamadas a provedores reais. Nenhuma credencial é necessária para
-validar o projeto. Próximo passo recomendado: revisar este corte de aprovação e
-realizar um smoke test opt-in com um endpoint local real e uma listagem aprovada.
+simulados; os smokes Groq anteriores estão registrados no contrato. Nenhuma credencial
+é necessária para validar o projeto. O smoke de substituição usa servidor HTTP local
+e fixture temporária. Não há garantia de exclusão de escritores externos entre a
+última validação e rename, nem rollback após commit ou durabilidade em queda de energia.

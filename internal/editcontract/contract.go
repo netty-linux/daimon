@@ -1,5 +1,5 @@
-// Package editcontract prepares and validates single-file proposals read-only.
-// It has no executor, Tool implementation or loop integration.
+// Package editcontract prepares exact single-file proposals and applies approved
+// replacements once. Apply supports Linux; read-only contracts remain portable.
 package editcontract
 
 import (
@@ -32,14 +32,21 @@ var (
 	ErrDenied     = errors.New("edit proposal denied")
 	ErrUsed       = errors.New("edit approval already attempted or consumed")
 	ErrApproval   = errors.New("edit approval failed")
+	ErrHardLink   = errors.New("edit target has multiple hard links")
 )
 
 // Limits apply to each version and to the complete approval display.
-// InputBytes <= 1 MiB, Lines <= 1000 and PathBytes <= 4096 are required.
-type Limits struct{ InputBytes, Lines, PathBytes, PreviewBytes int }
+// InputBytes and FinalBytes <= 1 MiB, Lines <= 1000 and PathBytes <= 4096 are required.
+type Limits struct{ InputBytes, FinalBytes, Lines, PathBytes, PreviewBytes int }
 
 func (l Limits) valid() bool {
-	return l.InputBytes > 0 && l.InputBytes <= 1024*1024 && l.Lines > 0 && l.Lines <= 1000 && l.PathBytes > 0 && l.PathBytes <= 4096 && l.PreviewBytes > 0
+	return l.InputBytes > 0 && l.InputBytes <= 1024*1024 && l.FinalBytes > 0 && l.FinalBytes <= 1024*1024 && l.Lines > 0 && l.Lines <= 1000 && l.PathBytes > 0 && l.PathBytes <= 4096 && l.PreviewBytes > 0
+}
+func (l Limits) Validate() error {
+	if !l.valid() {
+		return ErrInvalid
+	}
+	return nil
 }
 
 // Version describes bytes and metadata; file identity is also retained privately.
@@ -105,9 +112,16 @@ type permitState struct {
 	used        atomic.Bool
 }
 
-// Permit copies share a single-use state. It is only a read-only validation
-// capability, not permission for any implemented filesystem write.
+// Permit copies share one use, for either Consume (read-only) or Apply (write).
 type Permit struct{ state *permitState }
+
+// Invalidate abandons an unused approval, without reading or writing the target.
+func (p *Permit) Invalidate() {
+	if p != nil && p.state != nil {
+		p.state.used.Store(true)
+	}
+}
+
 type Validated struct {
 	Review   Review
 	Proposed []byte
@@ -155,6 +169,9 @@ func (w *Workspace) inspect(p string) (os.FileInfo, error) {
 			if !info.Mode().IsRegular() {
 				return nil, ErrFile
 			}
+			if err := checkLinks(info); err != nil {
+				return nil, err
+			}
 			return info, nil
 		}
 	}
@@ -180,6 +197,9 @@ func (w *Workspace) snapshot(ctx context.Context, p string, limit int) ([]byte, 
 	opened, err := f.Stat()
 	if err != nil || !opened.Mode().IsRegular() {
 		return nil, nil, ErrFile
+	}
+	if err := checkLinks(opened); err != nil {
+		return nil, nil, err
 	}
 	if !sameVersion(before, opened) {
 		return nil, nil, ErrChanged
@@ -211,7 +231,7 @@ func (w *Workspace) snapshot(ctx context.Context, p string, limit int) ([]byte, 
 	return data, after, nil
 }
 func sameVersion(a, b os.FileInfo) bool {
-	return os.SameFile(a, b) && a.Size() == b.Size() && a.Mode() == b.Mode() && a.ModTime().Equal(b.ModTime())
+	return os.SameFile(a, b) && a.Size() == b.Size() && a.Mode() == b.Mode() && a.ModTime().Equal(b.ModTime()) && samePlatformMetadata(a, b)
 }
 
 func (w *Workspace) Prepare(ctx context.Context, p string, proposed []byte, limits Limits) (*Proposal, error) {
@@ -224,7 +244,7 @@ func (w *Workspace) Prepare(ctx context.Context, p string, proposed []byte, limi
 	if !validPath(p) {
 		return nil, ErrUnsafePath
 	}
-	if len(p) > limits.PathBytes || len(proposed) > limits.InputBytes {
+	if len(p) > limits.PathBytes || len(proposed) > limits.FinalBytes {
 		return nil, ErrLimit
 	}
 	// Copy before reading the file or invoking any caller component.
@@ -257,7 +277,7 @@ func (w *Workspace) Prepare(ctx context.Context, p string, proposed []byte, limi
 	}{hex.EncodeToString(nonce), r})
 	r.ID = digest(binding)
 	// Full proposed content is quoted ASCII, including exact line endings.
-	header := fmt.Sprintf("Proposal: %s\nPath: %s\nOriginal: sha256=%s bytes=%d mode=%d modified=%s\nProposed: sha256=%s bytes=%d\nLimits: input_bytes=%d lines=%d path_bytes=%d preview_bytes=%d\nEncoding: Go ASCII escapes; diff omits only unchanged context.\n", r.ID, strconv.QuoteToASCII(p), r.Original.SHA256, r.Original.Bytes, r.Original.Mode, r.Original.Modified, r.ProposedSHA256, len(content), limits.InputBytes, limits.Lines, limits.PathBytes, limits.PreviewBytes)
+	header := fmt.Sprintf("Proposal: %s\nPath: %s\nOriginal: sha256=%s bytes=%d mode=%d modified=%s\nProposed: sha256=%s bytes=%d\nLimits: input_bytes=%d final_bytes=%d lines=%d path_bytes=%d preview_bytes=%d\nEncoding: Go ASCII escapes; diff omits only unchanged context.\n", r.ID, strconv.QuoteToASCII(p), r.Original.SHA256, r.Original.Bytes, r.Original.Mode, r.Original.Modified, r.ProposedSHA256, len(content), limits.InputBytes, limits.FinalBytes, limits.Lines, limits.PathBytes, limits.PreviewBytes)
 	full := "Proposed content (complete): " + strconv.QuoteToASCII(string(content)) + "\n"
 	if len(header) > limits.PreviewBytes || len(diff) > limits.PreviewBytes-len(header) || len(full) > limits.PreviewBytes-len(header)-len(diff) {
 		return nil, ErrLimit
