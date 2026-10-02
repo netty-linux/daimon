@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/netty-linux/daimon/internal/agentloop"
+	"github.com/netty-linux/daimon/internal/createcontract"
 	"github.com/netty-linux/daimon/internal/editcontract"
 	"github.com/netty-linux/daimon/internal/model"
 	"github.com/netty-linux/daimon/internal/policy"
@@ -50,6 +51,10 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 	sink := &agentloop.MemoryEventSink{}
 	planMode := workspaceMode && len(args) == 3 && args[1] == "plan"
 	if planMode {
+		args = []string{"chat", args[2]}
+	}
+	creationEnabled := workspaceMode && len(args) == 3 && args[1] == "--workspace-create-file"
+	if creationEnabled {
 		args = []string{"chat", args[2]}
 	}
 	var selected model.Model
@@ -95,6 +100,9 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 		if replacementEnabled {
 			cliPolicy.Rules["replace_file"] = policy.RequireApproval
 		}
+		if creationEnabled {
+			cliPolicy.Rules["create_file"] = policy.RequireApproval
+		}
 		composed = &policy.Authorizer{
 			Policy:    cliPolicy,
 			Approvals: policy.NewTerminalApproval(bufferedInput, stderr),
@@ -109,7 +117,7 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 			message = planInstruction + "\n\nPedido do usuário:\n" + message
 		}
 	default:
-		return fmt.Errorf("usage: daimon demo | daimon chat [--enable-replace-file] \"mensagem\" | daimon workspace --root \"diretório\" [--enable-replace-file] \"mensagem\" | daimon workspace --root \"diretório\" plan \"mensagem\" | daimon smoke \"mensagem\"")
+		return fmt.Errorf("usage: daimon demo | daimon chat [--enable-replace-file] \"mensagem\" | daimon workspace --root \"diretório\" [--enable-replace-file | --enable-create-file] \"mensagem\" | daimon workspace --root \"diretório\" plan \"mensagem\" | daimon smoke \"mensagem\"")
 	}
 	if err := ctx.Err(); err != nil {
 		return err
@@ -157,6 +165,18 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 		}
 		composed.Replacements = replacer
 		composed.EditReviews = editcontract.NewTerminal(bufferedInput, stderr)
+	}
+	if creationEnabled {
+		creator, err := tools.NewCreateFile(root, createcontract.Limits{FinalBytes: 64 * 1024, Lines: 1000, PathBytes: 4096, PreviewBytes: 1024 * 1024})
+		if err != nil {
+			return errWorkspace
+		}
+		defer creator.Close()
+		if err := register(creator, &counts.tools[4]); err != nil {
+			return err
+		}
+		composed.Creations = creator
+		composed.CreateReviews = createcontract.NewTerminal(bufferedInput, stderr)
 	}
 	loop := agentloop.Loop{Model: selected, Registry: registry, Budget: agentloop.DefaultBudget(), Sink: sink, Authorizer: authorizer}
 	result, err := loop.Run(ctx, message)

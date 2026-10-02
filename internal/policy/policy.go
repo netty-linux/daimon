@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	"github.com/netty-linux/daimon/internal/agentloop"
+	"github.com/netty-linux/daimon/internal/createcontract"
 	"github.com/netty-linux/daimon/internal/editcontract"
 	"github.com/netty-linux/daimon/internal/tools"
 )
@@ -52,6 +53,7 @@ func DefaultCLIPolicy() StaticPolicy {
 			"list_dir":     RequireApproval,
 			"read_file":    RequireApproval,
 			"replace_file": Deny,
+			"create_file":  Deny,
 		},
 		Fallback: Deny,
 	}
@@ -69,11 +71,13 @@ type ApprovalProvider interface {
 // recorded before the loop emits any ToolAllowed/ToolDenied event, so an
 // approved call yields: approval_requested, approval_granted, tool_allowed.
 type Authorizer struct {
-	Policy       ToolPolicy
-	Approvals    ApprovalProvider
-	Sink         agentloop.EventSink
-	Replacements *tools.ReplaceFile
-	EditReviews  editcontract.Reviewer
+	Policy        ToolPolicy
+	Approvals     ApprovalProvider
+	Sink          agentloop.EventSink
+	Replacements  *tools.ReplaceFile
+	EditReviews   editcontract.Reviewer
+	Creations     *tools.CreateFile
+	CreateReviews createcontract.Reviewer
 }
 
 var (
@@ -87,6 +91,30 @@ func (a *Authorizer) Authorize(ctx context.Context, request agentloop.ToolAuthor
 		return "", errMissingPolicy
 	}
 	decision := a.Policy.Decide(request.Call.Name)
+	if request.Call.Name == "create_file" {
+		if decision == Deny {
+			return agentloop.ToolDecisionDeny, nil
+		}
+		if decision != RequireApproval {
+			return "", errUnknownPolicyDecision
+		}
+		if a.Creations == nil || a.CreateReviews == nil {
+			return "", errMissingApprovals
+		}
+		if err := a.Creations.Prepare(ctx, request.Call.Arguments); err != nil {
+			return "", err
+		}
+		a.record(ctx, agentloop.ApprovalRequested, request)
+		if err := a.Creations.Approve(ctx, a.CreateReviews); err != nil {
+			if errors.Is(err, createcontract.ErrDenied) {
+				a.record(ctx, agentloop.ApprovalDenied, request)
+				return agentloop.ToolDecisionDeny, nil
+			}
+			return "", err
+		}
+		a.record(ctx, agentloop.ApprovalGranted, request)
+		return agentloop.ToolDecisionAllow, nil
+	}
 	if request.Call.Name == "replace_file" {
 		if decision == Deny {
 			return agentloop.ToolDecisionDeny, nil
