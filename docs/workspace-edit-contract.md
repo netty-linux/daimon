@@ -1,7 +1,7 @@
 # Contrato de proposta e aprovação de edição
 
 Estado: preparação, preview, aprovação e executor de substituição implementados.
-`replace_file` está registrado no chat/smoke, com aprovação obrigatória. O loop e
+`replace_file` é registrado somente em `chat --enable-replace-file`, com aprovação obrigatória. A política padrão nega escrita; chat comum e smoke não expõem a ferramenta. O loop e
 seus contratos não mudaram. O demo permanece offline, sem ferramenta de escrita.
 A escrita é suportada em Linux; outras plataformas retornam ErrUnsupported antes
 de criar temporário. O contrato de preparação/Consume continua portátil.

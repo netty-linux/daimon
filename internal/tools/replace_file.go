@@ -43,7 +43,7 @@ func (t *ReplaceFile) Close() error {
 }
 func (*ReplaceFile) Name() string { return "replace_file" }
 func (*ReplaceFile) Description() string {
-	return "Replace one existing regular file with exact UTF-8 content, after complete human-approved preview. One proposal attempt per run; Linux only. No creation, deletion or symlinks/hard links."
+	return "Replace one existing regular file with exact UTF-8 content, after complete human-approved preview. Explicit opt-in; one proposal attempt per run; Linux only. No creation, deletion or symlinks/hard links. Controlled workspace required: external writers may race rename; cancellation after commit cannot undo it. No power-loss durability or ownership/ACL/xattr preservation."
 }
 func (*ReplaceFile) InputSchema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"],"additionalProperties":false}`)

@@ -141,7 +141,7 @@ impressão da configuração. A CLI também oculta a chave se ela for ecoada na 
 **Enviar a um provider remoto transmite a mensagem e todo o histórico aceito,
 incluindo resultados de ferramentas.** O chat registra `read_file` e `list_dir`
 no diretório atual; ambos exigem aprovação humana por chamada, exibida no stderr
-com os argumentos sanitizados. `replace_file` também exige aprovação do preview
+com os argumentos sanitizados. `replace_file`, quando habilitado explicitamente, exige aprovação do preview
 completo; substitui um arquivo existente em Linux, com uma proposta por run.
 No Windows a escrita falha fechado, sem temporário. `echo` executa automaticamente; qualquer outra
 ferramenta é negada. Execute somente em um workspace apropriado e com um serviço
@@ -272,7 +272,7 @@ ferramenta. As decisões possíveis nesta versão são:
 A CLI compõe dois conceitos antes de responder `allow`/`deny` ao loop:
 
 - `ToolPolicy`: decide `allow`, `deny` ou `require approval` por nome de ferramenta.
-  Padrão do chat: `echo` → allow, `list_dir`, `read_file` e `replace_file` → require approval,
+  Padrão do chat: `echo` → allow, `list_dir` e `read_file` → require approval; `replace_file` → deny,
   qualquer outra → deny. Política com fallback não configurado nega (zero value).
 - `ApprovalProvider`: pergunta ao humano quando necessário. A implementação de
   terminal exibe o pedido no stderr, sanitiza argumentos (controles e formatação
@@ -409,3 +409,26 @@ simulados; os smokes Groq anteriores estão registrados no contrato. Nenhuma cre
 é necessária para validar o projeto. O smoke de substituição usa servidor HTTP local
 e fixture temporária. Não há garantia de exclusão de escritores externos entre a
 última validação e rename, nem rollback após commit ou durabilidade em queda de energia.
+
+### Chat com substituição opt-in
+
+`go run ./cmd/daimon chat --enable-replace-file "proponha a substituição de arquivo.txt"`
+expõe replace_file ao provider OpenAI-compatible somente nesta execução. Chat comum,
+smoke e demo não registram a ferramenta; a política padrão nega a substituição.
+A opção não aprova escrita: a proposta exige preview integral no stderr e resposta
+explícita y. EOF, resposta inválida, display parcial/falho, cancelamento e revalidação
+negativa impedem a escrita. Uma única proposta pode ser tentada por run.
+
+O provider recebe o schema, a mensagem do usuário, os argumentos que ele próprio
+produziu e o recibo controlado necessário para a resposta final. O runtime não envia
+original, diff, identidade do arquivo ou preview como mensagens adicionais. read_file
+continua enviando seu resultado quando aprovado; a resposta final pode repetir conteúdo
+que o modelo já conhece. Eventos e erros locais não incluem conteúdo; somente o preview
+deliberado exibe original e proposta com escapes reversíveis. Opt-in não garante
+confidencialidade perante o provider. Testes usam httptest sem credencial/request externa.
+
+Garantias mantidas: aprovação exata e única, limites, confinamento e escrita atômica
+em Linux. Limites assumidos: workspace controlado, sem exclusão de escritor externo
+entre revalidação e rename, sem rollback após commit ou durabilidade em perda de energia;
+ACLs, ownership e xattrs não são preservados. Fora de escopo: outras plataformas de
+escrita, novos alvos, exclusão, movimentação, lote, shell e permissões persistentes.

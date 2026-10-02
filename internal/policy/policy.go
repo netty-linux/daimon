@@ -42,7 +42,7 @@ func (p StaticPolicy) Decide(toolName string) Decision {
 	return p.Fallback
 }
 
-// DefaultCLIPolicy: echo runs automatically, workspace reads and replacement
+// DefaultCLIPolicy: echo runs automatically, workspace reads
 // need one-shot human approval, everything else is denied. There is no
 // global "approve everything" option.
 func DefaultCLIPolicy() StaticPolicy {
@@ -51,7 +51,7 @@ func DefaultCLIPolicy() StaticPolicy {
 			"echo":         Allow,
 			"list_dir":     RequireApproval,
 			"read_file":    RequireApproval,
-			"replace_file": RequireApproval,
+			"replace_file": Deny,
 		},
 		Fallback: Deny,
 	}
