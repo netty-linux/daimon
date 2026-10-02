@@ -2,8 +2,8 @@
 
 Visão: fundação experimental de um Sovereign Personal Agent sob controle do usuário.
 Escopo atual: Reliable Agent Loop + Execution Budget + OpenAI-compatible
-non-streaming + Human Approval + Workspace Read-Only, em Go, com Scripted,
-echo, read_file e list_dir.
+non-streaming + Human Approval + Workspace Read + Single-File Replacement,
+em Go, com Scripted, echo, read_file, list_dir e replace_file (escrita em Linux).
 
 ## Arquitetura
 
@@ -54,7 +54,8 @@ echo, read_file e list_dir.
   não oferece "sempre permitir". Padrão é No; EOF e entrada inválida negam sem
   falhar o run. Cancelamento interrompe a aprovação e retorna o erro de contexto.
 - Argumentos exibidos são sanitizados: controles e formatação Unicode não chegam
-  ao terminal; conteúdo de arquivo nunca é exibido. Prompts vão ao stderr injetado;
+  ao terminal; aprovações de leitura não exibem conteúdo de arquivo. A substituição
+  exige o preview completo com escapes do contrato. Prompts vão ao stderr injetado;
   nada lê os.Stdin dentro da política.
 - Authorize recebe runCtx e continua governado por MaxRunDuration e deadlines externos.
 - ToolAuthorizationRequest recebe os argumentos copiados defensivamente.
@@ -69,19 +70,24 @@ echo, read_file e list_dir.
   ToolDenied → recibo controlado correlato, sem execução.
 - Desconhecido ou JSON inválido: ToolRequested → ToolFailed, sem evento de autorização.
 - Eventos nunca contêm nomes, IDs, argumentos, motivos de decisão ou resultados.
-- A política padrão do CLI permite echo, exige aprovação para list_dir e read_file
+- A política padrão do CLI permite echo, exige aprovação para list_dir, read_file e replace_file
   e nega qualquer outra ferramenta; não existe opção global de aprovar tudo.
 - Não adicionar aprovação permanente, wildcards de permissão, configuração de
-  política em arquivo ou novas ferramentas neste corte.
+  política em arquivo ou ferramentas além de replace_file neste corte.
 
 ## Segurança e escopo
 
-- internal/editcontract prepara propostas imutáveis e aprovação de uso único
-  somente leitura, sem executor/Tool/integração ao loop. Vincule caminho, versão
+- internal/editcontract prepara propostas imutáveis e aprovação de uso único.
+  Permit.Apply substitui um arquivo existente em Linux. Vincule caminho, versão
   original, bytes propostos e limites; preview ASCII reversível completo obrigatório.
   Rejeite symlinks observados em qualquer componente; revalide antes/depois da
-  decisão e no consumo. Falha/cancelamento gasta a tentativa/capacidade, sem retry.
-  Inspeções não provam exclusão de corridas, ABA, hard links ou atomicidade de escrita.
+  decisão e na aplicação. Rejeite hard links em Linux. Falha/cancelamento gasta
+  a tentativa/capacidade, sem retry. Temporário exclusivo no diretório do alvo,
+  sync/close e rename; cleanup em falha, com erro explícito se não puder remover.
+  Não truncar o alvo diretamente. Uma proposta de escrita por run/instância.
+  Deadline obrigatório; cancelamento antes do commit impede rename, após commit
+  não desfaz o efeito. Não prometer exclusão atômica de escritores externos,
+  durabilidade de diretório, sandbox ou escrita atômica no Windows.
 
 - Ferramentas desconhecidas, JSON inválido e erros normais viram resultados controlados.
 - Não usar panic, log.Fatal ou os.Exit no loop.
@@ -92,7 +98,8 @@ echo, read_file e list_dir.
 - Testes de symlink devem executar; falta de permissão é falha explícita.
 - Não adicionar prematuramente banco, memória longa/vetorial, gateway, múltiplos providers,
   subagentes, MCP, servidor HTTP, Telegram/Discord, TUI/web, event sourcing completo,
-  shell, escrita/edição de arquivos, streaming ou abstrações especulativas.
+  shell, edição em lote, criação/exclusão/movimentação de arquivos do usuário,
+  streaming ou abstrações especulativas. Temporários internos do executor são permitidos.
 - Não anunciar garantias de sandbox ou limite rígido de memória: o budget limita dados aceitos.
 
 ## Provider HTTP

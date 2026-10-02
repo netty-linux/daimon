@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/netty-linux/daimon/internal/agentloop"
+	"github.com/netty-linux/daimon/internal/editcontract"
 	"github.com/netty-linux/daimon/internal/model"
 	"github.com/netty-linux/daimon/internal/policy"
 	"github.com/netty-linux/daimon/internal/providers/groq"
@@ -38,7 +40,9 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 	sink := &agentloop.MemoryEventSink{}
 	var selected model.Model
 	var authorizer agentloop.ToolAuthorizer
+	var composed *policy.Authorizer
 	var message, apiKey string
+	bufferedInput := bufio.NewReader(stdin)
 	demo := len(args) == 1 && args[0] == "demo"
 	switch {
 	case demo:
@@ -68,11 +72,12 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 		if err != nil {
 			return err
 		}
-		authorizer = &policy.Authorizer{
+		composed = &policy.Authorizer{
 			Policy:    policy.DefaultCLIPolicy(),
-			Approvals: policy.NewTerminalApproval(stdin, stderr),
+			Approvals: policy.NewTerminalApproval(bufferedInput, stderr),
 			Sink:      sink,
 		}
+		authorizer = composed
 		message = args[1]
 	default:
 		return fmt.Errorf("usage: daimon demo | daimon chat \"mensagem\" | daimon smoke \"mensagem\"")
@@ -95,6 +100,18 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 		if err := registry.Register(tool); err != nil {
 			return err
 		}
+	}
+	if !demo {
+		replacer, err := tools.NewReplaceFile(".", editcontract.Limits{InputBytes: 64 * 1024, FinalBytes: 64 * 1024, Lines: 1000, PathBytes: 4096, PreviewBytes: 1024 * 1024})
+		if err != nil {
+			return err
+		}
+		defer replacer.Close()
+		if err := registry.Register(replacer); err != nil {
+			return err
+		}
+		composed.Replacements = replacer
+		composed.EditReviews = editcontract.NewTerminal(bufferedInput, stderr)
 	}
 	loop := agentloop.Loop{Model: selected, Registry: registry, Budget: agentloop.DefaultBudget(), Sink: sink, Authorizer: authorizer}
 	result, err := loop.Run(ctx, message)

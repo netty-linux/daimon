@@ -16,7 +16,7 @@ type reviewerFunc func(context.Context, Review) (Decision, error)
 
 func (f reviewerFunc) Review(ctx context.Context, r Review) (Decision, error) { return f(ctx, r) }
 func testLimits() Limits {
-	return Limits{InputBytes: 4096, Lines: 100, PathBytes: 128, PreviewBytes: 16384}
+	return Limits{InputBytes: 4096, FinalBytes: 4096, Lines: 100, PathBytes: 128, PreviewBytes: 16384}
 }
 func fixture(t *testing.T) (*Workspace, string) {
 	t.Helper()

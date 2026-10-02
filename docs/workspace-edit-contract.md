@@ -1,9 +1,10 @@
 # Contrato de proposta e aprovação de edição
 
-Estado: preparação, preview e aprovação implementados como biblioteca independente
-e somente leitura. Não há executor, ferramenta de edição, registro no Registry ou
-integração à CLI/loop. A política atual permanece inalterada. A aprovação deste
-contrato não executa nem habilita escrita.
+Estado: preparação, preview, aprovação e executor de substituição implementados.
+`replace_file` está registrado no chat/smoke, com aprovação obrigatória. O loop e
+seus contratos não mudaram. O demo permanece offline, sem ferramenta de escrita.
+A escrita é suportada em Linux; outras plataformas retornam ErrUnsupported antes
+de criar temporário. O contrato de preparação/Consume continua portátil.
 
 ## Contrato implementado
 
@@ -34,7 +35,8 @@ bytes exatos propostos e limites. Seu ID inclui os hashes, metadados, caminho,
 limites e nonce aleatório. IDs não são tokens de autorização persistentes.
 Nenhuma referência mutável aos bytes internos é entregue ao chamador.
 
-Limits exige todos os campos positivos: InputBytes (por versão, até 1 MiB), Lines
+Limits exige todos os campos positivos: InputBytes (original, até 1 MiB), FinalBytes
+(proposto, até 1 MiB), Lines
 (por versão, até 1000), PathBytes (até 4096) e PreviewBytes (display completo).
 O display inclui ID, caminho, versão original, hash/tamanho proposto, limites,
 diff e **conteúdo proposto completo** como string ASCII entre aspas, com todos os
@@ -69,39 +71,110 @@ O fluxo é síncrono; não há suporte a uso concorrente do Workspace/Terminal.
 
 - Arquivo alterado antes/durante aprovação: sem Permit. Depois da aprovação:
   Consume falha e gasta o Permit. Mudanças em conteúdo, identidade, modo, tamanho
-  ou mtime exigem nova preparação e aprovação; não há retry automático.
+  ou mtime exigem nova preparação e aprovação; em Linux também se compara ctime,
+  uid/gid e número de links, retidos privadamente. Não há retry automático.
 - Cancelamento/deadline: preserva errors.Is de contexto e nunca valida sucesso
   depois de observado. Aprovação/consumo cancelado gasta a tentativa/capacidade.
 - Symlink observado em qualquer componente, interno ou externo: rejeitado na
-  preparação e revalidação. Diretório, alvo ausente, leitura/inspeção falha ou
+  preparação e revalidação. Em Linux, número de hard links diferente de um também
+  é rejeitado. Diretório, alvo ausente, leitura/inspeção falha ou
   workspace fechado impedem aprovação/consumo. Erros não expõem conteúdo/caminho
   nem mensagens livres dos componentes. Falha de filesystem pode retornar
   ErrFile/ErrSymlink/ErrLimit em vez de ErrChanged; todas impedem o fluxo.
 - Leitura é limitada antes da aceitação. UTF-8 inválido ou limite excedido não
-  produz proposta. Nenhuma dessas operações escreve, cria, remove ou renomeia arquivos.
+  produz proposta. Prepare/Approve/Consume permanecem somente leitura; a escrita
+  ocorre exclusivamente em Apply após aprovação.
 
-## Executor futuro: ausente neste PR
+## Executor implementado: Permit.Apply
 
-Um executor só poderá ser implementado em outro corte explicitamente autorizado,
-para um arquivo existente por operação. Deve consumir a capacidade junto ao efeito
-sem transformar os bytes retornados em autorização permanente. Precisa preservar
-budget, autorização prévia, cancelamento, recibos e eventos sem conteúdo sensível.
-Não há shell, edição em lote, permissões persistentes, retry ou fallback.
+Apply consome o mesmo estado de uso único de Consume. Se Consume já foi usado,
+Apply falha e vice-versa. Não aceita caminho ou conteúdo adicionais: aplica somente
+os bytes privados da proposta aprovada ao caminho original. Invalidar, falhar ou
+cancelar não devolve a capacidade. Deadline é obrigatório; no loop, os deadlines
+de run e ferramenta vêm do Budget existente. Não há timeout concorrente próprio.
+
+Antes de criar qualquer temporário: valida plataforma, limites, hash proposto,
+contexto e versão do alvo. Abre o diretório pai como os.Root e revalida o alvo
+também nesse handle. O temporário tem nome aleatório e é criado uma vez com
+O_EXCL e modo 0600, no diretório do alvo, sem retry em colisão. O original nunca
+é aberto com flag de escrita/truncamento.
+
+Grava em chunks de até 32 KiB, verifica contexto, copia permissões rwx, faz Sync
+do temporário e Close. Bits setuid/setgid/sticky são rejeitados antes de staging.
+Ownership, ACLs, xattrs e timestamps não são copiados; o novo inode é criado pelo
+usuário executor. Se copiar permissões falhar, não há commit.
+
+Depois de staging, revalida conteúdo/hash, identidade, modo, metadados e links
+do temporário e do alvo no caminho do workspace e no diretório pai fixado,
+e verifica cancelamento antes
+do rename. O rename do temporário para o alvo é o ponto de commit atômico. Alvo
+observado ausente é rejeitado; não existe ferramenta de criação, exclusão ou
+mudança de nome de arquivo do usuário.
+
+Antes do commit, falha/cancelamento fecha e remove o temporário, deixando o
+original intacto pelo executor. Se o filesystem negar a remoção, ErrCleanup
+relata explicitamente que pode existir temporário residual; não se afirma limpeza
+incondicional contra falha do próprio filesystem. Depois do commit não há rollback:
+cancelamento que concorra com rename pode ser observado pelo loop após o efeito,
+com histórico sem recibo, conforme a regra existente de cancelamento cooperativo.
+Sync do arquivo não equivale a fsync do diretório nem garante durabilidade em
+queda de energia. Atomicidade de visibilidade em Linux não é atomicidade de versão.
+
+### Integração e erros
+
+ReplaceFile.Prepare/Approve rodam no authorizer antes da passagem de efeitos.
+O provider de leitura continua mostrando somente argumentos; o reviewer de edição
+mostra a proposta completa. Ambos compartilham o mesmo buffered reader na CLI.
+Política Allow direta ou aprovação genérica de argumentos não pode autorizar
+replace_file. Execute sem Permit, com argumentos diferentes ou com Permit usado
+falha fechado. Permite apenas uma tentativa de proposta por instância/run; um lote
+com duas substituições falha na autorização antes de executar qualquer ferramenta.
+O authorizer usa runCtx; Execute usa toolCtx. Não existe memória de permissões.
+
+Configuração da CLI: original/final 64 KiB, caminho 4096 bytes, 1000 linhas por
+versão, display completo 1 MiB. O budget também limita os argumentos JSON em
+64 KiB, portanto escaping e overhead podem restringir o conteúdo final alcançável.
+Falhas de preparação/aprovação viram AuthorizationError; falhas normais de Apply
+viram recibos controlados ToolFailed. Cancelamento/deadline interrompem o loop.
+Eventos não contêm conteúdo, nomes/IDs, caminhos, argumentos ou textos de erro.
+
+| Erro | Comportamento |
+|---|---|
+| ErrLimit / ErrInvalid / ErrUnsafePath | proposta/configuração rejeitada antes de staging |
+| ErrFile / ErrChanged / ErrSymlink / ErrHardLink | alvo inadequado ou versão divergente; sem commit |
+| ErrDenied / ErrUsed | sem aprovação válida de uso único |
+| ErrUnsupported | escrita desabilitada fora de Linux |
+| ErrStage | falha em criar/gravar/chmod/sync/close; cleanup |
+| ErrCommit | rename falhou; cleanup |
+| ErrNoSpace / fs.ErrPermission | categoria controlada preservada por errors.Is |
+| ErrCleanup | remoção do temporário falhou; possível residual |
+| erro de contexto | errors.Is preservado; capacidade invalidada |
+
+Mensagens não incluem conteúdo, caminho ou mensagem livre de erro do OS. As
+categorias são sentinelas; causas com paths sensíveis não são incorporadas à mensagem.
 
 ## Critérios ainda não validados
 
 A sequência de inspeção/leitura/check não elimina corridas de filesystem. os.Root
 confina resolução, mas as verificações de symlink não são exclusão atômica de
 trocas concorrentes. Mudanças transitórias restauradas (ABA) podem não ser detectadas.
-O contrato é apropriado a um workspace controlado, não prova sandbox ou segurança
-em filesystem hostil. Hard links não são rejeitados nem resolvidos neste corte.
+O executor é apropriado a um workspace controlado, não prova sandbox ou segurança
+em filesystem hostil. Hard links observados são rejeitados em Linux, inclusive
+aliases fora do workspace. Um escritor externo ainda pode agir no intervalo entre
+a última verificação e rename: a biblioteca padrão não oferece compare-and-rename.
 
-Antes de escrita: definir exclusão de concorrência/conflitos, proteção de identidade
-até o efeito, política de hard links, permissões, troca atômica, durabilidade,
-limpeza de temporários e tratamento de falhas/cancelamento durante o commit.
-Atomicidade, ausência de escrita após cancelamento e comportamento sob concorrência
-precisam de evidência própria em Linux e Windows. Os testes deste PR validam somente
-o contrato read-only, não essas garantias de um executor inexistente.
+Não se validou escrita atômica no Windows, exclusão de escritores externos,
+durabilidade após falha de energia, preservação de ACL/ownership/xattrs ou recuperação
+de temporário após crash. Esses critérios não são apresentados como garantias.
+Não há shell, edição em lote, permissões persistentes, retry ou fallback.
+
+Testes Linux cobrem aplicação exata/permissões, modificação/remoção/symlink/hard link
+antes de aplicação e durante staging, cancelamento após chunk escrito, deadlines,
+limites exatos independentes de entrada/final e aprovação reutilizada. ENOSPC e
+EACCES são injetados deterministicamente nas operações reais de temporário, assim
+como falhas de chmod/sync/close/rename; os testes verificam original e ausência de
+temporários. Smokes HTTP locais exercitam CLI/loop/provider: aprovação, negativa
+e lote com duas substituições. Nenhum teste desse corte requer rede externa/chave.
 
 ## Smokes reais
 
