@@ -9,7 +9,7 @@ OpenAI-compatible para Chat Completions sem streaming e a primeira capacidade
 real de exploração de workspace com aprovação humana:
 mensagem → modelo → ferramentas opcionais → resultados → modelo → resposta final.
 Usa somente a biblioteca padrão, um modelo programável e as ferramentas
-`echo`, `read_file`, `list_dir` e `replace_file`. O demo e os testes não requerem credenciais
+`echo`, `read_file`, `list_dir`, `replace_file` e `create_file`. O demo e os testes não requerem credenciais
 nem APIs externas; o comando chat se conecta ao endpoint escolhido pelo usuário.
 
 ## Execução e validação
@@ -55,9 +55,11 @@ docker run --rm --network none --mount "type=bind,source=$((Get-Location).Path),
 - `cmd/daimon`: escolhe Scripted ou provider, monta Registry, Budget, sink,
   política e aprovação; lê ambiente e conecta stdin/stdout/stderr.
 - `internal/model`: mensagens, descrições de ferramentas, `Model.Generate` e `Scripted`.
-- `internal/tools`: `Tool.Execute`, Registry determinístico, echo, read_file, list_dir e replace_file.
+- `internal/tools`: `Tool.Execute`, Registry determinístico, echo, read_file, list_dir, replace_file e create_file.
 - `internal/editcontract`: proposta imutável, preview completo, aprovação de uso único
   e substituição via temporário/rename em Linux.
+- `internal/createcontract`: contrato separado de ausência, preview e criação exclusiva
+  aprovada de um arquivo novo em Linux.
 - `internal/policy`: `ToolPolicy` estática, `ApprovalProvider`, authorizer composto
   e aprovação de terminal. Implementa o `ToolAuthorizer` que o loop conhece.
 - `internal/agentloop`: loop síncrono, Budget, autorização, limites de histórico,
@@ -272,7 +274,7 @@ ferramenta. As decisões possíveis nesta versão são:
 A CLI compõe dois conceitos antes de responder `allow`/`deny` ao loop:
 
 - `ToolPolicy`: decide `allow`, `deny` ou `require approval` por nome de ferramenta.
-  Padrão do chat: `echo` → allow, `list_dir` e `read_file` → require approval; `replace_file` → deny,
+  Padrão do chat: `echo` → allow, `list_dir` e `read_file` → require approval; `replace_file` e `create_file` → deny,
   qualquer outra → deny. Política com fallback não configurado nega (zero value).
 - `ApprovalProvider`: pergunta ao humano quando necessário. A implementação de
   terminal exibe o pedido no stderr, sanitiza argumentos (controles e formatação
@@ -402,7 +404,7 @@ de código arbitrário nem suporte a interfaces contendo ponteiros nil tipados.
 
 Não existem banco, memória vetorial, gateway, subagentes, MCP, servidor, UI,
 streaming/SSE, Responses API, retry, fallback, múltiplos providers simultâneos,
-shell, edição em lote, criação/exclusão/movimentação de arquivos do usuário,
+shell, edição em lote, criação além de create_file, exclusão/movimentação de arquivos do usuário,
 aprovação permanente ou configuração de
 política em arquivo. A compatibilidade foi testada com servidores locais
 simulados; os smokes Groq anteriores estão registrados no contrato. Nenhuma credencial
@@ -459,7 +461,7 @@ não é um modo offline para uso real. A validação usa somente httptest offlin
 O root e o filesystem precisam estar sob controle do usuário. O executor Linux não
 foi alterado: permanece sem compare-and-rename contra escritor hostil, rollback após
 commit, durabilidade em perda de energia ou preservação de ACL/ownership/xattrs.
-Não há shell, lote, criação/exclusão/movimentação de alvos, integrações adicionais,
+Não há shell, lote, criação além de create_file, exclusão/movimentação de alvos, integrações adicionais,
 retry/fallback, memória ou múltiplos workspaces. Falhas de abertura não expõem root.
 
 ### Planejamento read-only
@@ -491,3 +493,40 @@ somente resumo; workspace plan exige root, solicita e exibe plano deliberado sem
 ferramenta de escrita; workspace com --enable-replace-file disponibiliza substituição
 Linux com preview/aprovação, sem execução automática de planos. Um plano não concede
 permissão futura. Limitações do executor permanecem inalteradas e fora deste corte.
+
+### Criação aprovada e opt-in
+
+`daimon workspace --root "<diretório>" --enable-create-file "proponha um arquivo novo"`
+registra create_file somente nesta sessão. A flag não concede autorização: a proposta
+precisa de preview integral e aprovação explícita por chamada. Chat, workspace normal,
+plan e --enable-replace-file não expõem criação. Neste corte, as duas flags de escrita
+não podem ser combinadas; nenhum opt-in implica o outro. Plan permanece incompatível
+com ambas. O modelo usa {"path":"novo.txt","content":"conteúdo"}.
+
+replace_file substitui uma versão existente aprovada usando temporário/rename.
+create_file usa contrato separado de inexistência: caminho relativo canônico, root
+aberto, pais seguros já existentes, bytes copiados, limites e aprovação de uso único.
+Nunca cria diretórios nem sobrescreve qualquer alvo existente. Uma proposta/tentativa
+por instância/run; dois creates no mesmo lote falham antes de executar ferramentas.
+
+Somente Linux. Criação direta exclusiva O_CREATE|O_EXCL|O_RDWR, chmod explícito 0600,
+chunks com checagens de contexto, Sync, leitura limitada para hash/verificação exata,
+Close e validação final de identidade/metadados/pais. O arquivo fica visível durante
+a gravação: não é publicação atômica de conteúdo completo. Falhas tentam remover
+somente o arquivo recém-criado identificado; outra identidade, symlink ou hard link
+impede limpeza e reporta ErrCleanup. Limpeza recusada pode deixar resíduo, nunca
+sucesso falso. Não há proteção contra escritor hostil entre verificações, exclusão
+de cleanup atômica, rollback depois do sucesso ou durabilidade em perda de energia.
+
+Limites CLI: conteúdo UTF-8 64 KiB, 1000 linhas, path 4096 bytes, preview 1 MiB;
+budget de argumentos JSON pode restringir conteúdo antes disso. Permissões finais
+0600 são verificadas e testadas com umask 000 e 777. Deadline obrigatório. Cancelamento,
+conflito ou erro consomem a capacidade; sem retry/fallback. Resumo agrega commits
+confirmados em Completed writes e separa Execute por tipo incluindo create_file.
+
+Preview é a exibição deliberada de ausência, conteúdo completo com escapes ASCII,
+limites e avisos. Eventos, recibos, erros e resumo não incluem os dados. O provider
+já conhece os argumentos que produziu; recebe somente o recibo adicional controlado,
+sem injeção pelo runtime de preview, conteúdo ou identidade. A resposta final livre
+continua omitida no workspace. Testes usam somente httptest/fixtures locais.
+O [contrato de criação](docs/workspace-create-contract.md) detalha garantias e erros.

@@ -3,7 +3,7 @@
 Visão: fundação experimental de um Sovereign Personal Agent sob controle do usuário.
 Escopo atual: Reliable Agent Loop + Execution Budget + OpenAI-compatible
 non-streaming + Human Approval + Workspace Read + Single-File Replacement,
-em Go, com Scripted, echo, read_file, list_dir e replace_file (escrita em Linux).
+em Go, com Scripted, echo, read_file, list_dir, replace_file e create_file (escrita em Linux).
 
 ## Arquitetura
 
@@ -70,10 +70,10 @@ em Go, com Scripted, echo, read_file, list_dir e replace_file (escrita em Linux)
   ToolDenied → recibo controlado correlato, sem execução.
 - Desconhecido ou JSON inválido: ToolRequested → ToolFailed, sem evento de autorização.
 - Eventos nunca contêm nomes, IDs, argumentos, motivos de decisão ou resultados.
-- A política padrão do CLI permite echo, exige aprovação para list_dir e read_file; replace_file é negado por padrão
+- A política padrão do CLI permite echo, exige aprovação para list_dir e read_file; replace_file e create_file são negados por padrão
   e nega qualquer outra ferramenta; não existe opção global de aprovar tudo.
 - Não adicionar aprovação permanente, wildcards de permissão, configuração de
-  política em arquivo ou ferramentas além de replace_file neste corte.
+  política em arquivo ou ferramentas além de replace_file e create_file neste corte.
 
 ## Segurança e escopo
 
@@ -98,7 +98,7 @@ em Go, com Scripted, echo, read_file, list_dir e replace_file (escrita em Linux)
 - Testes de symlink devem executar; falta de permissão é falha explícita.
 - Não adicionar prematuramente banco, memória longa/vetorial, gateway, múltiplos providers,
   subagentes, MCP, servidor HTTP, Telegram/Discord, TUI/web, event sourcing completo,
-  shell, edição em lote, criação/exclusão/movimentação de arquivos do usuário,
+  shell, edição em lote, criação além de create_file, exclusão/movimentação de arquivos do usuário,
   streaming ou abstrações especulativas. Temporários internos do executor são permitidos.
 - Não anunciar garantias de sandbox ou limite rígido de memória: o budget limita dados aceitos.
 
@@ -158,7 +158,7 @@ a cada push e pull request. Não substitua execução real por comandos simulado
   ferramentas usam esse root, sem fallback para o diretório atual.
 - --enable-replace-file é o único opt-in de escrita; mensagem e ambiente não ativam.
 - Preservar contratos, preview, autorização e executor existentes sem modificações.
-- Resumo usa somente eventos tipados e contadores dos quatro tipos fixos de ferramenta;
+- Resumo usa somente eventos tipados e contadores dos cinco tipos fixos de ferramenta;
   nunca imprimir resposta final, argumentos, paths, IDs, outputs ou segredos no resumo.
 - Contar tentativas de Execute e commits confirmados, inclusive em runs interrompidos.
 - Nada persiste; não criar abstrações genéricas de sessão ou múltiplos workspaces.
@@ -174,3 +174,19 @@ a cada push e pull request. Não substitua execução real por comandos simulado
 - Plano é saída deliberada separada do resumo público e pode conter dados do modelo.
   Resumo, eventos, prompts operacionais e erros não incluem esses dados.
 - Contratos/preview/executor e limites Linux existentes não mudam.
+
+## Criação opt-in de um arquivo
+
+- Somente workspace --root explícito --enable-create-file registra create_file.
+  Plan, chat e a flag de replace_file não habilitam criação; neste corte não combinar flags.
+- internal/createcontract é distinto de editcontract: proposta/Permit separados,
+  root aberto, pais existentes sem symlink, ausência, bytes exatos e limites vinculados.
+- Preview completo ASCII reversível e aprovação individual de uso único obrigatórios.
+  Falha, negativa, cancelamento, conflito ou aplicação gastam tentativa/capacidade.
+- Linux apenas: O_EXCL direto no alvo ausente, chmod 0600 independente de umask,
+  chunks/contexto, Sync, hash/verificação limitada, Close e identidade/metadados finais.
+- Nunca sobrescrever/renomear. Cleanup de arquivo incompleto próprio é permitido;
+  falha de limpeza/identidade deve ser explícita e nunca convertida em sucesso.
+- Não prometer conteúdo publicado atomicamente: arquivo pode ser visto em gravação.
+  Workspace controlado; sem garantia contra escritor externo ou perda de energia.
+- Preservar contratos/executor de replace_file, plan, loop e eventos sem dados sensíveis.
