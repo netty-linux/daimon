@@ -44,7 +44,15 @@ incluindo o próprio caractere de escape e os marcadores de terminadores de linh
 8. Cobrir negativa, EOF, cancelamento, proposta alterada, alvo alterado, symlinks,
    limites, controles Unicode, falhas de escrita e ausência de efeitos em rejeição.
 
-## Smoke test local pendente
+## Smokes reais
+
+Groq é o padrão dos smokes opt-in via `daimon smoke`, com `openai/gpt-oss-20b`.
+Em 2026-10-02, o smoke real de echo passou: dois requests, uma chamada de
+ferramenta, resposta DAIMON e StopReason completed. Nenhuma chave foi persistida.
+Listagem aprovada/negada e leitura de fixture continuam pendentes de validação
+manual com esse serviço. O comando conserva a aprovação humana por chamada.
+
+### Smoke local pendente
 
 Na revisão de 2026-10-02, o Ollama instalado não respondeu em 127.0.0.1:11434.
 Não houve chamada a provider real, download de modelo ou uso do endpoint remoto

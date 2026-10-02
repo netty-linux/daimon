@@ -74,6 +74,31 @@ Não há default implícito para um budget vazio.
 
 ## Chat OpenAI-compatible — non-streaming
 
+### Smokes reais: Groq por padrão
+
+`go run ./cmd/daimon smoke "mensagem"` usa Groq em
+`https://api.groq.com/openai/v1`, com `openai/gpt-oss-20b` por padrão.
+`DAIMON_API_KEY` é obrigatória; `DAIMON_GROQ_MODEL` pode trocar o modelo.
+Esse comando ignora DAIMON_BASE_URL e DAIMON_MODEL, evitando reutilizar uma
+configuração antiga de outro serviço. `chat` mantém sua configuração explícita.
+O pacote `internal/providers/groq` reutiliza o transporte e protocolo existentes.
+
+Em PowerShell 7, informe a chave sem gravá-la em arquivos ou no histórico:
+
+```powershell
+$env:DAIMON_API_KEY = Read-Host "Chave Groq" -MaskInput
+go run ./cmd/daimon smoke "Use a ferramenta echo com text DAIMON e depois responda apenas DAIMON."
+Remove-Item Env:DAIMON_API_KEY
+```
+
+Smokes são opt-in e usam rede/cota; não fazem parte de go test ou do CI.
+Cada chamada ao modelo consome um request. Não há retry automático ou fallback.
+Use workspace de teste com arquivos inofensivos: resultados aprovados são enviados
+ao serviço remoto. list_dir e read_file continuam exigindo aprovação por chamada.
+Comece com echo; depois teste manualmente listagem aprovada/negada e leitura de
+arquivo pequeno. Mantenha a suíte determinística offline para regressões frequentes.
+
+
 O adapter envia `POST {base_url}/chat/completions`, preservando o prefixo configurado,
 como `/v1`. Usa o formato de [Chat Completions](https://developers.openai.com/api/reference/cli/resources/chat),
 sem SDK: `model`, `messages`, `tools` quando presentes e `stream: false`.

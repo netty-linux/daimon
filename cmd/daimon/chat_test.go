@@ -54,6 +54,20 @@ func TestDemoDoesNotReadEnvironment(t *testing.T) {
 		t.Fatal(err, &out)
 	}
 }
+
+func TestSmokeRequiresKeyAndIgnoresGenericEndpoint(t *testing.T) {
+	var out bytes.Buffer
+	err := runWithContext(context.Background(), []string{"smoke", "echo DAIMON"}, strings.NewReader(""), &out, io.Discard, func(name string) string {
+		if name != "DAIMON_API_KEY" && name != "DAIMON_GROQ_MODEL" {
+			t.Fatalf("smoke read generic configuration %s", name)
+		}
+		return ""
+	})
+	var config *openai.ConfigError
+	if !errors.As(err, &config) || out.Len() != 0 {
+		t.Fatalf("out=%q err=%v", out.String(), err)
+	}
+}
 func TestChatToolCycle(t *testing.T) {
 	t.Chdir(t.TempDir())
 	if err := os.WriteFile("fixture.txt", []byte("public fixture"), 0600); err != nil {

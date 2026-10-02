@@ -94,7 +94,10 @@ echo, read_file e list_dir.
 - HTTP e structs privadas do protocolo pertencem a internal/providers; agentloop e model
   não importam providers. Somente cmd/daimon escolhe Scripted ou o adapter.
 - Secrets entram pela configuração explícita. Somente cmd lê DAIMON_BASE_URL,
-  DAIMON_MODEL e DAIMON_API_KEY; nunca imprimir/gravar chave ou aceitá-la em argumento CLI.
+  DAIMON_MODEL, DAIMON_GROQ_MODEL e DAIMON_API_KEY; nunca imprimir/gravar chave ou aceitá-la em argumento CLI.
+- Smokes reais opt-in usam Groq por padrão via cmd/daimon smoke. internal/providers/groq
+  configura o adapter OpenAI-compatible existente; não duplica transporte/protocolo.
+  Testes automáticos e CI continuam offline, sem credenciais; não há fallback.
 - Provider traduz mensagens e descrições; não executa ferramentas, não faz retry,
   não implementa streaming/SSE, Responses API, fallback ou SDK externo.
 - Preserve argumentos como string/raw bytes, inclusive JSON inválido, para recuperação
