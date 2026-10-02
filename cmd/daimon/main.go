@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"time"
 
 	"github.com/netty-linux/daimon/internal/agentloop"
 	"github.com/netty-linux/daimon/internal/editcontract"
@@ -37,6 +38,15 @@ const maxResponseBytes int64 = 2 * 1024 * 1024
 // environment arrive injected so approval prompts and terminal answers are
 // testable without touching real terminals.
 func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, getenv func(string) string) (err error) {
+	started := time.Now()
+	workspaceMode := len(args) > 0 && args[0] == "workspace"
+	root := "."
+	if workspaceMode {
+		root, args, err = workspaceArguments(args)
+		if err != nil {
+			return err
+		}
+	}
 	sink := &agentloop.MemoryEventSink{}
 	var selected model.Model
 	var authorizer agentloop.ToolAuthorizer
@@ -89,34 +99,50 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 		authorizer = composed
 		message = args[1]
 	default:
-		return fmt.Errorf("usage: daimon demo | daimon chat [--enable-replace-file] \"mensagem\" | daimon smoke \"mensagem\"")
+		return fmt.Errorf("usage: daimon demo | daimon chat [--enable-replace-file] \"mensagem\" | daimon workspace --root \"diretório\" [--enable-replace-file] \"mensagem\" | daimon smoke \"mensagem\"")
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	reader, err := tools.NewReadFile(".", 64*1024)
+	reader, err := tools.NewReadFile(root, 64*1024)
 	if err != nil {
+		if workspaceMode {
+			return errWorkspace
+		}
 		return err
 	}
 	defer reader.Close()
-	lister, err := tools.NewListDir(".", 256, 32*1024)
+	lister, err := tools.NewListDir(root, 256, 32*1024)
 	if err != nil {
+		if workspaceMode {
+			return errWorkspace
+		}
 		return err
 	}
 	defer lister.Close()
 	registry := &tools.Registry{}
-	for _, tool := range []tools.Tool{tools.Echo{}, lister, reader} {
-		if err := registry.Register(tool); err != nil {
+	counts := &workspaceCounts{}
+	register := func(tool tools.Tool, counter *int) error {
+		if workspaceMode {
+			tool = &countedTool{Tool: tool, attempts: counter, writes: &counts.writes}
+		}
+		return registry.Register(tool)
+	}
+	for i, tool := range []tools.Tool{tools.Echo{}, lister, reader} {
+		if err := register(tool, &counts.tools[i]); err != nil {
 			return err
 		}
 	}
 	if replacementEnabled {
-		replacer, err := tools.NewReplaceFile(".", editcontract.Limits{InputBytes: 64 * 1024, FinalBytes: 64 * 1024, Lines: 1000, PathBytes: 4096, PreviewBytes: 1024 * 1024})
+		replacer, err := tools.NewReplaceFile(root, editcontract.Limits{InputBytes: 64 * 1024, FinalBytes: 64 * 1024, Lines: 1000, PathBytes: 4096, PreviewBytes: 1024 * 1024})
 		if err != nil {
+			if workspaceMode {
+				return errWorkspace
+			}
 			return err
 		}
 		defer replacer.Close()
-		if err := registry.Register(replacer); err != nil {
+		if err := register(replacer, &counts.tools[3]); err != nil {
 			return err
 		}
 		composed.Replacements = replacer
@@ -124,6 +150,13 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 	}
 	loop := agentloop.Loop{Model: selected, Registry: registry, Budget: agentloop.DefaultBudget(), Sink: sink, Authorizer: authorizer}
 	result, err := loop.Run(ctx, message)
+	if workspaceMode {
+		summaryErr := printWorkspaceSummary(stdout, result, sink.Events(), counts, time.Since(started))
+		if err != nil {
+			return err
+		}
+		return summaryErr
+	}
 	if err != nil {
 		return err
 	}

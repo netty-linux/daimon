@@ -28,6 +28,10 @@ func TestReplacementChatUnsupportedPlatform(t *testing.T) {
 	if !errors.Is(err, editcontract.ErrUnsupported) {
 		t.Fatal(err)
 	}
+	err = runWithContext(context.Background(), []string{"workspace", "--root", ".", "--enable-replace-file", "replace fixture"}, strings.NewReader("y\n"), io.Discard, io.Discard, chatEnvironment(server.URL, "offline", ""))
+	if !errors.Is(err, editcontract.ErrUnsupported) {
+		t.Fatal(err)
+	}
 	data, err := os.ReadFile("fixture.txt")
 	if err != nil || string(data) != "original" {
 		t.Fatal("unexpected write", err)
