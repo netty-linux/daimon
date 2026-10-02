@@ -21,6 +21,14 @@ type editDisplayWriter func([]byte) (int, error)
 func (f editDisplayWriter) Write(b []byte) (int, error) { return f(b) }
 
 func TestReplacementChatFailsClosed(t *testing.T) {
+	replacementFailsClosed(t, false)
+}
+
+func TestReplacementWorkspaceFailsClosed(t *testing.T) {
+	replacementFailsClosed(t, true)
+}
+
+func replacementFailsClosed(t *testing.T, workspace bool) {
 	for _, scenario := range []string{"default", "eof", "invalid", "cancel", "display", "partial", "changed", "removed", "symlink", "hardlink", "limit", "reuse"} {
 		t.Run(scenario, func(t *testing.T) {
 			t.Chdir(t.TempDir())
@@ -123,6 +131,9 @@ func TestReplacementChatFailsClosed(t *testing.T) {
 			if scenario == "default" {
 				cli = []string{"chat", "replace fixture"}
 			}
+			if workspace {
+				cli = append([]string{"workspace", "--root", "."}, cli[1:]...)
+			}
 			err := runWithContext(ctx, cli, strings.NewReader(answer), &stdout, writer, chatEnvironment(server.URL, "offline", ""))
 			denied := scenario == "default" || scenario == "eof" || scenario == "invalid"
 			if denied && (err != nil || calls != 2) {
@@ -136,6 +147,15 @@ func TestReplacementChatFailsClosed(t *testing.T) {
 			}
 			if strings.Contains(stdout.String(), original) || strings.Contains(stdout.String(), "PRIVATE_PROPOSAL") {
 				t.Fatal("sensitive routine output")
+			}
+			if workspace {
+				want := "Completed writes: 0"
+				if scenario == "reuse" {
+					want = "Completed writes: 1"
+				}
+				if !strings.Contains(stdout.String(), want) || strings.Contains(stdout.String(), "fixture.txt") || strings.Contains(stdout.String(), "edit1") {
+					t.Fatal("incorrect public summary")
+				}
 			}
 			if (scenario == "default" || scenario == "limit") && preview.Len() != 0 {
 				t.Fatal("unexpected preview")

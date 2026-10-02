@@ -145,9 +145,20 @@ a cada push e pull request. Não substitua execução real por comandos simulado
 
 ## Chat de substituição opt-in
 
-- Somente chat --enable-replace-file registra replace_file e configura RequireApproval
+- Somente chat ou workspace com --enable-replace-file registra replace_file e configura RequireApproval
   para esta execução. Chat comum, smoke e demo não expõem a ferramenta.
 - A opção nunca aprova escrita: preview completo e aprovação explícita continuam obrigatórios.
 - Não enviar original, diff ou preview adicional ao provider. Argumentos produzidos pelo
   modelo e recibo integram o protocolo; read_file aprovado mantém sua fronteira atual.
 - Conteúdo só aparece no preview deliberado, nunca em eventos, recibos ou erros.
+
+## Sessão efêmera de workspace
+
+- workspace exige --root explícito válido antes de configurar o provider; todas as
+  ferramentas usam esse root, sem fallback para o diretório atual.
+- --enable-replace-file é o único opt-in de escrita; mensagem e ambiente não ativam.
+- Preservar contratos, preview, autorização e executor existentes sem modificações.
+- Resumo usa somente eventos tipados e contadores dos quatro tipos fixos de ferramenta;
+  nunca imprimir resposta final, argumentos, paths, IDs, outputs ou segredos no resumo.
+- Contar tentativas de Execute e commits confirmados, inclusive em runs interrompidos.
+- Nada persiste; não criar abstrações genéricas de sessão ou múltiplos workspaces.

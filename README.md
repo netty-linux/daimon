@@ -432,3 +432,32 @@ em Linux. Limites assumidos: workspace controlado, sem exclusão de escritor ext
 entre revalidação e rename, sem rollback após commit ou durabilidade em perda de energia;
 ACLs, ownership e xattrs não são preservados. Fora de escopo: outras plataformas de
 escrita, novos alvos, exclusão, movimentação, lote, shell e permissões persistentes.
+
+### Sessão efêmera de workspace
+
+`daimon workspace --root "<diretório>" "mensagem"` usa exclusivamente o root explícito
+para list_dir e read_file, com aprovação por chamada. O diretório precisa existir e
+poder ser aberto com os.Root antes de configurar o provider. Não há root implícito.
+`daimon workspace --root "<diretório>" --enable-replace-file "mensagem"` também registra
+replace_file: a flag não concede aprovação nem dispensa o preview integral.
+Texto da mensagem, modelo e ambiente não ativam escrita.
+
+Ao contrário de chat, que imprime a resposta final do modelo e usa o diretório atual,
+workspace imprime somente um resumo público: stop reason, passos, tool calls,
+aprovações solicitadas/concedidas/negadas, tentativas de Execute por tipo fixo,
+escritas concluídas, truncamentos e duração arredondada em segundos. Negativas não
+contam como Execute. Falhas iniciadas contam; escrita concluída é contada quando o
+executor confirma o commit, inclusive se o loop observar cancelamento logo depois.
+Runs interrompidos também produzem resumo quando o loop foi iniciado. Erros prévios
+à execução não produzem resumo. A resposta livre do modelo é deliberadamente omitida,
+pois pode repetir dados conhecidos. Prompts de leitura e preview de edição mantêm
+seus displays explícitos no stderr; não são parte do resumo.
+
+A sessão não persiste contadores, eventos, permissões, histórico ou configuração.
+Ferramentas de leitura aprovadas ainda enviam resultados ao provider configurado;
+não é um modo offline para uso real. A validação usa somente httptest offline.
+O root e o filesystem precisam estar sob controle do usuário. O executor Linux não
+foi alterado: permanece sem compare-and-rename contra escritor hostil, rollback após
+commit, durabilidade em perda de energia ou preservação de ACL/ownership/xattrs.
+Não há shell, lote, criação/exclusão/movimentação de alvos, integrações adicionais,
+retry/fallback, memória ou múltiplos workspaces. Falhas de abertura não expõem root.
