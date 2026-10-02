@@ -6,8 +6,8 @@ package diffview
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 )
 
@@ -45,9 +45,8 @@ const noNewlineMarker = `\ No newline at end of file`
 // collapseMarker stands for omitted unchanged lines.
 const collapseMarker = "..."
 
-// carriageReturnSuffix marks a CRLF line ending that plain display would
-// hide. U+240D is a printable symbol, so it survives control sanitizing.
-const carriageReturnSuffix = "␍"
+// A literal backslash is itself escaped, so this cannot collide with content.
+const carriageReturnSuffix = `\r`
 
 // textLine is one source line with its terminator class. Only a file-final
 // line may lack a terminator; equality requires the same text and class so
@@ -83,28 +82,16 @@ func equalLine(a, b textLine) bool {
 	return a.text == b.text && a.crlf == b.crlf && a.terminated == b.terminated
 }
 
-// sanitizeDisplay replaces control and formatting characters with '?' so
-// approved text can never shape the terminal. Structure markers are added
-// separately and never pass through here.
+// sanitizeDisplay uses reversible Go string escapes, without surrounding
+// quotes. All non-ASCII, controls, quotes and backslashes are escaped.
+// Structural newlines and row prefixes are added separately.
 func sanitizeDisplay(text string) string {
-	if strings.IndexFunc(text, func(r rune) bool {
-		return unicode.IsControl(r) || unicode.Is(unicode.Cf, r)
-	}) < 0 {
-		return text
-	}
-	var builder strings.Builder
-	builder.Grow(len(text))
-	for _, r := range text {
-		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
-			r = '?'
-		}
-		builder.WriteRune(r)
-	}
-	return builder.String()
+	quoted := strconv.QuoteToASCII(text)
+	return quoted[1 : len(quoted)-1]
 }
 
 // sanitizePath keeps one path on one header line: any control or formatting
-// character, including newlines, becomes '?'.
+// character, including newlines, is escaped without losing identity.
 func sanitizePath(path string) string { return sanitizeDisplay(path) }
 
 type editOp uint8

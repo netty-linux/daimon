@@ -133,14 +133,14 @@ func TestEmptySides(t *testing.T) {
 
 func TestCRLFEndingsVisible(t *testing.T) {
 	out := render(t, "p", "a\r\nb\r\n", "a\r\nB\r\n")
-	for _, want := range []string{" a␍", "-b␍", "+B␍"} {
+	for _, want := range []string{` a\r`, `-b\r`, `+B\r`} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in %q", want, out)
 		}
 	}
 	// An ending-only change is still a change.
 	out = render(t, "p", "a\r\n", "a\n")
-	if !strings.Contains(out, "-a␍") || !strings.Contains(out, "+a\n") {
+	if !strings.Contains(out, `-a\r`) || !strings.Contains(out, "+a\n") {
 		t.Fatalf("ending change hidden: %q", out)
 	}
 }
@@ -162,7 +162,7 @@ func TestControlCharactersSanitized(t *testing.T) {
 			t.Fatalf("control reached output: %q", out)
 		}
 	}
-	for _, want := range []string{"-a?b", "+a?B ?c ?d"} {
+	for _, want := range []string{`-a\x1bb`, `+a\x1bB \u009bc \u202ed`} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in %q", want, out)
 		}
@@ -248,11 +248,37 @@ func TestInvalidLimitsAndInput(t *testing.T) {
 func TestPathStaysOnHeaderLines(t *testing.T) {
 	out := render(t, "a\nb", "x\n", "y\n")
 	for _, line := range strings.Split(out, "\n") {
-		if strings.HasPrefix(line, "--- ") && line != "--- a?b" {
+		if strings.HasPrefix(line, "--- ") && line != `--- a\nb` {
 			t.Fatalf("header=%q", line)
 		}
-		if strings.HasPrefix(line, "+++ ") && line != "+++ a?b" {
+		if strings.HasPrefix(line, "+++ ") && line != `+++ a\nb` {
 			t.Fatalf("header=%q", line)
 		}
+	}
+}
+
+func TestEscapesAreReversibleAndDistinct(t *testing.T) {
+	inputs := []string{"?", "\x1b", `\x1b`, "\u202e", `\u202e`, "␍", "\r", `\r`, "\t", "\u2028", "é", "e\u0301", "\"", "\\", "\n"}
+	seen := map[string]bool{}
+	for _, input := range inputs {
+		escaped := sanitizeDisplay(input)
+		if seen[escaped] {
+			t.Fatalf("collision for %q", input)
+		}
+		seen[escaped] = true
+		decoded, err := strconv.Unquote(`"` + escaped + `"`)
+		if err != nil || decoded != input {
+			t.Fatalf("roundtrip %q: %q %v", input, decoded, err)
+		}
+		for _, r := range escaped {
+			if r < 32 || r > 126 {
+				t.Fatalf("unsafe display %q", escaped)
+			}
+		}
+	}
+	crlf := render(t, "p", "", "x\r\n")
+	literal := render(t, "p", "", "x\\r\n")
+	if crlf == literal {
+		t.Fatal("CRLF collides with literal escape")
 	}
 }

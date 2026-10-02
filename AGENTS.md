@@ -76,6 +76,13 @@ echo, read_file e list_dir.
 
 ## Segurança e escopo
 
+- internal/editcontract prepara propostas imutáveis e aprovação de uso único
+  somente leitura, sem executor/Tool/integração ao loop. Vincule caminho, versão
+  original, bytes propostos e limites; preview ASCII reversível completo obrigatório.
+  Rejeite symlinks observados em qualquer componente; revalide antes/depois da
+  decisão e no consumo. Falha/cancelamento gasta a tentativa/capacidade, sem retry.
+  Inspeções não provam exclusão de corridas, ABA, hard links ou atomicidade de escrita.
+
 - Ferramentas desconhecidas, JSON inválido e erros normais viram resultados controlados.
 - Não usar panic, log.Fatal ou os.Exit no loop.
 - read_file e list_dir permanecem confinados com os.Root, somente caminhos

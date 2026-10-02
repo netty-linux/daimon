@@ -375,10 +375,11 @@ Nenhum teste acessa internet ou depende de um provider externo.
 
 ## Limites e próximo passo
 
-Há um preview independente em `internal/diffview`, ainda sem integração ao loop
-ou ferramenta de escrita. O [contrato proposto de edição](docs/workspace-edit-contract.md)
-documenta seus limites, os requisitos para uma futura aprovação de mudanças e o
-smoke test com modelo local que permanece pendente.
+Há um preview ASCII reversível em `internal/diffview` e um contrato somente leitura
+em `internal/editcontract`: proposta imutável, display completo, aprovação de uso
+único e revalidação do arquivo. Nenhum deles está integrado ao loop ou habilita
+escrita. O [contrato de edição](docs/workspace-edit-contract.md) separa comportamento
+implementado, executor futuro e critérios de concorrência/atomicidade ainda não validados.
 
 Esta fundação não oferece sandbox de processo, limite rígido de alocação de memória,
 tokenização, sumarização ou persistência. Um componente pode alocar

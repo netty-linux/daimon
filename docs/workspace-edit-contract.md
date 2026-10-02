@@ -1,48 +1,107 @@
-# Contrato proposto para edição do workspace
+# Contrato de proposta e aprovação de edição
 
-Estado: proposta, sem ferramenta de escrita e sem alteração da política atual.
-O agente permanece somente leitura. Implementar edição exige uma mudança explícita
-de escopo no AGENTS.md e revisão própria.
+Estado: preparação, preview e aprovação implementados como biblioteca independente
+e somente leitura. Não há executor, ferramenta de edição, registro no Registry ou
+integração à CLI/loop. A política atual permanece inalterada. A aprovação deste
+contrato não executa nem habilita escrita.
 
-## Preview implementado
+## Contrato implementado
 
 `internal/diffview.Render` produz um preview determinístico com três linhas de
-contexto, regiões separadas, CRLF visível e marcador de ausência de newline final.
+contexto, regiões separadas, CRLF visível como `\r` e marcador de ausência de newline final.
 Todas as linhas alteradas são mostradas; exceder limites retorna erro sem preview
 parcial. MaxLines e MaxBytes são positivos. Há tetos adicionais de 1000 linhas por
 versão e 1 MiB por string de entrada, inclusive caminho, para limitar o trabalho.
 O limite de saída conta bytes e inclui cabeçalhos e marcadores.
 
-O formato é para exibição, não é um patch aplicável. Controles e caracteres de
-formatação Unicode viram `?`; essa transformação pode tornar conteúdos diferentes
-visualmente iguais. Portanto este preview isolado não basta para autorizar escrita.
-Antes dessa integração, a exibição deve escapar caracteres de forma inequívoca,
-incluindo o próprio caractere de escape e os marcadores de terminadores de linha.
+O formato é para exibição, não é um patch aplicável. Conteúdo e caminhos usam
+escapes de string Go ASCII reversíveis: controles, aspas, barra invertida e todo
+caractere não ASCII são escapados. `\r` do terminador CRLF distingue-se do texto
+literal `\\r`; Unicode visualmente parecido mantém representações diferentes.
+Bytes UTF-8 inválidos são rejeitados. Linhas de conteúdo têm prefixo próprio;
+marcadores de estrutura não podem ser confundidos com o conteúdo escapado.
 
-## Requisitos da futura edição
+`internal/editcontract.Workspace` abre um os.Root e prepara uma Proposal para um
+único arquivo regular existente. O chamador mantém o workspace aberto até concluir
+o ciclo. O contrato aceita caminhos relativos canônicos com `/`: não aceita
+traversal, absoluto, `.` como alvo, barra invertida, ADS, nomes reservados Windows,
+componentes com ponto/espaço final ou caracteres de caminho proibidos. Não normaliza
+silenciosamente o caminho. Não altera read_file/list_dir, que mantêm seus contratos.
 
-1. Começar com substituição de um único arquivo regular existente, relativo ao
-   workspace, com limites explícitos e validação estrita de argumentos. Não criar,
-   remover, renomear arquivos nem executar shell nesse corte.
-2. Preparar uma proposta imutável: caminho, bytes originais, bytes propostos e
-   identificador do conteúdo. Validar todos os limites antes de pedir aprovação.
-3. Mostrar a mudança completa em representação inequívoca. Se não couber no
-   preview, negar; nunca pedir aprovação de uma mudança parcialmente exibida.
-4. Vincular aprovação de uso único à proposta exata, incluindo caminho e bytes.
-   Não aceitar aprovação persistente nem permitir que o modelo altere a proposta
-   entre a exibição e o efeito.
-5. Revalidar conteúdo e identidade do alvo antes de escrever. Se houver mudança,
-   recusar sem efeito e exigir nova proposta/aprovação. Uma simples sequência
-   read/check/write não elimina corrida: a estratégia de concorrência e troca
-   segura precisa ser definida e testada antes da implementação.
-6. Definir confinamento com os.Root, política de symlinks/hard links, permissões,
-   substituição atômica, falhas e limpeza do temporário. Não prometer sandbox nem
-   atomicidade sem evidência em Linux e Windows.
-7. Preservar autorização do lote antes de efeitos, budget, cancelamento, recibos
-   correlatos e eventos sem conteúdo sensível. Preparação e preview ficam fora
-   do modelo e não introduzem retries ou execução concorrente.
-8. Cobrir negativa, EOF, cancelamento, proposta alterada, alvo alterado, symlinks,
-   limites, controles Unicode, falhas de escrita e ausência de efeitos em rejeição.
+A proposta vincula o workspace aberto, caminho exato, SHA-256/bytes/modo/mtime do
+original, identidade do arquivo retida privadamente com os.SameFile, cópia dos
+bytes exatos propostos e limites. Seu ID inclui os hashes, metadados, caminho,
+limites e nonce aleatório. IDs não são tokens de autorização persistentes.
+Nenhuma referência mutável aos bytes internos é entregue ao chamador.
+
+Limits exige todos os campos positivos: InputBytes (por versão, até 1 MiB), Lines
+(por versão, até 1000), PathBytes (até 4096) e PreviewBytes (display completo).
+O display inclui ID, caminho, versão original, hash/tamanho proposto, limites,
+diff e **conteúdo proposto completo** como string ASCII entre aspas, com todos os
+terminadores. Contexto omitido pelo diff não omite bytes do conteúdo proposto.
+Cabeçalhos, escapes e marcadores contam no limite. Se qualquer parte não couber,
+Prepare retorna erro e nenhuma proposta aprovável; nunca há corte parcial.
+
+Proposal.Approve aceita um Reviewer injetado e só uma tentativa. Revalida o
+arquivo antes e depois da decisão. Só Allow explícito produz Permit; nil, decisões
+inválidas, erro, negativa e cancelamento falham fechado. View e Review são cópias
+destacadas; alterações feitas pelo reviewer não mudam a proposta. Um reviewer
+é um componente confiável: deve exibir todo o display e obter uma decisão fresca.
+Não há proteção contra uma implementação de reviewer que minta deliberadamente.
+
+O reviewer Terminal implementado escreve o display inteiro e o prompt no writer
+injetado antes de ler a resposta. Escrita parcial/falha impede aprovação; controles
+não chegam ao terminal. Padrão No, EOF e entrada inválida negam. Resposta longa ou
+erro de leitura inutiliza a instância, impedindo que sobras aprovem outra proposta.
+Cancelamento interrompe a espera; um reader bloqueado pode manter uma goroutine
+até o fechamento. Descarte o Terminal após cancelamento e feche o reader quando
+possível. Não lê os.Stdin, não persiste decisões e não oferece sempre permitir.
+
+Permit.Consume gasta a aprovação antes de revalidar e devolve uma cópia dos bytes
+somente se o alvo ainda corresponder. A capacidade também permanece vinculada ao
+contexto usado na aprovação: cancelá-lo impede consumo mesmo com novo contexto.
+O chamador deve usar o contexto de execução na aprovação. Cópias de Proposal/Permit compartilham o
+estado de uso único. Um resultado Validated não é uma operação de escrita nem
+uma credencial serializável; não pode ser reutilizado como autorização de executor.
+O fluxo é síncrono; não há suporte a uso concorrente do Workspace/Terminal.
+
+### Alterações, cancelamento, symlinks e falhas
+
+- Arquivo alterado antes/durante aprovação: sem Permit. Depois da aprovação:
+  Consume falha e gasta o Permit. Mudanças em conteúdo, identidade, modo, tamanho
+  ou mtime exigem nova preparação e aprovação; não há retry automático.
+- Cancelamento/deadline: preserva errors.Is de contexto e nunca valida sucesso
+  depois de observado. Aprovação/consumo cancelado gasta a tentativa/capacidade.
+- Symlink observado em qualquer componente, interno ou externo: rejeitado na
+  preparação e revalidação. Diretório, alvo ausente, leitura/inspeção falha ou
+  workspace fechado impedem aprovação/consumo. Erros não expõem conteúdo/caminho
+  nem mensagens livres dos componentes. Falha de filesystem pode retornar
+  ErrFile/ErrSymlink/ErrLimit em vez de ErrChanged; todas impedem o fluxo.
+- Leitura é limitada antes da aceitação. UTF-8 inválido ou limite excedido não
+  produz proposta. Nenhuma dessas operações escreve, cria, remove ou renomeia arquivos.
+
+## Executor futuro: ausente neste PR
+
+Um executor só poderá ser implementado em outro corte explicitamente autorizado,
+para um arquivo existente por operação. Deve consumir a capacidade junto ao efeito
+sem transformar os bytes retornados em autorização permanente. Precisa preservar
+budget, autorização prévia, cancelamento, recibos e eventos sem conteúdo sensível.
+Não há shell, edição em lote, permissões persistentes, retry ou fallback.
+
+## Critérios ainda não validados
+
+A sequência de inspeção/leitura/check não elimina corridas de filesystem. os.Root
+confina resolução, mas as verificações de symlink não são exclusão atômica de
+trocas concorrentes. Mudanças transitórias restauradas (ABA) podem não ser detectadas.
+O contrato é apropriado a um workspace controlado, não prova sandbox ou segurança
+em filesystem hostil. Hard links não são rejeitados nem resolvidos neste corte.
+
+Antes de escrita: definir exclusão de concorrência/conflitos, proteção de identidade
+até o efeito, política de hard links, permissões, troca atômica, durabilidade,
+limpeza de temporários e tratamento de falhas/cancelamento durante o commit.
+Atomicidade, ausência de escrita após cancelamento e comportamento sob concorrência
+precisam de evidência própria em Linux e Windows. Os testes deste PR validam somente
+o contrato read-only, não essas garantias de um executor inexistente.
 
 ## Smokes reais
 
