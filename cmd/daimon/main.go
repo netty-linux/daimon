@@ -11,6 +11,7 @@ import (
 	"github.com/netty-linux/daimon/internal/agentloop"
 	"github.com/netty-linux/daimon/internal/model"
 	"github.com/netty-linux/daimon/internal/policy"
+	"github.com/netty-linux/daimon/internal/providers/groq"
 	"github.com/netty-linux/daimon/internal/providers/openai"
 	"github.com/netty-linux/daimon/internal/tools"
 )
@@ -47,7 +48,7 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 			model.ScriptStep{Response: model.ModelResponse{FinalText: "DAIMON"}},
 		)
 		message = "repita DAIMON"
-	case len(args) == 2 && args[0] == "chat" && strings.TrimSpace(args[1]) != "":
+	case len(args) == 2 && (args[0] == "chat" || args[0] == "smoke") && strings.TrimSpace(args[1]) != "":
 		apiKey = getenv("DAIMON_API_KEY")
 		// Redact even provider-echoed secrets or downstream writer errors.
 		defer func() {
@@ -55,10 +56,15 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 				err = &outputError{message: strings.ReplaceAll(err.Error(), apiKey, "[REDACTED]"), cause: err}
 			}
 		}()
-		selected, err = openai.New(openai.Config{
-			BaseURL: getenv("DAIMON_BASE_URL"), Model: getenv("DAIMON_MODEL"),
-			APIKey: apiKey, MaxResponseBytes: maxResponseBytes,
-		})
+		if args[0] == "smoke" {
+			selected, err = groq.New(groq.Config{APIKey: apiKey,
+				Model: getenv("DAIMON_GROQ_MODEL"), MaxResponseBytes: maxResponseBytes})
+		} else {
+			selected, err = openai.New(openai.Config{
+				BaseURL: getenv("DAIMON_BASE_URL"), Model: getenv("DAIMON_MODEL"),
+				APIKey: apiKey, MaxResponseBytes: maxResponseBytes,
+			})
+		}
 		if err != nil {
 			return err
 		}
@@ -69,7 +75,7 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 		}
 		message = args[1]
 	default:
-		return fmt.Errorf("usage: daimon demo | daimon chat \"mensagem\"")
+		return fmt.Errorf("usage: daimon demo | daimon chat \"mensagem\" | daimon smoke \"mensagem\"")
 	}
 	if err := ctx.Err(); err != nil {
 		return err
