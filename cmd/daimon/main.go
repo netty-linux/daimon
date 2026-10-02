@@ -48,6 +48,10 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 		}
 	}
 	sink := &agentloop.MemoryEventSink{}
+	planMode := workspaceMode && len(args) == 3 && args[1] == "plan"
+	if planMode {
+		args = []string{"chat", args[2]}
+	}
 	var selected model.Model
 	var authorizer agentloop.ToolAuthorizer
 	var composed *policy.Authorizer
@@ -96,10 +100,16 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 			Approvals: policy.NewTerminalApproval(bufferedInput, stderr),
 			Sink:      sink,
 		}
+		if planMode {
+			composed.Approvals = &planApproval{terminal: policy.NewTerminalApproval(bufferedInput, stderr)}
+		}
 		authorizer = composed
 		message = args[1]
+		if planMode {
+			message = planInstruction + "\n\nPedido do usuário:\n" + message
+		}
 	default:
-		return fmt.Errorf("usage: daimon demo | daimon chat [--enable-replace-file] \"mensagem\" | daimon workspace --root \"diretório\" [--enable-replace-file] \"mensagem\" | daimon smoke \"mensagem\"")
+		return fmt.Errorf("usage: daimon demo | daimon chat [--enable-replace-file] \"mensagem\" | daimon workspace --root \"diretório\" [--enable-replace-file] \"mensagem\" | daimon workspace --root \"diretório\" plan \"mensagem\" | daimon smoke \"mensagem\"")
 	}
 	if err := ctx.Err(); err != nil {
 		return err
@@ -151,9 +161,23 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 	loop := agentloop.Loop{Model: selected, Registry: registry, Budget: agentloop.DefaultBudget(), Sink: sink, Authorizer: authorizer}
 	result, err := loop.Run(ctx, message)
 	if workspaceMode {
+		var planErr error
+		if planMode && err == nil {
+			plan := result.FinalAnswer
+			if apiKey != "" {
+				plan = strings.ReplaceAll(plan, apiKey, "[REDACTED]")
+			}
+			text := "Plano proposto (texto do modelo; não executado):\n" + plan + "\n\n"
+			if n, writeErr := io.WriteString(stdout, text); writeErr != nil || n != len(text) {
+				planErr = fmt.Errorf("cannot display proposed plan")
+			}
+		}
 		summaryErr := printWorkspaceSummary(stdout, result, sink.Events(), counts, time.Since(started))
 		if err != nil {
 			return err
+		}
+		if planErr != nil {
+			return planErr
 		}
 		return summaryErr
 	}
