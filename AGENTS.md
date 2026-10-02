@@ -70,7 +70,7 @@ em Go, com Scripted, echo, read_file, list_dir e replace_file (escrita em Linux)
   ToolDenied → recibo controlado correlato, sem execução.
 - Desconhecido ou JSON inválido: ToolRequested → ToolFailed, sem evento de autorização.
 - Eventos nunca contêm nomes, IDs, argumentos, motivos de decisão ou resultados.
-- A política padrão do CLI permite echo, exige aprovação para list_dir, read_file e replace_file
+- A política padrão do CLI permite echo, exige aprovação para list_dir e read_file; replace_file é negado por padrão
   e nega qualquer outra ferramenta; não existe opção global de aprovar tudo.
 - Não adicionar aprovação permanente, wildcards de permissão, configuração de
   política em arquivo ou ferramentas além de replace_file neste corte.
@@ -142,3 +142,12 @@ go run ./cmd/daimon demo
 ```
 gofmt -l não pode listar arquivos. CI executa formatação, vet, testes e race detector
 a cada push e pull request. Não substitua execução real por comandos simulados.
+
+## Chat de substituição opt-in
+
+- Somente chat --enable-replace-file registra replace_file e configura RequireApproval
+  para esta execução. Chat comum, smoke e demo não expõem a ferramenta.
+- A opção nunca aprova escrita: preview completo e aprovação explícita continuam obrigatórios.
+- Não enviar original, diff ou preview adicional ao provider. Argumentos produzidos pelo
+  modelo e recibo integram o protocolo; read_file aprovado mantém sua fronteira atual.
+- Conteúdo só aparece no preview deliberado, nunca em eventos, recibos ou erros.

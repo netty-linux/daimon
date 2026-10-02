@@ -101,7 +101,7 @@ func TestChatToolCycle(t *testing.T) {
 			w.WriteHeader(500)
 			return
 		}
-		if len(request.Tools) != 4 || request.Tools[0].Function.Name != "echo" || request.Tools[1].Function.Name != "list_dir" || request.Tools[2].Function.Name != "read_file" || request.Tools[3].Function.Name != "replace_file" {
+		if len(request.Tools) != 3 || request.Tools[0].Function.Name != "echo" || request.Tools[1].Function.Name != "list_dir" || request.Tools[2].Function.Name != "read_file" {
 			t.Error("tools not registered")
 		}
 		if calls.Add(1) == 1 {
