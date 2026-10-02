@@ -350,6 +350,11 @@ Nenhum teste acessa internet ou depende de um provider externo.
 
 ## Limites e próximo passo
 
+Há um preview independente em `internal/diffview`, ainda sem integração ao loop
+ou ferramenta de escrita. O [contrato proposto de edição](docs/workspace-edit-contract.md)
+documenta seus limites, os requisitos para uma futura aprovação de mudanças e o
+smoke test com modelo local que permanece pendente.
+
 Esta fundação não oferece sandbox de processo, limite rígido de alocação de memória,
 tokenização, sumarização ou persistência. Um componente pode alocar
 uma resposta grande antes de devolvê-la; o budget limita o que o loop aceita e armazena.
