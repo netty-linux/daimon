@@ -22,9 +22,20 @@ func workspaceArguments(args []string) (string, []string, error) {
 	}
 	root, tail := args[2], args[3:]
 	var chat []string
-	if len(tail) == 2 && tail[0] == "--enable-replace-file" {
+	if len(tail) == 2 && tail[0] == "plan" {
+		if tail[1] == "--enable-replace-file" {
+			return "", nil, errWorkspace
+		}
+		chat = []string{"chat", "plan", tail[1]}
+	} else if len(tail) == 2 && tail[0] == "--enable-replace-file" {
+		if tail[1] == "plan" {
+			return "", nil, errWorkspace
+		}
 		chat = []string{"chat", tail[0], tail[1]}
 	} else if len(tail) == 1 {
+		if tail[0] == "plan" {
+			return "", nil, errWorkspace
+		}
 		chat = []string{"chat", tail[0]}
 	} else {
 		return "", nil, errWorkspace

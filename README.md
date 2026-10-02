@@ -461,3 +461,33 @@ foi alterado: permanece sem compare-and-rename contra escritor hostil, rollback 
 commit, durabilidade em perda de energia ou preservação de ACL/ownership/xattrs.
 Não há shell, lote, criação/exclusão/movimentação de alvos, integrações adicionais,
 retry/fallback, memória ou múltiplos workspaces. Falhas de abertura não expõem root.
+
+### Planejamento read-only
+
+`daimon workspace --root "<diretório>" plan "analisar a mudança"` abre uma sessão
+efêmera de diagnóstico. O runtime solicita ao modelo diagnóstico, objetivo,
+arquivos prováveis, mudança pretendida por arquivo, riscos/suposições, validação e
+bloqueios. A resposta é texto livre: nenhuma validação semântica, parser, arquivo,
+cache, persistência ou execução do plano é realizada.
+
+Somente echo, list_dir e read_file são registrados; --enable-replace-file é
+incompatível com plan. Pedidos de escrita no texto ou calls maliciosas não mudam
+schema nem política. Ferramenta ausente gera recibo de ferramenta desconhecida.
+Root e formato do comando são validados antes de configurar o provider; argumentos
+inválidos são rejeitados antes de abrir o workspace. Leituras continuam aprovadas
+por chamada. Nesse modo, prompts mostram somente o tipo fixo de ferramenta,
+sem argumentos/caminhos; os requests originais são preservados para execução.
+
+A saída deliberada `Plano proposto` mostra o texto do modelo, seguida pelo resumo
+público existente. O plano pode conter nomes de arquivos e dados conhecidos pelo
+modelo; não deve ser tratado como um log público. Resumo, prompts operacionais,
+eventos e erros não exibem esses dados. Falhas do run não exibem um plano parcial.
+Leituras aprovadas ainda enviam seus resultados ao provider; plan não acrescenta
+mensagens com dados do workspace além do protocolo existente. Testes usam somente
+httptest e fixtures locais, sem credenciais reais ou requests externos.
+
+Diferenças: chat usa cwd e imprime resposta final; workspace exige root e imprime
+somente resumo; workspace plan exige root, solicita e exibe plano deliberado sem
+ferramenta de escrita; workspace com --enable-replace-file disponibiliza substituição
+Linux com preview/aprovação, sem execução automática de planos. Um plano não concede
+permissão futura. Limitações do executor permanecem inalteradas e fora deste corte.

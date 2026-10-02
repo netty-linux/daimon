@@ -162,3 +162,15 @@ a cada push e pull request. Não substitua execução real por comandos simulado
   nunca imprimir resposta final, argumentos, paths, IDs, outputs ou segredos no resumo.
 - Contar tentativas de Execute e commits confirmados, inclusive em runs interrompidos.
 - Nada persiste; não criar abstrações genéricas de sessão ou múltiplos workspaces.
+
+## Planejamento read-only
+
+- workspace --root "diretório" plan "mensagem" solicita plano textual estruturado,
+  sem interpretar, validar semanticamente, persistir ou executar seu conteúdo.
+- Plan nunca registra replace_file; flag de escrita e plan são incompatíveis.
+- Validar formato antes de abrir workspace; root antes de configurar provider.
+- Preservar policy e requests originais. Somente no modo plan, prompts de aprovação
+  mostram tipo de ferramenta sem argumentos/paths; ainda exigem decisão por chamada.
+- Plano é saída deliberada separada do resumo público e pode conter dados do modelo.
+  Resumo, eventos, prompts operacionais e erros não incluem esses dados.
+- Contratos/preview/executor e limites Linux existentes não mudam.
