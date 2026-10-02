@@ -48,9 +48,21 @@ incluindo o próprio caractere de escape e os marcadores de terminadores de linh
 
 Groq é o padrão dos smokes opt-in via `daimon smoke`, com `openai/gpt-oss-20b`.
 Em 2026-10-02, o smoke real de echo passou: dois requests, uma chamada de
-ferramenta, resposta DAIMON e StopReason completed. Nenhuma chave foi persistida.
-Listagem aprovada/negada e leitura de fixture continuam pendentes de validação
-manual com esse serviço. O comando conserva a aprovação humana por chamada.
+ferramenta, resposta DAIMON e StopReason completed. Nesse primeiro teste a chave
+foi usada apenas no processo.
+
+Também passaram os smokes reais de listagem aprovada, listagem negada e leitura
+aprovada de fixture temporária, cada um com dois requests, uma tentativa de
+ferramenta e StopReason completed. A negativa retornou DENIED; a leitura retornou
+exatamente DAIMON_SMOKE_FIXTURE_20261002. As respostas y/n foram fornecidas pelo
+operador de teste sob autorização do usuário e não alteram o padrão No da CLI.
+A comprovação de ausência de Execute em negativa vem dos testes determinísticos;
+a resposta do modelo sozinha não comprova ausência de efeito.
+
+Por solicitação explícita do usuário, a chave passou a ficar na variável de
+ambiente DAIMON_API_KEY do usuário Windows, fora do repositório. Não há chave em
+arquivo versionado nem carregamento implícito de secrets pelo provider.
+O comando conserva a aprovação de uso único por chamada.
 
 ### Smoke local pendente
 
