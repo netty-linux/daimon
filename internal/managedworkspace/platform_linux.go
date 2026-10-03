@@ -3,6 +3,7 @@
 package managedworkspace
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -12,6 +13,20 @@ import (
 )
 
 func supported() bool { return runtime.GOARCH == "amd64" }
+
+// Advisory directory locks coordinate cooperating managed operations without
+// creating a lock artifact. The owning UID and administrators remain trusted.
+func exclusiveDirectory(root *os.Root) (*os.File, error) {
+	f, err := openRead(root, ".", true)
+	if err != nil {
+		return nil, ErrPrivate
+	}
+	if syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) != nil {
+		f.Close()
+		return nil, ErrState
+	}
+	return f, nil
+}
 
 // Topology guard: no mount crossings/bind aliases from the namespace root.
 // This does not immobilize shared trees; private ownership is still required.
@@ -54,6 +69,14 @@ func identityInfo(i os.FileInfo) Identity {
 		return Identity{}
 	}
 	return Identity{uint64(s.Dev), s.Ino}
+}
+
+func changeInfo(i os.FileInfo) string {
+	s, ok := i.Sys().(*syscall.Stat_t)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%d:%d", s.Ctim.Sec, s.Ctim.Nsec)
 }
 func identity(name string) (Identity, error) {
 	i, err := os.Lstat(name)

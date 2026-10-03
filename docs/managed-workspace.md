@@ -167,5 +167,7 @@ operações foram aplicadas. Consulte o report/journal para distinguir isso.
 A saída e approved-plan podem conter dados sensíveis porque são o artefato
 deliberadamente solicitado; permanecem privados, nunca duplicados em logs.
 Revise output e artifacts antes de exportar. **Publicar no source é uma operação
-externa, fora de escopo, sem comando ou permissão na Daimon.** Remoção dos runs
-é manual pelo operador; a CLI não remove nem o source nem runs antigos.
+externa, fora de escopo, sem comando ou permissão na Daimon.** Descarte de um run
+é explícito, opt-in e aprovado; não existe remoção automática por idade.
+List/inspect são read-only. Consulte [o lifecycle](managed-lifecycle.md) para
+preview, confirmação, tombstones, estados e condições de bloqueio.

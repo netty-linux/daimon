@@ -611,6 +611,9 @@ atualizar atime. Apply em roots compartilhadas permanece bloqueado.
 daimon managed-workspace --base /tmp/daimon-store create --source /input
 daimon managed-workspace --base /tmp/daimon-store apply --run <id> --plan /input-plan.json
 daimon managed-workspace --base /tmp/daimon-store report --run <id>
+daimon managed-workspace --base /tmp/daimon-store list
+daimon managed-workspace --base /tmp/daimon-store inspect --run <id>
+daimon managed-workspace --base /tmp/daimon-store discard --run <id> --enable-discard
 ```
 
 Aplicação determinística somente na cópia privada, com preview integral, aprovação
@@ -618,3 +621,9 @@ de uso único, journal e relatório verificado. Não há publicação na origem,
 retomada após crash, limpeza automática ou suporte Windows. Veja
 [o contrato e as limitações](docs/managed-workspace.md) e
 [o formato do plano](docs/workspace-core.md).
+
+List e inspect são read-only. Discard remove somente uma cópia gerenciada,
+com opt-in, preview completo, confirmação única, revalidação e tombstone privado
+sincronizado fora do run. Não modifica a origem nem faz limpeza automática.
+Runs interrompidos ou inconsistentes permanecem bloqueados para descarte.
+Veja [estados, auditoria e limitações do lifecycle](docs/managed-lifecycle.md).

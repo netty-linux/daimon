@@ -13,12 +13,15 @@ import (
 
 // Strict bounded metadata decoding, not authentication against the trusted UID.
 func strictMetadata(data []byte, target any) error {
-	d := json.NewDecoder(bytes.NewReader(data))
-	d.UseNumber()
 	allowed := map[string]bool{}
 	for _, key := range []string{"version", "run_id", "created", "source_reference_sha256", "snapshot_sha256", "files", "directories", "bytes", "root_identity", "output_identity", "device", "inode", "status", "rules", "operations", "type", "path", "before", "after", "sequence", "timestamp", "operation"} {
 		allowed[key] = true
 	}
+	return strictJSON(data, target, allowed)
+}
+func strictJSON(data []byte, target any, allowed map[string]bool) error {
+	d := json.NewDecoder(bytes.NewReader(data))
+	d.UseNumber()
 	var walk func(int) bool
 	walk = func(depth int) bool {
 		if depth > 4 {
