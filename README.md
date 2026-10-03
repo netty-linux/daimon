@@ -599,3 +599,22 @@ testes e limpeza automática não confirmadas. A proposta foi negada e a sessão
 interrompida; nenhuma escrita ocorreu. Esses achados motivam o protocolo, mas não
 comprovam sua eficácia: este corte é validado com httptest/fixtures, sem nova chamada
 real. A aprovação humana e os contratos de escrita continuam sendo a barreira.
+
+## Managed Workspace v1 — Experimental
+
+Somente Linux amd64. O proprietário, processos do mesmo UID e administradores
+são confiáveis; processos hostis do mesmo UID não são isolados. A Daimon nunca
+modifica conteúdo ou permissões da origem nem a abre para escrita; leituras podem
+atualizar atime. Apply em roots compartilhadas permanece bloqueado.
+
+```text
+daimon managed-workspace --base /tmp/daimon-store create --source /input
+daimon managed-workspace --base /tmp/daimon-store apply --run <id> --plan /input-plan.json
+daimon managed-workspace --base /tmp/daimon-store report --run <id>
+```
+
+Aplicação determinística somente na cópia privada, com preview integral, aprovação
+de uso único, journal e relatório verificado. Não há publicação na origem, rollback,
+retomada após crash, limpeza automática ou suporte Windows. Veja
+[o contrato e as limitações](docs/managed-workspace.md) e
+[o formato do plano](docs/workspace-core.md).

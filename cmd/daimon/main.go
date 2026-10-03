@@ -39,6 +39,9 @@ const maxResponseBytes int64 = 2 * 1024 * 1024
 // environment arrive injected so approval prompts and terminal answers are
 // testable without touching real terminals.
 func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, getenv func(string) string) (err error) {
+	if len(args) > 0 && args[0] == "managed-workspace" {
+		return runManagedWorkspace(ctx, args[1:], stdin, stdout, stderr)
+	}
 	started := time.Now()
 	workspaceMode := len(args) > 0 && args[0] == "workspace"
 	if workspaceMode {

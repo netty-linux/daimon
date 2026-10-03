@@ -60,11 +60,12 @@ type Version struct {
 // Review is a detached value. Display contains the complete escaped proposed
 // content, not just the changed rows. A reviewer must display it in full.
 type Review struct {
-	ID, Path       string
-	Original       Version
-	ProposedSHA256 string
-	Limits         Limits
-	Display        string
+	ID, Path                 string
+	RootID, RunID, Operation string
+	Original                 Version
+	ProposedSHA256           string
+	Limits                   Limits
+	Display                  string
 }
 type Decision uint8
 
