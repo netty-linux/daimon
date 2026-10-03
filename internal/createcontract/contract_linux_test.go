@@ -67,11 +67,11 @@ func TestExactCreationAndOneUse(t *testing.T) {
 	}
 	data[0] = 'X'
 	view := p.View()
-	if !view.TargetAbsent || view.RootID == "" || !strings.Contains(view.Display, strconv.QuoteToASCII(string(original))) || !strings.Contains(view.Display, "ABSENT") {
+	if !view.TargetAbsent || view.RootID == "" || !strings.Contains(view.Display, strconv.QuoteToASCII(string(original))) || !strings.Contains(view.Display, "AUSENTE") {
 		t.Fatal("incomplete binding")
 	}
 	for _, r := range view.Display {
-		if r > 127 || r == '\x1b' {
+		if (r < 32 && r != '\n') || r == '\x1b' {
 			t.Fatal("unsafe preview")
 		}
 	}

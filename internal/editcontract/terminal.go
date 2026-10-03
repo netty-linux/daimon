@@ -30,7 +30,7 @@ func (t *Terminal) Review(ctx context.Context, r Review) (Decision, error) {
 		return Deny, err
 	}
 	// The complete proposal must be written successfully before accepting input.
-	for _, text := range []string{r.Display, "Approve this proposal once? [y/N]: "} {
+	for _, text := range []string{r.Display, "Aprovar esta proposta uma vez? [y/N]: "} {
 		n, err := io.WriteString(t.output, text)
 		if err != nil {
 			return Deny, ErrApproval

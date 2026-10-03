@@ -169,10 +169,10 @@ a cada push e pull request. Não substitua execução real por comandos simulado
   sem interpretar, validar semanticamente, persistir ou executar seu conteúdo.
 - Plan nunca registra replace_file; flag de escrita e plan são incompatíveis.
 - Validar formato antes de abrir workspace; root antes de configurar provider.
-- Preservar policy e requests originais. Somente no modo plan, prompts de aprovação
-  mostram tipo de ferramenta sem argumentos/paths; ainda exigem decisão por chamada.
+- Preservar policy e requests originais. Nos displays deliberados, prompts de aprovação
+  mostram tipo e caminho relativo integral com escapes reversíveis e aviso de envio ao provider; ainda exigem decisão por chamada.
 - Plano é saída deliberada separada do resumo público e pode conter dados do modelo.
-  Resumo, eventos, prompts operacionais e erros não incluem esses dados.
+  Resumo, eventos e erros públicos não incluem esses dados; displays deliberados de aprovação identificam o alvo.
 - Contratos/preview/executor e limites Linux existentes não mudam.
 
 ## Criação opt-in de um arquivo

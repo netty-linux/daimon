@@ -119,7 +119,7 @@ func TestChatToolCycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"Resposta final: DAIMON", "Passos do modelo: 2", "Tool calls: 1", "Resultados truncados: 0", "Stop reason: completed"} {
+	for _, want := range []string{"Resposta final: DAIMON", "Passos do modelo: 2", "Chamadas de ferramenta: 1", "Resultados truncados: 0", "Motivo de parada: completed"} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("missing %q: %s", want, &out)
 		}
@@ -172,12 +172,12 @@ func TestChatDeniesReadFileByDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"Resposta final: bloqueado", "Passos do modelo: 2", "Tool calls: 1", "Resultados truncados: 0", "Stop reason: completed"} {
+	for _, want := range []string{"Resposta final: bloqueado", "Passos do modelo: 2", "Chamadas de ferramenta: 1", "Resultados truncados: 0", "Motivo de parada: completed"} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("missing %q: %s", want, &out)
 		}
 	}
-	for _, want := range []string{"DAIMON solicita:", "Ferramenta: read_file", "Caminho: secret.txt", "Permitir uma vez? [y/N]:"} {
+	for _, want := range []string{"DAIMON solicita leitura:", "Ferramenta: read_file", "Caminho relativo: \"secret.txt\"", "Permitir uma vez? [y/N]:"} {
 		if !strings.Contains(stderr.String(), want) {
 			t.Fatalf("missing %q in prompt: %s", want, stderr.String())
 		}

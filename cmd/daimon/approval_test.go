@@ -112,12 +112,12 @@ func TestChatVerticalApproval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"Resposta final: explorado", "Tool calls: 2", "Stop reason: completed"} {
+	for _, want := range []string{"Resposta final: explorado", "Chamadas de ferramenta: 2", "Motivo de parada: completed"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q: %s", want, out)
 		}
 	}
-	for _, want := range []string{"Ferramenta: list_dir", "Ferramenta: read_file", "Caminho: alpha.txt"} {
+	for _, want := range []string{"Ferramenta: list_dir", "Ferramenta: read_file", "Caminho relativo: \"alpha.txt\""} {
 		if !strings.Contains(stderr.String(), want) {
 			t.Fatalf("missing %q in prompts: %s", want, stderr.String())
 		}
@@ -258,7 +258,7 @@ func TestChatUnknownToolNeverPrompts(t *testing.T) {
 	if !strings.Contains(out, "Resposta final: sem bash") {
 		t.Fatalf("out=%s", out)
 	}
-	if strings.Contains(stderr.String(), "DAIMON solicita:") {
+	if strings.Contains(stderr.String(), "DAIMON solicita leitura:") {
 		t.Fatalf("unknown tool prompted: %s", stderr.String())
 	}
 }
@@ -297,7 +297,7 @@ func TestChatApprovalSanitizesTerminalEscape(t *testing.T) {
 	if strings.ContainsRune(stderr.String(), '\x1b') {
 		t.Fatalf("escape byte reached the terminal: %q", stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "Caminho: a?[31m.txt") {
+	if !strings.Contains(stderr.String(), "Caminho relativo: \"a\\x1b[31m.txt\"") {
 		t.Fatalf("sanitized path missing: %q", stderr.String())
 	}
 }

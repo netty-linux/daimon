@@ -94,7 +94,7 @@ func replacementFailsClosed(t *testing.T, workspace bool) {
 				if scenario == "partial" {
 					return len(b) - 1, nil
 				}
-				if !mutated && strings.Contains(string(b), "Approve this proposal once?") {
+				if !mutated && strings.Contains(string(b), "Aprovar esta proposta uma vez?") {
 					mutated = true
 					var err error
 					switch scenario {
@@ -149,9 +149,9 @@ func replacementFailsClosed(t *testing.T, workspace bool) {
 				t.Fatal("sensitive routine output")
 			}
 			if workspace {
-				want := "Completed writes: 0"
+				want := "Escritas confirmadas: 0"
 				if scenario == "reuse" {
-					want = "Completed writes: 1"
+					want = "Escritas confirmadas: 1"
 				}
 				if !strings.Contains(stdout.String(), want) || strings.Contains(stdout.String(), "fixture.txt") || strings.Contains(stdout.String(), "edit1") {
 					t.Fatal("incorrect public summary")
@@ -204,7 +204,7 @@ func TestLocalReplacementChatSmoke(t *testing.T) {
 					respond(w, toolCallsResponse(toolCallJSON("edit1", "replace_file", string(encoded))))
 					return
 				}
-				if bytes.Contains(body, []byte("original")) || bytes.Contains(body, []byte("Proposed content (complete):")) || bytes.Contains(body, []byte("sha256=")) {
+				if bytes.Contains(body, []byte("original")) || bytes.Contains(body, []byte("Conteúdo proposto (completo):")) || bytes.Contains(body, []byte("sha256=")) {
 					t.Error("runtime added private preview data to provider request")
 				}
 				var request struct {
@@ -243,7 +243,7 @@ func TestLocalReplacementChatSmoke(t *testing.T) {
 			if string(data) != want {
 				t.Fatal("incorrect resulting file", string(data))
 			}
-			if !strings.Contains(stderr.String(), "Proposed content (complete):") || !strings.Contains(stdout.String(), "Stop reason: completed") || calls != 2 {
+			if !strings.Contains(stderr.String(), "Conteúdo proposto (completo):") || !strings.Contains(stdout.String(), "Motivo de parada: completed") || calls != 2 {
 				t.Fatal(stdout.String(), stderr.String(), calls)
 			}
 		})
@@ -273,7 +273,7 @@ func TestTwoReplacementCallsCannotExecuteBatch(t *testing.T) {
 			t.Fatal("batch wrote", p, err)
 		}
 	}
-	if strings.Count(stderr.String(), "Approve this proposal once?") != 1 {
+	if strings.Count(stderr.String(), "Aprovar esta proposta uma vez?") != 1 {
 		t.Fatal("unexpected second approval")
 	}
 }
@@ -301,7 +301,7 @@ func TestReadAndReplaceShareApprovalInput(t *testing.T) {
 	if err != nil || string(data) != "new" {
 		t.Fatal(data, err)
 	}
-	if calls != 2 || !strings.Contains(stderr.String(), "Permitir uma vez?") || !strings.Contains(stderr.String(), "Approve this proposal once?") {
+	if calls != 2 || !strings.Contains(stderr.String(), "Permitir uma vez?") || !strings.Contains(stderr.String(), "Aprovar esta proposta uma vez?") {
 		t.Fatal(stderr.String(), calls)
 	}
 }

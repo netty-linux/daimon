@@ -37,7 +37,7 @@ func TestCreateBatchFailsBeforeEffects(t *testing.T) {
 	if err != nil || len(entries) != 0 {
 		t.Fatal("batch effects", err)
 	}
-	if strings.Count(preview.String(), "Approve this proposal once?") != 1 {
+	if strings.Count(preview.String(), "Aprovar esta proposta uma vez?") != 1 {
 		t.Fatal("unexpected second prompt")
 	}
 }
@@ -101,7 +101,7 @@ func TestCreateVerticalOffline(t *testing.T) {
 				if len(req.Messages) != 3 || req.Messages[2].Content != want {
 					t.Error("incorrect receipt")
 				}
-				if bytes.Contains(body, []byte("Target: ABSENT")) || bytes.Contains(body, []byte("Workspace binding:")) {
+				if bytes.Contains(body, []byte("Alvo: AUSENTE")) || bytes.Contains(body, []byte("Vínculo do workspace:")) {
 					t.Error("runtime leaked preview to provider")
 				}
 				respond(w, finalResponse("PRIVATE_CONTENT parent/new.txt PRIVATE_ID"))
@@ -133,7 +133,7 @@ func TestCreateVerticalOffline(t *testing.T) {
 				if scenario == "partial" {
 					return len(b) - 1, nil
 				}
-				if strings.Contains(string(b), "Approve this proposal once?") && !changed {
+				if strings.Contains(string(b), "Aprovar esta proposta uma vez?") && !changed {
 					changed = true
 					if scenario == "cancel" {
 						cancel()
@@ -171,10 +171,10 @@ func TestCreateVerticalOffline(t *testing.T) {
 				if err != nil || info.Mode().Perm() != 0600 {
 					t.Fatal("wrong permissions", err)
 				}
-				if !strings.Contains(preview.String(), strconv.QuoteToASCII(content)) || !strings.Contains(preview.String(), "ABSENT at preparation") {
+				if !strings.Contains(preview.String(), strconv.QuoteToASCII(content)) || !strings.Contains(preview.String(), "AUSENTE na preparação") {
 					t.Fatal("incomplete preview")
 				}
-				if !strings.Contains(out.String(), "Completed writes: 1") {
+				if !strings.Contains(out.String(), "Escritas confirmadas: 1") {
 					t.Fatal(out.String())
 				}
 			} else if scenario == "conflict" {
@@ -190,7 +190,7 @@ func TestCreateVerticalOffline(t *testing.T) {
 			if _, err := os.Lstat("parent/new.txt"); !os.IsNotExist(err) {
 				t.Fatal("created outside root", err)
 			}
-			if scenario == "reuse" && strings.Count(preview.String(), "Approve this proposal once?") != 1 {
+			if scenario == "reuse" && strings.Count(preview.String(), "Aprovar esta proposta uma vez?") != 1 {
 				t.Fatal("approval reused")
 			}
 		})

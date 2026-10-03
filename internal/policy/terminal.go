@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -15,6 +16,10 @@ import (
 )
 
 const maxValueRunes = 120
+
+const maxReadDisplayBytes = 32 * 1024
+
+var ErrDisplay = errors.New("cannot display complete approval")
 
 // TerminalApproval asks the human operator once per call. Prompt text goes to
 // out; answers come from a single buffered reader over in, so queued input
@@ -37,7 +42,7 @@ func (t *TerminalApproval) Approve(ctx context.Context, request agentloop.ToolAu
 	// A prompt that cannot be displayed fails closed: the error returns
 	// before any answer is read or accepted.
 	if err := t.print(request); err != nil {
-		return false, err
+		return false, errors.Join(ErrDisplay, err)
 	}
 	line, err := t.readLine(ctx)
 	if err != nil {
@@ -46,6 +51,9 @@ func (t *TerminalApproval) Approve(ctx context.Context, request agentloop.ToolAu
 		}
 		// EOF and read errors deny; they are not authorization failures.
 		return false, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return false, context.Cause(ctx)
 	}
 	switch strings.TrimSpace(line) {
 	case "y", "Y", "yes", "YES", "Yes":
@@ -56,6 +64,28 @@ func (t *TerminalApproval) Approve(ctx context.Context, request agentloop.ToolAu
 }
 
 func (t *TerminalApproval) print(request agentloop.ToolAuthorizationRequest) error {
+	if request.Call.Name == "read_file" || request.Call.Name == "list_dir" {
+		var args struct {
+			Path *string `json:"path"`
+		}
+		if json.Unmarshal(request.Call.Arguments, &args) != nil || args.Path == nil {
+			return ErrDisplay
+		}
+		// QuoteToASCII is reversible and never emits terminal control characters.
+		if len(*args.Path) > maxReadDisplayBytes {
+			return ErrDisplay
+		}
+		display := fmt.Sprintf("DAIMON solicita leitura:\n\n  Ferramenta: %s\n  Caminho relativo: %s\n  A leitura aprovada envia o resultado ao provider.\n\nPermitir uma vez? [y/N]: ", request.Call.Name, strconv.QuoteToASCII(*args.Path))
+		if len(display) > maxReadDisplayBytes {
+			return ErrDisplay
+		}
+		n, err := io.WriteString(t.out, display)
+		if err != nil || n != len(display) {
+			return errors.Join(ErrDisplay, err)
+		}
+		return nil
+	}
+
 	if _, err := fmt.Fprintf(t.out, "DAIMON solicita:\n\n  Ferramenta: %s\n", sanitize(request.Call.Name, maxValueRunes)); err != nil {
 		return err
 	}

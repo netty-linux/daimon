@@ -477,13 +477,15 @@ incompatível com plan. Pedidos de escrita no texto ou calls maliciosas não mud
 schema nem política. Ferramenta ausente gera recibo de ferramenta desconhecida.
 Root e formato do comando são validados antes de configurar o provider; argumentos
 inválidos são rejeitados antes de abrir o workspace. Leituras continuam aprovadas
-por chamada. Nesse modo, prompts mostram somente o tipo fixo de ferramenta,
-sem argumentos/caminhos; os requests originais são preservados para execução.
+por chamada. Os displays deliberados de aprovação mostram o tipo da ferramenta,
+o caminho relativo integral com escapes ASCII reversíveis e o aviso de envio do
+resultado ao provider. Os argumentos originais são preservados para execução.
 
 A saída deliberada `Plano proposto` mostra o texto do modelo, seguida pelo resumo
 público existente. O plano pode conter nomes de arquivos e dados conhecidos pelo
-modelo; não deve ser tratado como um log público. Resumo, prompts operacionais,
-eventos e erros não exibem esses dados. Falhas do run não exibem um plano parcial.
+modelo; não deve ser tratado como um log público. Resumo, eventos e erros públicos
+não exibem esses dados. A aprovação é um display privado deliberado para a pessoa
+que precisa conhecer o alvo. Falhas do run não exibem um plano parcial.
 Leituras aprovadas ainda enviam seus resultados ao provider; plan não acrescenta
 mensagens com dados do workspace além do protocolo existente. Testes usam somente
 httptest e fixtures locais, sem credenciais reais ou requests externos.
@@ -522,7 +524,7 @@ Limites CLI: conteúdo UTF-8 64 KiB, 1000 linhas, path 4096 bytes, preview 1 MiB
 budget de argumentos JSON pode restringir conteúdo antes disso. Permissões finais
 0600 são verificadas e testadas com umask 000 e 777. Deadline obrigatório. Cancelamento,
 conflito ou erro consomem a capacidade; sem retry/fallback. Resumo agrega commits
-confirmados em Completed writes e separa Execute por tipo incluindo create_file.
+confirmados em Escritas confirmadas e separa Execute por tipo incluindo create_file.
 
 Preview é a exibição deliberada de ausência, conteúdo completo com escapes ASCII,
 limites e avisos. Eventos, recibos, erros e resumo não incluem os dados. O provider
@@ -530,3 +532,33 @@ já conhece os argumentos que produziu; recebe somente o recibo adicional contro
 sem injeção pelo runtime de preview, conteúdo ou identidade. A resposta final livre
 continua omitida no workspace. Testes usam somente httptest/fixtures locais.
 O [contrato de criação](docs/workspace-create-contract.md) detalha garantias e erros.
+
+### Aprovação informada e privacidade
+
+Privacidade de logs não implica ocultar a ação da pessoa que precisa aprová-la.
+Para read_file/list_dir, o display de aprovação identifica o caminho relativo
+integral e informa que o resultado aprovado será enviado ao provider. O conteúdo
+não aparece nesse display. Caminhos usam QuoteToASCII de Go, incluindo controles,
+Unicode, espaços, aspas e escapes. O display inteiro tem limite de 32768 bytes;
+excesso ou escrita incompleta impede aprovação e execução, sem corte silencioso.
+Negativa, EOF e entrada inválida continuam negando; cancelamento interrompe o run.
+
+Há quatro superfícies distintas: aprovação privada deliberada; plano textual
+deliberado; eventos/resumo público; erros públicos. Só as duas primeiras podem
+mostrar os dados deliberados descritos acima. Permissões do preview de substituição
+são octais (0600/0640/0644); bytes do display atualizado continuam sujeitos ao
+limite integral de preview, e a proposta interna aprovada permanece imutável.
+
+Erros públicos de workspace usam somente categorias tipadas, preservando a causa
+por Unwrap: conflito, mudança de alvo, limite, cancelamento, prazo, aprovação e
+limpeza. Erro livre nunca é usado para inferir diagnóstico. Negação e EOF são
+recibos controlados, não falhas de autorização. Falha de revisão nem sempre permite
+distinguir erro de display de outro erro do reviewer; nesse caso a explicação
+permanece genérica. Contadores de escritas confirmadas devem ser consultados mesmo
+após falha: cancelamento não desfaz sucesso confirmado e limpeza pode deixar resíduo.
+Identificadores, flags, ferramentas e recibos de protocolo não são traduzidos.
+
+A validação operacional usou provider HTTP simulado, não um LLM real. Permanecem
+as limitações de workspace controlado, concorrência externa, visibilidade durante
+criação, durabilidade e metadados descritas nos contratos. Git read-only permanece
+bloqueado até existir isolamento real de processo e filesystem; não faz parte deste corte.

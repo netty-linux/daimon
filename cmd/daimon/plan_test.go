@@ -95,16 +95,16 @@ func TestPlanVerticalReadOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	parts := strings.SplitN(out.String(), "Workspace summary:", 2)
+	parts := strings.SplitN(out.String(), "Resumo do workspace:", 2)
 	if len(parts) != 2 || !strings.Contains(parts[0], finalPlan) {
 		t.Fatal("missing deliberate plan")
 	}
 	for _, value := range []string{root, "private.txt", "FILE_SECRET", "PRIVATE_READ_ID", "malicious"} {
-		if strings.Contains(parts[1], value) || strings.Contains(prompts.String(), value) {
+		if strings.Contains(parts[1], value) || (value != "private.txt" && strings.Contains(prompts.String(), value)) {
 			t.Fatal("operational leak")
 		}
 	}
-	if !strings.Contains(parts[1], "Completed writes: 0") || !strings.Contains(parts[1], "Approvals granted: 2") {
+	if !strings.Contains(parts[1], "Escritas confirmadas: 0") || !strings.Contains(parts[1], "Aprovações concedidas: 2") {
 		t.Fatal(parts[1])
 	}
 	data, err := os.ReadFile(filepath.Join(root, "private.txt"))
@@ -177,7 +177,7 @@ func TestPlanFailuresHaveNoWrites(t *testing.T) {
 			if err != nil && strings.Contains(err.Error(), "SECRET") {
 				t.Fatal("sensitive error")
 			}
-			if strings.Contains(prompts.String(), "private.txt") || strings.Contains(prompts.String(), "SECRET") {
+			if strings.Contains(prompts.String(), "SECRET") {
 				t.Fatal("sensitive prompt")
 			}
 			data, err := os.ReadFile(filepath.Join(root, "private.txt"))

@@ -41,6 +41,9 @@ const maxResponseBytes int64 = 2 * 1024 * 1024
 func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, getenv func(string) string) (err error) {
 	started := time.Now()
 	workspaceMode := len(args) > 0 && args[0] == "workspace"
+	if workspaceMode {
+		defer func() { err = workspaceError(err) }()
+	}
 	root := "."
 	if workspaceMode {
 		root, args, err = workspaceArguments(args)
@@ -189,7 +192,7 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 			}
 			text := "Plano proposto (texto do modelo; não executado):\n" + plan + "\n\n"
 			if n, writeErr := io.WriteString(stdout, text); writeErr != nil || n != len(text) {
-				planErr = fmt.Errorf("cannot display proposed plan")
+				planErr = fmt.Errorf("não foi possível exibir o plano proposto")
 			}
 		}
 		summaryErr := printWorkspaceSummary(stdout, result, sink.Events(), counts, time.Since(started))
@@ -208,7 +211,7 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 	if apiKey != "" {
 		answer = strings.ReplaceAll(answer, apiKey, "[REDACTED]")
 	}
-	if _, err := fmt.Fprintf(stdout, "Resposta final: %s\nPassos do modelo: %d\nTool calls: %d\nResultados truncados: %d\nStop reason: %s\n", answer, result.Steps, result.ToolCalls, result.TruncatedToolResults, result.StopReason); err != nil {
+	if _, err := fmt.Fprintf(stdout, "Resposta final: %s\nPassos do modelo: %d\nChamadas de ferramenta: %d\nResultados truncados: %d\nMotivo de parada: %s\n", answer, result.Steps, result.ToolCalls, result.TruncatedToolResults, result.StopReason); err != nil {
 		return err
 	}
 	if !demo {
