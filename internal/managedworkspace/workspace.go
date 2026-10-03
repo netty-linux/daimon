@@ -73,6 +73,7 @@ type Run struct {
 	manifest                Manifest
 	closed                  bool
 	lock, journalFile       *os.File
+	active                  *os.File
 	pending                 *Proposal
 }
 
@@ -103,6 +104,9 @@ func (r *Run) Close() error {
 		return nil
 	}
 	r.closed = true
+	if r.active != nil {
+		r.active.Close()
+	}
 	if r.pending != nil {
 		r.pending.closePrepared()
 	}
@@ -139,7 +143,7 @@ func Create(ctx context.Context, base, source string) (*Run, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	baseAbs, err := filepath.Abs(base)
+	baseAbs, err := canonicalBase(base)
 	if err != nil {
 		return nil, ErrPrivate
 	}
@@ -273,7 +277,7 @@ func Open(base, id string) (*Run, error) {
 	if !validID(id) {
 		return nil, ErrPrivate
 	}
-	base, err := filepath.Abs(base)
+	base, err := canonicalBase(base)
 	if err != nil {
 		return nil, ErrPrivate
 	}

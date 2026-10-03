@@ -49,7 +49,7 @@ func (p *Proposal) View() editcontract.Review {
 
 // Prepare validates every operation and builds the entire exact preview. Its
 // metadata writes stay in this run; it makes no changes to output or source.
-func (r *Run) Prepare(ctx context.Context, planBytes []byte) (*Proposal, error) {
+func (r *Run) Prepare(ctx context.Context, planBytes []byte) (result *Proposal, resultErr error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if err := ctx.Err(); err != nil {
@@ -65,6 +65,31 @@ func (r *Run) Prepare(ctx context.Context, planBytes []byte) (*Proposal, error) 
 	if err := r.check(); err != nil {
 		return nil, err
 	}
+	if r.active != nil {
+		return nil, ErrState
+	}
+	active, err := exclusiveDirectory(r.root)
+	if err != nil {
+		return nil, err
+	}
+	r.active = active
+	defer func() {
+		if resultErr != nil && r.lock == nil {
+			r.active.Close()
+			r.active = nil
+		}
+	}()
+	store, e := OpenStore(r.base)
+	if e != nil {
+		return nil, e
+	}
+	tomb, e := store.readTombstone(r.manifest.RunID, nil)
+	store.Close()
+	if e != nil || tomb != "" {
+		return nil, ErrState
+	}
+	// Retain the exclusion through approval/application until Run.Close, even
+	// on failure. A separate lifecycle process cannot discard an active run.
 	if r.manifest.Status != "ready" {
 		return nil, ErrState
 	}

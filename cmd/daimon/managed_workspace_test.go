@@ -15,9 +15,14 @@ import (
 )
 
 func TestManagedArguments(t *testing.T) {
-	for _, tail := range [][]string{{"create", "--source", "src"}, {"apply", "--run", "id", "--plan", "p"}, {"apply", "--plan", "p", "--run", "id"}, {"report", "--run", "id"}} {
+	for _, tail := range [][]string{{"create", "--source", "src"}, {"apply", "--run", "id", "--plan", "p"}, {"apply", "--plan", "p", "--run", "id"}, {"report", "--run", "id"}, {"list"}, {"inspect", "--run", "id"}, {"discard", "--run", "id", "--enable-discard"}, {"discard", "--enable-discard", "--run", "id"}} {
 		if _, _, _, err := managedArguments(append([]string{"--base", "store"}, tail...)); err != nil {
 			t.Fatal(err)
+		}
+	}
+	for _, tail := range [][]string{{"discard", "--run", "id"}, {"discard", "--run", "id", "--enable-discard", "--enable-discard"}, {"list", "--run", "id"}, {"inspect"}, {"inspect", "--run", "id", "--unknown"}, {"discard", "--enable-discard"}} {
+		if _, _, _, err := managedArguments(append([]string{"--base", "store"}, tail...)); err == nil {
+			t.Fatal("invalid lifecycle args accepted", tail)
 		}
 	}
 	for _, args := range [][]string{nil, {"--base", "store"}, {"--base", "store", "apply"}, {"--base", "store", "apply", "--run", "id"}, {"--base", "store", "report", "--run", "id", "--run", "id"}, {"--base", "store", "create", "--source", ""}, {"--base", "store", "create", "--root", "src"}, {"--base", "store", "delete", "--run", "id"}} {
@@ -80,6 +85,16 @@ func TestManagedCLIExecutable(t *testing.T) {
 		if _, e := os.Stat(base); !os.IsNotExist(e) {
 			t.Fatal("unsupported command wrote")
 		}
+		for _, tail := range [][]string{{"list"}, {"inspect", "--run", strings.Repeat("a", 32)}, {"discard", "--run", strings.Repeat("a", 32), "--enable-discard"}} {
+			args := append([]string{"managed-workspace", "--base", base}, tail...)
+			out, display, err = invoke("y\n", args...)
+			if err == nil || !strings.Contains(display, "não suportado") {
+				t.Fatal("unsupported lifecycle enabled", out, display, err)
+			}
+			if _, e := os.Stat(base); !os.IsNotExist(e) {
+				t.Fatal("unsupported lifecycle provisioned")
+			}
+		}
 		return
 	}
 	if err != nil {
@@ -114,5 +129,57 @@ func TestManagedCLIExecutable(t *testing.T) {
 	if _, _, err := invoke("y\n", "managed-workspace", "--base", base, "apply", "--run", id, "--plan", planFile); err == nil {
 		t.Fatal("CLI reused approval/run")
 	}
-	t.Log("real CLI: one approval; private output changed; source unchanged; report succeeded; second apply denied; no provider configuration")
+	out, display, err = invoke("", "managed-workspace", "--base", base, "create", "--source", source)
+	if err != nil {
+		t.Fatal(out, display, err)
+	}
+	otherID := strings.Split(strings.Split(out, "Run ID: ")[1], "\n")[0]
+	for _, command := range []string{"list", "inspect"} {
+		args := []string{"managed-workspace", "--base", base, command}
+		if command == "inspect" {
+			args = append(args, "--run", id)
+		}
+		out, display, err = invoke("", args...)
+		if err != nil || !strings.Contains(out, `"state":"succeeded"`) || strings.Contains(out, "config.txt") || strings.Contains(out, "initial\\n") {
+			t.Fatal(out, display, err)
+		}
+	}
+	if _, display, err = invoke("y\n", "managed-workspace", "--base", base, "discard", "--run", id); err == nil || strings.Contains(display, "Aprovar esta proposta") {
+		t.Fatal("absent opt-in approved")
+	}
+	if _, _, err = invoke("n\n", "managed-workspace", "--base", base, "discard", "--run", id, "--enable-discard"); err == nil {
+		t.Fatal("denial accepted")
+	}
+	if _, e = os.Stat(filepath.Join(base, id)); e != nil {
+		t.Fatal("denial removed run")
+	}
+	out, display, err = invoke("y\n", "managed-workspace", "--base", base, "discard", "--run", id, "--enable-discard")
+	if err != nil || !strings.Contains(out, "Estado do descarte: discarded") || strings.Count(display, "Aprovar esta proposta uma vez?") != 1 || strings.Contains(display, "final\\n") {
+		t.Fatal(out, display, err)
+	}
+	if _, e = os.Stat(filepath.Join(base, id)); !os.IsNotExist(e) {
+		t.Fatal("discard retained run", e)
+	}
+	if _, e = os.Stat(filepath.Join(base, "_tombstones", id+".jsonl")); e != nil {
+		t.Fatal("audit absent", e)
+	}
+	for _, command := range []string{"list", "inspect"} {
+		args := []string{"managed-workspace", "--base", base, command}
+		if command == "inspect" {
+			args = append(args, "--run", id)
+		}
+		out, display, err = invoke("", args...)
+		if err != nil || !strings.Contains(out, `"state":"discarded"`) {
+			t.Fatal(out, display, err)
+		}
+	}
+	out, display, err = invoke("", "managed-workspace", "--base", base, "inspect", "--run", otherID)
+	if err != nil || !strings.Contains(out, `"state":"ready"`) {
+		t.Fatal("other run affected", out, display, err)
+	}
+	original, e = os.ReadFile(filepath.Join(source, "config.txt"))
+	if e != nil || string(original) != "initial\n" {
+		t.Fatal("source modified after discard")
+	}
+	t.Log("real CLI create/apply/report/list/inspect/deny/discard: source unchanged; other run ready; terminal audit verified; no provider configuration")
 }
