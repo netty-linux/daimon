@@ -88,7 +88,7 @@ func TestWorkspaceReadRootAndSafeSummary(t *testing.T) {
 			t.Fatal("summary leak")
 		}
 	}
-	for _, expected := range []string{"Stop reason: completed", "Approvals granted: 3", "list_dir=1 read_file=2 replace_file=0", "Completed writes: 0"} {
+	for _, expected := range []string{"Motivo de parada: completed", "Aprovações concedidas: 3", "list_dir=1 read_file=2 replace_file=0", "Escritas confirmadas: 0"} {
 		if !strings.Contains(out.String(), expected) {
 			t.Fatal(out.String())
 		}
@@ -98,7 +98,7 @@ func TestWorkspaceReadRootAndSafeSummary(t *testing.T) {
 func TestWorkspaceSummaryUsesOnlyPublicCounters(t *testing.T) {
 	var out bytes.Buffer
 	err := printWorkspaceSummary(&out, agentloop.Result{FinalAnswer: "SECRET", StopReason: agentloop.StopReasonCanceled}, []agentloop.Event{{Kind: agentloop.ApprovalRequested}, {Kind: agentloop.ApprovalDenied}}, &workspaceCounts{}, time.Millisecond)
-	if err != nil || strings.Contains(out.String(), "SECRET") || !strings.Contains(out.String(), "Approvals denied: 1") {
+	if err != nil || strings.Contains(out.String(), "SECRET") || !strings.Contains(out.String(), "Aprovações negadas: 1") {
 		t.Fatal(err, out.String())
 	}
 }

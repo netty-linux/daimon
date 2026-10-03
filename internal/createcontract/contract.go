@@ -228,7 +228,7 @@ func (w *Workspace) Prepare(ctx context.Context, p string, content []byte, limit
 		Review Review
 	}{hex.EncodeToString(nonce), r})
 	r.ID = digest(binding)
-	r.Display = fmt.Sprintf("Creation proposal: %s\nWorkspace binding: %s\nPath: %s\nTarget: ABSENT at preparation; never overwrite. All parents must already exist.\nProposed: sha256=%s bytes=%d\nLimits: final_bytes=%d lines=%d path_bytes=%d preview_bytes=%d\nCreation: Linux only; exclusive creation, permissions 0600. Controlled workspace required. File may be visible during writing. Failure cleanup may fail; no power-loss durability or rollback after success.\nEncoding: Go ASCII escapes.\nProposed content (complete): %s\n", r.ID, r.RootID, strconv.QuoteToASCII(p), r.ProposedSHA256, r.Bytes, limits.FinalBytes, limits.Lines, limits.PathBytes, limits.PreviewBytes, strconv.QuoteToASCII(string(data)))
+	r.Display = fmt.Sprintf("Proposta de criação: %s\nVínculo do workspace: %s\nCaminho: %s\nAlvo: AUSENTE na preparação; nunca sobrescrever. Todos os diretórios pais devem existir.\nProposto: sha256=%s bytes=%d\nLimites: final_bytes=%d lines=%d path_bytes=%d preview_bytes=%d\nCriação: somente Linux; criação exclusiva, permissões 0600. Workspace controlado obrigatório. Arquivo pode ficar visível durante a gravação. Limpeza após falha pode falhar; sem garantia contra perda de energia ou reversão após sucesso.\nCodificação: escapes ASCII de Go.\nConteúdo proposto (completo): %s\n", r.ID, r.RootID, strconv.QuoteToASCII(p), r.ProposedSHA256, r.Bytes, limits.FinalBytes, limits.Lines, limits.PathBytes, limits.PreviewBytes, strconv.QuoteToASCII(string(data)))
 	if len(r.Display) > limits.PreviewBytes {
 		return nil, ErrLimit
 	}

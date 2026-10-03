@@ -40,6 +40,39 @@ func prepared(t *testing.T, w *Workspace) *Proposal {
 	return p
 }
 
+func TestOctalPermissionsAndExactPreviewLimit(t *testing.T) {
+	w, dir := fixture(t)
+	for _, mode := range []os.FileMode{0600, 0640, 0644} {
+		if err := os.Chmod(filepath.Join(dir, "file.txt"), mode); err != nil {
+			t.Fatal(err)
+		}
+		p := prepared(t, w)
+		want := "mode=0" + strconv.FormatUint(uint64(p.View().Original.Mode), 8) + " "
+		if !strings.Contains(p.View().Display, want) {
+			t.Fatal(p.View().Display)
+		}
+		if os.PathSeparator == '/' && p.View().Original.Mode != uint32(mode) {
+			t.Fatal("changed mode")
+		}
+		limits := testLimits()
+		limits.PreviewBytes = len(p.View().Display)
+		// The printed preview_bytes field itself changes the display length.
+		probe, err := w.Prepare(context.Background(), "file.txt", []byte("proposed\n"), limits)
+		if err != nil {
+			t.Fatal(err)
+		}
+		limits.PreviewBytes = len(probe.View().Display)
+		exact, err := w.Prepare(context.Background(), "file.txt", []byte("proposed\n"), limits)
+		if err != nil || len(exact.View().Display) != limits.PreviewBytes {
+			t.Fatal(err)
+		}
+		limits.PreviewBytes--
+		if _, err := w.Prepare(context.Background(), "file.txt", []byte("proposed\n"), limits); !errors.Is(err, ErrLimit) {
+			t.Fatal(err)
+		}
+	}
+}
+
 var allow = reviewerFunc(func(context.Context, Review) (Decision, error) { return Allow, nil })
 
 func TestBindingCopiesAndReadOnly(t *testing.T) {
@@ -59,7 +92,7 @@ func TestBindingCopiesAndReadOnly(t *testing.T) {
 		t.Fatal("incomplete review")
 	}
 	for _, c := range r.Display {
-		if (c < 32 && c != '\n') || c > 126 {
+		if c < 32 && c != '\n' {
 			t.Fatal("unsafe display")
 		}
 	}

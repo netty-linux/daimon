@@ -117,7 +117,7 @@ func TestAuthorizerContextErrorReturnsDirectly(t *testing.T) {
 		Policy:    DefaultCLIPolicy(),
 		Approvals: &scriptedApprovals{err: context.Canceled},
 	}
-	if _, err := authorizer.Authorize(ctx, requestFor("read_file", "{}")); !errors.Is(err, context.Canceled) {
+	if _, err := authorizer.Authorize(ctx, requestFor("read_file", `{"path":"x"}`)); !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
 	}
 }
@@ -183,7 +183,7 @@ func TestTerminalApprovalAnswers(t *testing.T) {
 			if err != nil || got != tc.want {
 				t.Fatalf("got=%v err=%v", got, err)
 			}
-			for _, want := range []string{"Ferramenta: read_file", "Caminho: internal/agentloop/loop.go", "Permitir uma vez? [y/N]:"} {
+			for _, want := range []string{"Ferramenta: read_file", "Caminho relativo: \"internal/agentloop/loop.go\"", "Permitir uma vez? [y/N]:"} {
 				if !strings.Contains(out.String(), want) {
 					t.Fatalf("missing %q in %q", want, out.String())
 				}
@@ -215,7 +215,7 @@ func TestTerminalApprovalSanitizesArguments(t *testing.T) {
 	var out bytes.Buffer
 	arguments := `{"path":"bad\u001b[31m\nline","other":123}`
 	approvals := NewTerminalApproval(strings.NewReader("n\n"), &out)
-	if _, err := approvals.Approve(context.Background(), requestFor("read_file", arguments)); err != nil {
+	if _, err := approvals.Approve(context.Background(), requestFor("echo", arguments)); err != nil {
 		t.Fatal(err)
 	}
 	text := out.String()
@@ -233,7 +233,7 @@ func TestTerminalApprovalCapsLongValues(t *testing.T) {
 	var out bytes.Buffer
 	long := strings.Repeat("a", 500)
 	approvals := NewTerminalApproval(strings.NewReader("n\n"), &out)
-	if _, err := approvals.Approve(context.Background(), requestFor("read_file", `{"path":"`+long+`"}`)); err != nil {
+	if _, err := approvals.Approve(context.Background(), requestFor("echo", `{"path":"`+long+`"}`)); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Count(out.String(), "a") > maxValueRunes+len("Caminho: ")+10 {
@@ -244,7 +244,7 @@ func TestTerminalApprovalCapsLongValues(t *testing.T) {
 func TestTerminalApprovalUnparseableArguments(t *testing.T) {
 	var out bytes.Buffer
 	approvals := NewTerminalApproval(strings.NewReader("n\n"), &out)
-	if _, err := approvals.Approve(context.Background(), requestFor("read_file", `{not json`)); err != nil {
+	if _, err := approvals.Approve(context.Background(), requestFor("echo", `{not json`)); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "Argumentos: {not json") {
@@ -262,7 +262,7 @@ func TestTerminalApprovalContextCancellation(t *testing.T) {
 		<-time.After(30 * time.Millisecond)
 		cancel()
 	}()
-	_, err := approvals.Approve(ctx, requestFor("read_file", "{}"))
+	_, err := approvals.Approve(ctx, requestFor("read_file", `{"path":"x"}`))
 	if !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
 	}
@@ -399,7 +399,7 @@ func TestSanitizeUnicodeControlAndFormat(t *testing.T) {
 	}
 	var out bytes.Buffer
 	approvals := NewTerminalApproval(strings.NewReader("n\n"), &out)
-	if _, err := approvals.Approve(context.Background(), requestFor("read_file", `{"path":"a`+"\u001b[31m"+`x`+"\u009b"+`y`+"\u202e"+`z"}`)); err != nil {
+	if _, err := approvals.Approve(context.Background(), requestFor("echo", `{"path":"a`+"\u001b[31m"+`x`+"\u009b"+`y`+"\u202e"+`z"}`)); err != nil {
 		t.Fatal(err)
 	}
 	for _, forbidden := range []rune{'\x1b', '\u009b', '\u202e'} {

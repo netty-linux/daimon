@@ -277,8 +277,8 @@ func (w *Workspace) Prepare(ctx context.Context, p string, proposed []byte, limi
 	}{hex.EncodeToString(nonce), r})
 	r.ID = digest(binding)
 	// Full proposed content is quoted ASCII, including exact line endings.
-	header := fmt.Sprintf("Proposal: %s\nPath: %s\nOriginal: sha256=%s bytes=%d mode=%d modified=%s\nProposed: sha256=%s bytes=%d\nLimits: input_bytes=%d final_bytes=%d lines=%d path_bytes=%d preview_bytes=%d\nEncoding: Go ASCII escapes; diff omits only unchanged context.\nReplacement: Linux only; controlled workspace required. External writers may race rename. Cancellation after commit cannot undo replacement. No power-loss durability; ownership/ACL/xattrs are not preserved.\n", r.ID, strconv.QuoteToASCII(p), r.Original.SHA256, r.Original.Bytes, r.Original.Mode, r.Original.Modified, r.ProposedSHA256, len(content), limits.InputBytes, limits.FinalBytes, limits.Lines, limits.PathBytes, limits.PreviewBytes)
-	full := "Proposed content (complete): " + strconv.QuoteToASCII(string(content)) + "\n"
+	header := fmt.Sprintf("Proposta: %s\nCaminho: %s\nOriginal: sha256=%s bytes=%d mode=%04o modified=%s\nProposto: sha256=%s bytes=%d\nLimites: input_bytes=%d final_bytes=%d lines=%d path_bytes=%d preview_bytes=%d\nCodificação: escapes ASCII de Go; diff omite somente contexto inalterado.\nSubstituição: somente Linux; workspace controlado obrigatório. Escritores externos podem concorrer com a substituição. Cancelamento após confirmação não desfaz a substituição. Sem garantia contra perda de energia; proprietário/ACL/xattrs não são preservados.\n", r.ID, strconv.QuoteToASCII(p), r.Original.SHA256, r.Original.Bytes, r.Original.Mode, r.Original.Modified, r.ProposedSHA256, len(content), limits.InputBytes, limits.FinalBytes, limits.Lines, limits.PathBytes, limits.PreviewBytes)
+	full := "Conteúdo proposto (completo): " + strconv.QuoteToASCII(string(content)) + "\n"
 	if len(header) > limits.PreviewBytes || len(diff) > limits.PreviewBytes-len(header) || len(full) > limits.PreviewBytes-len(header)-len(diff) {
 		return nil, ErrLimit
 	}

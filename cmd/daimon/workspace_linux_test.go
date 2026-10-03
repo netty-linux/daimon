@@ -60,10 +60,10 @@ func TestWorkspaceVerticalApprovedReplacement(t *testing.T) {
 	if err != nil || string(outside) != "outside" {
 		t.Fatal("escaped root", err)
 	}
-	if !strings.Contains(preview.String(), "Proposed content (complete):") {
+	if !strings.Contains(preview.String(), "Conteúdo proposto (completo):") {
 		t.Fatal("missing preview")
 	}
-	for _, expected := range []string{"Model steps: 4", "Approvals requested: 3", "Approvals granted: 3", "echo=0 list_dir=1 read_file=1 replace_file=1", "Completed writes: 1"} {
+	for _, expected := range []string{"Passos do modelo: 4", "Aprovações solicitadas: 3", "Aprovações concedidas: 3", "echo=0 list_dir=1 read_file=1 replace_file=1", "Escritas confirmadas: 1"} {
 		if !strings.Contains(out.String(), expected) {
 			t.Fatal(out.String())
 		}

@@ -76,6 +76,9 @@ func (t *countedTool) Execute(ctx context.Context, raw json.RawMessage) (tools.T
 	if (t.Name() == "replace_file" || t.Name() == "create_file") && err == nil && !result.IsError {
 		(*t.writes)++
 	}
+	if t.Name() == "replace_file" || t.Name() == "create_file" {
+		err = workspaceError(err)
+	}
 	return result, err
 }
 
@@ -91,9 +94,9 @@ func printWorkspaceSummary(out io.Writer, result agentloop.Result, events []agen
 			denied++
 		}
 	}
-	_, err := fmt.Fprintf(out, "Workspace summary:\nStop reason: %s\nModel steps: %d\nTool calls: %d\nApprovals requested: %d\nApprovals granted: %d\nApprovals denied: %d\nExecutions: echo=%d list_dir=%d read_file=%d replace_file=%d create_file=%d\nCompleted writes: %d\nTruncated results: %d\nDuration seconds: %.0f\n", result.StopReason, result.Steps, result.ToolCalls, requested, granted, denied, counts.tools[0], counts.tools[1], counts.tools[2], counts.tools[3], counts.tools[4], counts.writes, result.TruncatedToolResults, duration.Round(time.Second).Seconds())
+	_, err := fmt.Fprintf(out, "Resumo do workspace:\nMotivo de parada: %s\nPassos do modelo: %d\nChamadas de ferramenta: %d\nAprovações solicitadas: %d\nAprovações concedidas: %d\nAprovações negadas: %d\nExecuções: echo=%d list_dir=%d read_file=%d replace_file=%d create_file=%d\nEscritas confirmadas: %d\nResultados truncados: %d\nDuração em segundos: %.0f\n", result.StopReason, result.Steps, result.ToolCalls, requested, granted, denied, counts.tools[0], counts.tools[1], counts.tools[2], counts.tools[3], counts.tools[4], counts.writes, result.TruncatedToolResults, duration.Round(time.Second).Seconds())
 	if err != nil {
-		return errors.New("cannot display workspace summary")
+		return errors.New("não foi possível exibir o resumo do workspace")
 	}
 	return nil
 }
