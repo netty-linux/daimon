@@ -55,7 +55,11 @@ func TestCreateNotExposedWithoutOwnFlag(t *testing.T) {
 					respond(w, toolCallsResponse(toolCallJSON("c", "create_file", `"{\"path\":\"new\",\"content\":\"x\"}"`)))
 					return
 				}
-				if len(req.Messages) != 3 || req.Messages[2].Content != "unknown tool" {
+				offset := 0
+				if mode != "chat" {
+					offset = 1
+				}
+				if len(req.Messages) != 3+offset || req.Messages[2+offset].Content != "unknown tool" {
 					t.Error("incorrect controlled receipt")
 				}
 				respond(w, finalResponse("done"))

@@ -17,12 +17,18 @@ type Config struct {
 	APIKey           string
 	Model            string
 	MaxResponseBytes int64
+	// Optional caller-owned operational guidance, separate from conversation.
+	// Bounded independently; it is not loop history and grants no capabilities.
+	SystemInstruction string
 	// An injected client owns its redirect, TLS, proxy and timeout policies.
 	// Configure it before New and do not mutate its transport during use.
 	HTTPClient *http.Client
 }
 
 func New(cfg Config) (*Provider, error) {
+	if len(cfg.SystemInstruction) > 8192 || !utf8.ValidString(cfg.SystemInstruction) {
+		return nil, &ConfigError{Field: "SystemInstruction"}
+	}
 	endpoint, err := completionURL(cfg.BaseURL)
 	if err != nil {
 		return nil, err
@@ -54,7 +60,7 @@ func New(cfg Config) (*Provider, error) {
 		}
 	}
 	clientCopy := *client
-	return &Provider{endpoint: endpoint, apiKey: cfg.APIKey, model: cfg.Model, maxResponseBytes: cfg.MaxResponseBytes, client: &clientCopy}, nil
+	return &Provider{endpoint: endpoint, apiKey: cfg.APIKey, model: cfg.Model, maxResponseBytes: cfg.MaxResponseBytes, client: &clientCopy, systemInstruction: cfg.SystemInstruction}, nil
 }
 
 func completionURL(base string) (string, error) {

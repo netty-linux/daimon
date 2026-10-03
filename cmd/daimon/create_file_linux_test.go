@@ -98,7 +98,7 @@ func TestCreateVerticalOffline(t *testing.T) {
 				if scenario == "allow" {
 					want = "file created"
 				}
-				if len(req.Messages) != 3 || req.Messages[2].Content != want {
+				if len(req.Messages) != 4 || req.Messages[3].Content != want {
 					t.Error("incorrect receipt")
 				}
 				if bytes.Contains(body, []byte("Alvo: AUSENTE")) || bytes.Contains(body, []byte("Vínculo do workspace:")) {

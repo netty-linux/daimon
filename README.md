@@ -562,3 +562,40 @@ A validação operacional usou provider HTTP simulado, não um LLM real. Permane
 as limitações de workspace controlado, concorrência externa, visibilidade durante
 criação, durabilidade e metadados descritas nos contratos. Git read-only permanece
 bloqueado até existir isolamento real de processo e filesystem; não faz parte deste corte.
+
+### Instruções operacionais de workspace
+
+Cada request de workspace usa uma mensagem system separada, identificada no código
+como DAIMON workspace protocol v1, seguida da mensagem livre do usuário intacta.
+Há orientações distintas para plan, workspace read-only, criação e substituição.
+Chat, demo e smoke não recebem essa instrução de workspace. Model.Generate, o
+histórico do loop, as ferramentas e seus schemas permanecem iguais.
+
+As orientações pedem tool calling estruturado em vez de autorização em linguagem
+natural, evidência de ferramenta ou declaração explícita do usuário antes de
+alegar fatos, distinção de fato/inferência/hipótese e bloqueio quando faltam dados.
+Plan solicita sete seções em ordem: Diagnóstico; Objetivo da mudança; Arquivos
+prováveis; Alteração proposta por arquivo; Riscos e suposições; Validação proposta;
+Bloqueios ou informações faltantes. Criação e substituição orientam somente o
+arquivo/alteração solicitado, sem inventar comportamentos ou efeitos adicionais.
+
+O adapter aceita instrução UTF-8 de até 8192 bytes, como configuração explícita do
+chamador. Esse overhead estático de transporte é limitado separadamente e não é
+contado como histórico aceito pelo budget do loop. O CLI fornece somente constantes,
+sem segredos, caminhos pessoais ou dados do host. O runtime não imprime essa
+configuração em eventos, resumo, erros ou aprovação. A mensagem system é enviada
+novamente em cada request; não é memória persistente.
+
+Instruções não garantem adesão do modelo nem mitigam completamente alucinações.
+Planos e propostas continuam não confiáveis até revisão humana. Não há parser
+semântico, formato JSON obrigatório, validação por outro LLM ou retry. Uma resposta
+não aderente não provoca execução automática nem reduz policy, budget, aprovação,
+preview, binding, revalidação ou confinamento. Conteúdo não relacionado deve ser
+preservado em substituições, salvo pedido explícito do usuário.
+
+Na validação real com Groq/openai/gpt-oss-20b, o modelo entregou um plano incompleto,
+pediu autorização em linguagem natural e propôs documentação com integração em
+testes e limpeza automática não confirmadas. A proposta foi negada e a sessão
+interrompida; nenhuma escrita ocorreu. Esses achados motivam o protocolo, mas não
+comprovam sua eficácia: este corte é validado com httptest/fixtures, sem nova chamada
+real. A aprovação humana e os contratos de escrita continuam sendo a barreira.

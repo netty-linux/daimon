@@ -91,9 +91,14 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 			selected, err = groq.New(groq.Config{APIKey: apiKey,
 				Model: getenv("DAIMON_GROQ_MODEL"), MaxResponseBytes: maxResponseBytes})
 		} else {
+			instruction := ""
+			if workspaceMode {
+				instruction = workspaceInstruction(planMode, creationEnabled, replacementEnabled)
+			}
 			selected, err = openai.New(openai.Config{
 				BaseURL: getenv("DAIMON_BASE_URL"), Model: getenv("DAIMON_MODEL"),
 				APIKey: apiKey, MaxResponseBytes: maxResponseBytes,
+				SystemInstruction: instruction,
 			})
 		}
 		if err != nil {
@@ -116,9 +121,6 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 		}
 		authorizer = composed
 		message = args[1]
-		if planMode {
-			message = planInstruction + "\n\nPedido do usuário:\n" + message
-		}
 	default:
 		return fmt.Errorf("usage: daimon demo | daimon chat [--enable-replace-file] \"mensagem\" | daimon workspace --root \"diretório\" [--enable-replace-file | --enable-create-file] \"mensagem\" | daimon workspace --root \"diretório\" plan \"mensagem\" | daimon smoke \"mensagem\"")
 	}
