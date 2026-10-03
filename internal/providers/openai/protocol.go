@@ -46,10 +46,17 @@ type chatResponse struct {
 }
 
 func encodeRequest(modelName string, req model.ModelRequest) ([]byte, error) {
+	return encodeRequestWithSystem(modelName, req, "")
+}
+
+func encodeRequestWithSystem(modelName string, req model.ModelRequest, instruction string) ([]byte, error) {
 	if len(req.Messages) == 0 {
 		return nil, &RequestError{Reason: "messages are required"}
 	}
 	wire := chatRequest{Model: modelName, Messages: make([]chatMessage, 0, len(req.Messages)), Stream: false}
+	if instruction != "" {
+		wire.Messages = append(wire.Messages, chatMessage{Role: "system", Content: &instruction})
+	}
 	for _, msg := range req.Messages {
 		if !utf8.ValidString(msg.Content) || !utf8.ValidString(msg.ToolCallID) {
 			return nil, &RequestError{Reason: "invalid UTF-8 in message"}
