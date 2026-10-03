@@ -13,7 +13,7 @@ import (
 	"github.com/netty-linux/daimon/internal/workspaceplan"
 )
 
-var errManagedArguments = errors.New("Uso: managed-workspace --base <store-privado> create --source <origem> | apply --run <id> --plan <arquivo> | report --run <id> | list | inspect --run <id> | discard --run <id> --enable-discard")
+var errManagedArguments = errors.New("Uso: managed-workspace --base <store-privado> create --source <origem> | apply --run <id> --plan <arquivo> | report --run <id> | list | inspect --run <id> | discard --run <id> --enable-discard | export-evidence --run <id> --destination <novo-diretório-absoluto> --source-check <origem-absoluta> --enable-export-evidence. Exportação de output, conteúdo e patch está fora do escopo")
 
 func managedArguments(args []string) (string, string, map[string]string, error) {
 	if len(args) < 3 || args[0] != "--base" || args[1] == "" {
@@ -33,12 +33,17 @@ func managedArguments(args []string) (string, string, map[string]string, error) 
 	case "discard":
 		allowed["--run"] = true
 		allowed["--enable-discard"] = true
+	case "export-evidence":
+		allowed["--run"] = true
+		allowed["--destination"] = true
+		allowed["--source-check"] = true
+		allowed["--enable-export-evidence"] = true
 	default:
 		return "", "", nil, errManagedArguments
 	}
 	values := map[string]string{}
 	for i := 3; i < len(args); {
-		if args[i] == "--enable-discard" && command == "discard" {
+		if (args[i] == "--enable-discard" && command == "discard") || (args[i] == "--enable-export-evidence" && command == "export-evidence") {
 			if values[args[i]] != "" {
 				return "", "", nil, errManagedArguments
 			}
@@ -67,12 +72,37 @@ func runManagedWorkspace(ctx context.Context, args []string, input io.Reader, ou
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	if command == "list" || command == "inspect" || command == "discard" {
+	if command == "list" || command == "inspect" || command == "discard" || command == "export-evidence" {
 		store, err := managedworkspace.OpenStore(base)
 		if err != nil {
 			return err
 		}
-		defer store.Close()
+		storeClosed := false
+		defer func() {
+			if !storeClosed {
+				store.Close()
+			}
+		}()
+		if command == "export-evidence" {
+			proposal, err := store.PrepareEvidence(ctx, values["--run"], values["--destination"], values["--source-check"], values["--enable-export-evidence"] == "true")
+			if err != nil {
+				return err
+			}
+			defer proposal.Close()
+			permit, err := proposal.Approve(ctx, editcontract.NewTerminal(input, display))
+			if errors.Is(err, editcontract.ErrDenied) {
+				return &outputError{message: "Exportação de evidências negada; publicação não iniciada", cause: err}
+			}
+			if errors.Is(err, editcontract.ErrApproval) {
+				return &outputError{message: "Falha ao exibir ou obter aprovação de exportação; publicação não iniciada", cause: err}
+			}
+			if err != nil {
+				return err
+			}
+			result, err := permit.Export(ctx)
+			storeClosed = true
+			return finishEvidenceExport(ctx, result, err, store.Close, out)
+		}
 		if command == "list" {
 			summaries, err := store.List(ctx)
 			if err != nil {
@@ -159,6 +189,27 @@ func runManagedWorkspace(ctx context.Context, args []string, input io.Reader, ou
 		}
 	}
 	return err
+}
+
+// Close the caller-owned store before exposing success; raw close errors are
+// not public diagnostics. A late cancellation must not print exported.
+func finishEvidenceExport(ctx context.Context, result managedworkspace.EvidenceResult, operationErr error, closeStore func() error, out io.Writer) error {
+	if closeStore() != nil {
+		result.State = "unknown_interrupted"
+		operationErr = errors.Join(operationErr, managedworkspace.ErrArtifact)
+	}
+	if err := ctx.Err(); err != nil {
+		if result.State == "exported" {
+			result.State = "unknown_interrupted"
+		}
+		if !errors.Is(operationErr, err) {
+			operationErr = errors.Join(operationErr, err)
+		}
+	}
+	if err := writeManagedResult(out, fmt.Sprintf("Estado da exportação de evidências: %s\nArquivos: %d; bytes: %d\nConteúdo e patch: não incluídos\nPublicação na origem: não realizada\n", result.State, result.Files, result.Bytes)); err != nil {
+		return errors.Join(operationErr, err)
+	}
+	return operationErr
 }
 
 func printManagedSummaries(out io.Writer, summaries []managedworkspace.Summary) error {

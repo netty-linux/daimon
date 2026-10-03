@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netty-linux/daimon/internal/managedworkspace"
 	"github.com/netty-linux/daimon/internal/workspaceplan"
 )
 
@@ -58,6 +60,15 @@ func TestManagedCLIExecutable(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(source, "config.txt"), []byte("initial\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
+	const privateContent = "API_KEY=synthetic-cli-only\npassword=synthetic-cli\neyJhbGciOiJub25lIn0.e30.synthetic\n-----BEGIN PRIVATE KEY-----\nsynthetic-cli-key\n-----END PRIVATE KEY-----\n"
+	if err := os.WriteFile(filepath.Join(source, "README.md"), []byte(privateContent), 0600); err != nil {
+		t.Fatal(err)
+	}
+	reviewParent := filepath.Join(t.TempDir(), "review")
+	if err := os.Mkdir(reviewParent, 0700); err != nil {
+		t.Fatal(err)
+	}
+	destination := filepath.Join(reviewParent, "evidence")
 	binary := filepath.Join(t.TempDir(), "daimon")
 	if runtime.GOOS == "windows" {
 		binary += ".exe"
@@ -95,6 +106,17 @@ func TestManagedCLIExecutable(t *testing.T) {
 				t.Fatal("unsupported lifecycle provisioned")
 			}
 		}
+		_, display, err = invoke("y\n", "managed-workspace", "--base", base, "export-evidence", "--run", strings.Repeat("a", 32), "--destination", destination, "--source-check", source, "--enable-export-evidence")
+		if err == nil || !strings.Contains(display, "não suportado") {
+			t.Fatal("unsupported export", display, err)
+		}
+		if _, e := os.Stat(destination); !os.IsNotExist(e) {
+			t.Fatal("unsupported export wrote", e)
+		}
+		entries, e := os.ReadDir(reviewParent)
+		if e != nil || len(entries) != 0 {
+			t.Fatal("unsupported export audit", e)
+		}
 		return
 	}
 	if err != nil {
@@ -125,6 +147,41 @@ func TestManagedCLIExecutable(t *testing.T) {
 	out, display, err = invoke("", "managed-workspace", "--base", base, "report", "--run", id)
 	if err != nil || !strings.Contains(out, "Estado: succeeded") {
 		t.Fatal(out, display, err)
+	}
+	evidenceArgs := []string{"managed-workspace", "--base", base, "export-evidence", "--run", id, "--destination", destination, "--source-check", source, "--enable-export-evidence"}
+	out, display, err = invoke("", "managed-workspace", "--base", base, "inspect", "--run", id)
+	if err != nil || !strings.Contains(out, `"state":"succeeded"`) {
+		t.Fatal("inspect before export", out, display, err)
+	}
+	for _, input := range []string{"n\n", ""} {
+		_, display, err = invoke(input, evidenceArgs...)
+		if err == nil || strings.Count(display, "Aprovar esta proposta uma vez?") != 1 {
+			t.Fatal("evidence denial", display, err)
+		}
+		entries, e := os.ReadDir(reviewParent)
+		if e != nil || len(entries) != 0 {
+			t.Fatal("denial effects", e)
+		}
+	}
+	out, display, err = invoke("y\n", evidenceArgs...)
+	if err != nil || !strings.Contains(out, "Estado da exportação de evidências: exported") || strings.Count(display, "Aprovar esta proposta uma vez?") != 1 {
+		t.Fatal("evidence CLI", out, display, err)
+	}
+	for _, secret := range []string{"API_KEY=synthetic-cli-only", "password=synthetic-cli", "eyJhbGciOiJub25lIn0", "BEGIN PRIVATE KEY"} {
+		if strings.Contains(out+display, secret) {
+			t.Fatal("evidence CLI content leak")
+		}
+	}
+	for _, sensitive := range []string{source, base, destination, id, "config.txt"} {
+		if strings.Contains(out, sensitive) {
+			t.Fatal("evidence public output leak")
+		}
+	}
+	if _, e := managedworkspace.VerifyEvidence(ctx, destination); e != nil {
+		t.Fatal("CLI package verification", e)
+	}
+	if _, _, e := invoke("y\n", evidenceArgs...); e == nil {
+		t.Fatal("existing destination overwritten")
 	}
 	if _, _, err := invoke("y\n", "managed-workspace", "--base", base, "apply", "--run", id, "--plan", planFile); err == nil {
 		t.Fatal("CLI reused approval/run")
@@ -182,4 +239,56 @@ func TestManagedCLIExecutable(t *testing.T) {
 		t.Fatal("source modified after discard")
 	}
 	t.Log("real CLI create/apply/report/list/inspect/deny/discard: source unchanged; other run ready; terminal audit verified; no provider configuration")
+}
+
+func TestEvidenceManagedArguments(t *testing.T) {
+	valid := []string{"--base", "store", "export-evidence", "--run", "id", "--destination", "destination", "--source-check", "source", "--enable-export-evidence"}
+	if _, command, _, err := managedArguments(valid); err != nil || command != "export-evidence" {
+		t.Fatal(command, err)
+	}
+	for _, args := range [][]string{valid[:len(valid)-1], append(append([]string{}, valid...), "--enable-export-evidence"), append(append([]string{}, valid...), "--output"), append(append([]string{}, valid...), "--content"), append(append([]string{}, valid...), "--patch"), {"--base", "store", "export-content"}, {"--base", "store", "export-patch"}} {
+		if _, _, _, err := managedArguments(args); err == nil || !strings.Contains(err.Error(), "fora do escopo") {
+			t.Fatal("unsafe export accepted", err)
+		}
+	}
+}
+
+func TestEvidenceSummaryFinalCloseAndCancellation(t *testing.T) {
+	for _, kind := range []string{"close_error", "cancel_at_close", "success"} {
+		t.Run(kind, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			var out bytes.Buffer
+			closed := 0
+			closeStore := func() error {
+				closed++
+				if out.Len() != 0 {
+					t.Fatal("printed before close")
+				}
+				switch kind {
+				case "close_error":
+					return errors.New("SYNTHETIC_CLOSE_SECRET")
+				case "cancel_at_close":
+					cancel()
+				}
+				return nil
+			}
+			err := finishEvidenceExport(ctx, managedworkspace.EvidenceResult{State: "exported", Files: 6, Bytes: 42}, nil, closeStore, &out)
+			if closed != 1 || strings.Contains(out.String(), "SYNTHETIC_CLOSE_SECRET") {
+				t.Fatal("unsafe summary")
+			}
+			if kind == "success" {
+				if err != nil || !strings.Contains(out.String(), ": exported") {
+					t.Fatal(out.String(), err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(out.String(), "unknown_interrupted") || strings.Contains(out.String(), ": exported") || strings.Contains(err.Error(), "SYNTHETIC_CLOSE_SECRET") {
+				t.Fatal(out.String(), err)
+			}
+			if kind == "cancel_at_close" && !errors.Is(err, context.Canceled) {
+				t.Fatal("lost context error", err)
+			}
+		})
+	}
 }
