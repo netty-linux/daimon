@@ -171,3 +171,11 @@ externa, fora de escopo, sem comando ou permissão na Daimon.** Descarte de um r
 é explícito, opt-in e aprovado; não existe remoção automática por idade.
 List/inspect são read-only. Consulte [o lifecycle](managed-lifecycle.md) para
 preview, confirmação, tombstones, estados e condições de bloqueio.
+
+Evidence export opt-in, experimental e Linux amd64 only está descrito no
+[contrato dedicado](managed-evidence-export.md). Exporta apenas metadados por
+serializers próprios, sem duplicar conteúdo, plano bruto, output ou patch.
+Destino privado novo fora da source/store, preview e aprovação single-use são
+obrigatórios. Origem/run/store não recebem writes de export; content export e
+patch permanecem fora do escopo. Source is never modified. Same-UID processes
+are trusted; não há isolamento contra proprietário/administradores hostis.

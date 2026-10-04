@@ -627,3 +627,16 @@ com opt-in, preview completo, confirmação única, revalidação e tombstone pr
 sincronizado fora do run. Não modifica a origem nem faz limpeza automática.
 Runs interrompidos ou inconsistentes permanecem bloqueados para descarte.
 Veja [estados, auditoria e limitações do lifecycle](docs/managed-lifecycle.md).
+
+### Evidence export — experimental, Linux amd64 only
+
+```text
+daimon managed-workspace --base /tmp/daimon-store export-evidence --run <id> --destination /tmp/daimon-review/evidence-1 --source-check /input --enable-export-evidence
+```
+
+Exige pai privado 0700 existente, destino novo fora da source/store e aprovação
+única. Exporta somente seis artefatos metadata-only de ready/succeeded íntegro,
+com hashes, inventário e auditoria externa; source is never modified. Conteúdo,
+output e patch não são exportados. Não implementa secret scanning nem promete
+ausência universal de segredos. Same-UID processes are trusted. Windows bloqueia
+antes de efeitos. Veja [contrato, limites e falhas](docs/managed-evidence-export.md).
