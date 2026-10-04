@@ -12,6 +12,10 @@ type Loop struct {
 	Budget     Budget
 	Sink       EventSink
 	Authorizer ToolAuthorizer
+	// ValidateFinal is optional and deterministic. A nonempty recovery message
+	// requests one additional, tool-free model step within the existing budget.
+	// The loop enforces at most one recovery, regardless of validator behavior.
+	ValidateFinal func(string) (recovery string, err error)
 }
 
 type Result struct {

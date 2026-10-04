@@ -22,11 +22,30 @@ func workspaceArguments(args []string) (string, []string, error) {
 	}
 	root, tail := args[2], args[3:]
 	var chat []string
-	if len(tail) == 2 && tail[0] == "plan" {
-		if tail[1] == "--enable-replace-file" {
+	if tail[0] == "plan" {
+		var message string
+		validated, haveMessage := false, false
+		for _, arg := range tail[1:] {
+			if arg == "--validate-scope" {
+				if validated {
+					return "", nil, errWorkspace
+				}
+				validated = true
+			} else {
+				if haveMessage || strings.TrimSpace(arg) == "" || strings.HasPrefix(arg, "-") {
+					return "", nil, errWorkspace
+				}
+				message, haveMessage = arg, true
+			}
+		}
+		if !haveMessage {
 			return "", nil, errWorkspace
 		}
-		chat = []string{"chat", "plan", tail[1]}
+		chat = []string{"chat", "plan"}
+		if validated {
+			chat = append(chat, "--validate-scope")
+		}
+		chat = append(chat, message)
 	} else if len(tail) == 2 && tail[0] == "--enable-replace-file" {
 		if tail[1] == "plan" {
 			return "", nil, errWorkspace

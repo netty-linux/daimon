@@ -55,6 +55,12 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 		}
 	}
 	sink := &agentloop.MemoryEventSink{}
+	validatedPlan := workspaceMode && len(args) == 4 && args[1] == "plan" && args[2] == "--validate-scope"
+	var scope *planScope
+	if validatedPlan {
+		scope = recognizePlanScope(args[3])
+		args = []string{"chat", "plan", args[3]}
+	}
 	planMode := workspaceMode && len(args) == 3 && args[1] == "plan"
 	if planMode {
 		args = []string{"chat", args[2]}
@@ -97,6 +103,9 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 			instruction := ""
 			if workspaceMode {
 				instruction = workspaceInstruction(planMode, creationEnabled, replacementEnabled)
+				if scope != nil {
+					instruction += scopeProtocol
+				}
 			}
 			selected, err = openai.New(openai.Config{
 				BaseURL: getenv("DAIMON_BASE_URL"), Model: getenv("DAIMON_MODEL"),
@@ -187,11 +196,17 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 		composed.CreateReviews = createcontract.NewTerminal(bufferedInput, stderr)
 	}
 	loop := agentloop.Loop{Model: selected, Registry: registry, Budget: agentloop.DefaultBudget(), Sink: sink, Authorizer: authorizer}
+	if scope != nil {
+		loop.ValidateFinal = scope.validate
+	}
 	result, err := loop.Run(ctx, message)
 	if workspaceMode {
 		var planErr error
 		if planMode && err == nil {
 			plan := result.FinalAnswer
+			if scope != nil {
+				plan, _, _ = splitScopeAnswer(plan)
+			}
 			if apiKey != "" {
 				plan = strings.ReplaceAll(plan, apiKey, "[REDACTED]")
 			}

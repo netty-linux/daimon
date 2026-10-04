@@ -17,6 +17,10 @@ func workspaceError(err error) error {
 	}
 	message := "Não foi possível concluir a operação; consulte os contadores de escritas confirmadas."
 	switch {
+	case errors.Is(err, errWorkspace):
+		message = "Argumentos ou diretório de workspace inválidos. Uso de plan: workspace --root \"diretório\" plan [--validate-scope] \"pedido\" ou plan \"pedido\" --validate-scope. Forneça um único pedido não vazio; a única flag de plan é --validate-scope, no máximo uma vez."
+	case errors.Is(err, errPlanScope):
+		message = "Plano recusado: o contrato de escopo não foi validado após a recuperação única."
 	case errors.Is(err, createcontract.ErrCleanup), errors.Is(err, editcontract.ErrCleanup):
 		message = "Falha de limpeza; pode haver resíduo. Consulte as escritas confirmadas."
 	case errors.Is(err, context.Canceled):
