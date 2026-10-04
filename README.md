@@ -644,3 +644,5 @@ com hashes, inventário e auditoria externa; source is never modified. Conteúdo
 output e patch não são exportados. Não implementa secret scanning nem promete
 ausência universal de segredos. Same-UID processes are trusted. Windows bloqueia
 antes de efeitos. Veja [contrato, limites e falhas](docs/managed-evidence-export.md).
+
+Validação restrita e opt-in de planos: `workspace --root <root> plan --validate-scope <pedido>` (flag também aceita após o pedido). [Contrato, template reconhecido e recuperação sem tools](docs/workspace-core.md#validação-opt-in-de-escopo-do-plano). Pedidos fora do template continuam planos livres; não há execução ou nova permissão.

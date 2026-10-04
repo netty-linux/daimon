@@ -15,11 +15,16 @@ const (
 	ToolFailed     EventKind = "tool_failed"
 	// Approval events are emitted by composite authorizers, never by the loop,
 	// and follow the same no-secrets rule: step and tool index only.
-	ApprovalRequested EventKind = "approval_requested"
-	ApprovalGranted   EventKind = "approval_granted"
-	ApprovalDenied    EventKind = "approval_denied"
-	FinalAnswer       EventKind = "final_answer"
-	LoopStopped       EventKind = "loop_stopped"
+	ApprovalRequested        EventKind = "approval_requested"
+	ApprovalGranted          EventKind = "approval_granted"
+	ApprovalDenied           EventKind = "approval_denied"
+	FinalAnswer              EventKind = "final_answer"
+	FinalValidationRequested EventKind = "final_validation_requested"
+	FinalValidationAccepted  EventKind = "final_validation_accepted"
+	FinalValidationRejected  EventKind = "final_validation_rejected"
+	RecoveryRequested        EventKind = "recovery_requested"
+	RecoveryModelRequested   EventKind = "recovery_model_requested"
+	LoopStopped              EventKind = "loop_stopped"
 )
 
 // Event intentionally excludes names, IDs, arguments, output and error text.

@@ -58,6 +58,7 @@ func (l Loop) Run(ctx context.Context, userMessage string) (result Result, err e
 	}
 	result.History = []model.Message{user}
 	ids := make(map[string]bool)
+	recovering := false
 	for result.Steps < b.MaxSteps {
 		if err := interruption(ctx, runCtx); err != nil {
 			return result, err
@@ -67,12 +68,18 @@ func (l Loop) Run(ctx context.Context, userMessage string) (result Result, err e
 			return result, err
 		}
 		request := model.CloneRequest(model.ModelRequest{Messages: result.History, Tools: l.Registry.Descriptions()})
+		if recovering {
+			request.Tools = nil
+		}
 		modelCtx, cancelModel := b.ApplyModelTimeout(runCtx)
 		if err := interruption(ctx, modelCtx); err != nil {
 			cancelModel()
 			return result, err
 		}
 		result.Steps++
+		if recovering {
+			sink.Record(ctx, Event{Kind: RecoveryModelRequested, Step: result.Steps})
+		}
 		response, modelErr := l.Model.Generate(modelCtx, request)
 		// Inspect before cancel: cleanup cancellation must not look like a timeout.
 		interrupted := interruption(ctx, modelCtx)
@@ -87,6 +94,9 @@ func (l Loop) Run(ctx context.Context, userMessage string) (result Result, err e
 		if err := interruption(ctx, runCtx); err != nil {
 			return result, err
 		}
+		if recovering && len(response.ToolCalls) != 0 {
+			return result, ErrInvalidResponse
+		}
 		if len(response.ToolCalls) == 0 {
 			if err := validate(response, ids); err != nil {
 				return result, err
@@ -100,6 +110,36 @@ func (l Loop) Run(ctx context.Context, userMessage string) (result Result, err e
 			}
 			if err := interruption(ctx, runCtx); err != nil {
 				return result, err
+			}
+			if l.ValidateFinal != nil {
+				sink.Record(ctx, Event{Kind: FinalValidationRequested, Step: result.Steps})
+				recovery, validationErr := l.ValidateFinal(response.FinalText)
+				if err := interruption(ctx, runCtx); err != nil {
+					return result, err
+				}
+				if validationErr != nil {
+					sink.Record(ctx, Event{Kind: FinalValidationRejected, Step: result.Steps})
+					return result, validationErr
+				}
+				if recovery != "" {
+					sink.Record(ctx, Event{Kind: FinalValidationRejected, Step: result.Steps})
+					if recovering || strings.TrimSpace(recovery) == "" {
+						return result, ErrInvalidResponse
+					}
+					if len(recovery) > b.MaxUserMessageBytes {
+						return result, LimitError{Kind: LimitMaxUserMessageBytes, Limit: int64(b.MaxUserMessageBytes), Actual: int64(len(recovery))}
+					}
+					pending := append(append([]model.Message(nil), result.History...), message)
+					correction := model.Message{Role: model.RoleUser, Content: recovery}
+					if err := historyLimit(pending, correction, nil, b); err != nil {
+						return result, err
+					}
+					result.History = append(pending, correction)
+					recovering = true
+					sink.Record(ctx, Event{Kind: RecoveryRequested, Step: result.Steps})
+					continue
+				}
+				sink.Record(ctx, Event{Kind: FinalValidationAccepted, Step: result.Steps})
 			}
 			result.History = append(result.History, message)
 			result.FinalAnswer = response.FinalText
