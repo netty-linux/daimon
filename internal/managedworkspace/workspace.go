@@ -47,18 +47,18 @@ type Manifest struct {
 	Snapshot        string    `json:"snapshot_sha256"`
 	Files           int       `json:"files"`
 	Directories     int       `json:"directories"`
-	Bytes           int       `json:"bytes"`
+	Bytes           int       `json:"total_size_bytes"`
 	Root            Identity  `json:"root_identity"`
 	Output          Identity  `json:"output_identity"`
 	Status          string    `json:"status"`
 	Rules           string    `json:"rules"`
 }
 type OperationReport struct {
-	Type   string `json:"type"`
-	Path   string `json:"path"`
-	Before string `json:"before,omitempty"`
-	After  string `json:"after"`
-	Status string `json:"status"`
+	Type         string `json:"type"`
+	Path         string `json:"path"`
+	BeforeSHA256 string `json:"before_sha256,omitempty"`
+	AfterSHA256  string `json:"after_sha256"`
+	Status       string `json:"status"`
 }
 type Report struct {
 	Version    int               `json:"version"`
@@ -445,7 +445,7 @@ func (r *Run) Report() (Report, error) {
 		return Report{}, ErrArtifact
 	}
 	for _, op := range report.Operations {
-		if !workspaceplan.ValidPath(op.Path, workspaceplan.DefaultLimits()) || !validHash(op.After) || (op.Type != "create_file" && op.Type != "replace_file") || (op.Type == "create_file" && op.Before != "") || (op.Type == "replace_file" && !validHash(op.Before)) {
+		if !workspaceplan.ValidPath(op.Path, workspaceplan.DefaultLimits()) || !validHash(op.AfterSHA256) || (op.Type != "create_file" && op.Type != "replace_file") || (op.Type == "create_file" && op.BeforeSHA256 != "") || (op.Type == "replace_file" && !validHash(op.BeforeSHA256)) {
 			return Report{}, ErrArtifact
 		}
 		switch op.Status {

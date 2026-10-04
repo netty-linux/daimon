@@ -14,7 +14,7 @@ com basename no subset ASCII portátil, sem nome de controle iniciado por ponto.
 Não cria pais automaticamente nem aceita destino já existente, mesmo vazio.
 O pai não pode sobrepor source ou store, nem ser ancestral/descendente delas.
 
-`--source-check` é obrigatório: o manifest legado guarda somente o hash do path
+`--source-check` é obrigatório: o manifest guarda somente o hash do path
 canônico da origem. Este argumento verifica esse vínculo e a identidade física
 da origem, sem ler seu conteúdo. Exige a origem original ainda disponível, sem
 symlinks, com path absoluto exato. Origem movida/inacessível bloqueia export.
@@ -22,6 +22,35 @@ Não resolve novamente aliases. Essa exigência evita aceitar como destino a
 origem desconhecida a partir de um hash. Não escreve na origem.
 
 ## Elegibilidade e pacote
+
+### Schema metadata-only e incompatibilidade legada
+
+Hashes são strings SHA-256 completas, com exatamente 64 caracteres hexadecimais
+minúsculos: `before_sha256`, `after_sha256`, `output_sha256`,
+`artifact_sha256` e demais nomes terminados em `_sha256`. Tamanhos são inteiros
+não negativos, dentro dos limites existentes: `file_size_bytes`,
+`artifact_size_bytes`, `after_bytes` e `total_size_bytes`.
+Diretórios não têm `output_sha256`; operações de criação não têm
+`before_sha256`. Um inventário indisponível em list/inspect omite
+`inventory_sha256`. Hashes não são anonimização: permitem correlação com
+conteúdo conhecido. Não há conteúdo substituto quando falta um hash.
+
+Esta correção do formato experimental mantém os identificadores de versão 1,
+mas substitui a forma dos campos. Artefatos anteriores com `before`, `after`,
+`bytes`, `sha256`, `state_hash` ou `preview_hash` nos respectivos schemas
+metadata-only são incompatíveis e recusados, inclusive misturados com nomes
+novos. Não há aliases, migração, reparação ou fallback de leitura. A recusa
+não modifica os artefatos antigos. Use novos runs para o fluxo atualizado;
+preserve runs antigos para revisão externa com a versão que os criou.
+
+Campos de conteúdo são proibidos nos schemas metadata-only: `content`,
+`expected_content`, `preimage`, `postimage`, `data`, `payload`, `body`, `raw`,
+`encoded`, `base64`, `hex`, `diff`, `patch`, `prompt` e `response`.
+O plano executável privado `approved-plan.json` é um contrato de conteúdo
+separado e permanece inalterado; seu conteúdo não entra no Evidence Export.
+Os seis arquivos exportados e a auditoria externa usam tipos próprios,
+nunca cópia cega de artefatos internos. `--source-check` permanece estrutural:
+nenhum hash é calculado lendo bytes de arquivos regulares da source.
 
 Aceita somente `ready` íntegro ou `succeeded` íntegro. Partial, interrupted,
 invalid, missing, discarded e artefatos divergentes/truncados ficam bloqueados.

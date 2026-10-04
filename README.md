@@ -630,6 +630,10 @@ Veja [estados, auditoria e limitações do lifecycle](docs/managed-lifecycle.md)
 
 ### Evidence export — experimental, Linux amd64 only
 
+Os schemas metadata-only usam hashes `*_sha256` e tamanhos numéricos `*_bytes`.
+Artefatos com nomes legados ambíguos são recusados sem migração ou fallback.
+Veja a [incompatibilidade documentada](docs/managed-evidence-export.md#schema-metadata-only-e-incompatibilidade-legada).
+
 ```text
 daimon managed-workspace --base /tmp/daimon-store export-evidence --run <id> --destination /tmp/daimon-review/evidence-1 --source-check /input --enable-export-evidence
 ```

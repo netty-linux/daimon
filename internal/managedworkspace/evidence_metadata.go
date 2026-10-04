@@ -25,8 +25,8 @@ var evidenceWarnings = []string{"Exportar não é publicar na source.", "Sem con
 type evidenceInventoryEntry struct {
 	Path   string `json:"path"`
 	Type   string `json:"type"`
-	SHA256 string `json:"sha256,omitempty"`
-	Bytes  int    `json:"bytes"`
+	SHA256 string `json:"output_sha256,omitempty"`
+	Bytes  int    `json:"file_size_bytes"`
 	Mode   string `json:"mode"`
 }
 type evidenceInventory struct {
@@ -36,13 +36,13 @@ type evidenceInventory struct {
 
 // These export types deliberately have no file-content or free-form plan fields.
 type evidenceOperation struct {
-	Order      int    `json:"order"`
-	Type       string `json:"type"`
-	Path       string `json:"path"`
-	Before     string `json:"before,omitempty"`
-	After      string `json:"after"`
-	Status     string `json:"status"`
-	AfterBytes int    `json:"after_bytes"`
+	Order        int    `json:"order"`
+	Type         string `json:"type"`
+	Path         string `json:"path"`
+	BeforeSHA256 string `json:"before_sha256,omitempty"`
+	AfterSHA256  string `json:"after_sha256"`
+	Status       string `json:"status"`
+	AfterBytes   int    `json:"after_bytes"`
 }
 type evidenceOperations struct {
 	Version    int                 `json:"version"`
@@ -57,7 +57,7 @@ type evidenceRunManifest struct {
 	Snapshot        string    `json:"snapshot_sha256"`
 	Files           int       `json:"files"`
 	Directories     int       `json:"directories"`
-	Bytes           int       `json:"bytes"`
+	Bytes           int       `json:"total_size_bytes"`
 	Status          string    `json:"status"`
 }
 type evidenceReport struct {
@@ -73,15 +73,15 @@ type evidenceJournalRecord struct {
 	Status    string                   `json:"status"`
 }
 type evidenceJournalOperation struct {
-	Type   string `json:"type"`
-	Path   string `json:"path"`
-	Before string `json:"before,omitempty"`
-	After  string `json:"after"`
+	Type         string `json:"type"`
+	Path         string `json:"path"`
+	BeforeSHA256 string `json:"before_sha256,omitempty"`
+	AfterSHA256  string `json:"after_sha256"`
 }
 type EvidenceArtifact struct {
 	Path   string `json:"path"`
-	SHA256 string `json:"sha256"`
-	Bytes  int    `json:"bytes"`
+	SHA256 string `json:"artifact_sha256"`
+	Bytes  int    `json:"artifact_size_bytes"`
 }
 type EvidenceManifest struct {
 	FormatVersion            int                `json:"format_version"`
@@ -184,14 +184,14 @@ func (s *Store) buildEvidence(ctx context.Context, r *Run, exportID string, crea
 		}
 		for i, op := range plan.Operations {
 			result := report.Operations[i]
-			if result.Status != "succeeded" || result.Type != op.Type || result.Path != op.Path || result.Before != op.Precondition.SHA256 || result.After != op.Validation.SHA256 {
+			if result.Status != "succeeded" || result.Type != op.Type || result.Path != op.Path || result.BeforeSHA256 != op.Precondition.SHA256 || result.AfterSHA256 != op.Validation.SHA256 {
 				return bundle, ErrEvidence
 			}
 			data, e := r.readArtifact("output/"+op.Path, MaxFileBytes)
-			if e != nil || workspaceplan.Hash(data) != result.After {
+			if e != nil || workspaceplan.Hash(data) != result.AfterSHA256 {
 				return bundle, ErrEvidence
 			}
-			ops = append(ops, evidenceOperation{i + 1, result.Type, result.Path, result.Before, result.After, result.Status, len(data)})
+			ops = append(ops, evidenceOperation{i + 1, result.Type, result.Path, result.BeforeSHA256, result.AfterSHA256, result.Status, len(data)})
 		}
 		data, e := r.readArtifact("artifacts/journal.jsonl", 32768)
 		if e != nil {
@@ -202,7 +202,7 @@ func (s *Store) buildEvidence(ctx context.Context, r *Run, exportID string, crea
 			if strictMetadata(line, &record) != nil {
 				return bundle, ErrEvidence
 			}
-			transformed := evidenceJournalRecord{record.Version, record.Sequence, record.Timestamp, evidenceJournalOperation{record.Operation.Type, record.Operation.Path, record.Operation.Before, record.Operation.After}, record.Status}
+			transformed := evidenceJournalRecord{record.Version, record.Sequence, record.Timestamp, evidenceJournalOperation{record.Operation.Type, record.Operation.Path, record.Operation.BeforeSHA256, record.Operation.AfterSHA256}, record.Status}
 			encoded, e := metadataJSON(transformed)
 			if e != nil {
 				return bundle, e
@@ -258,7 +258,7 @@ func (s *Store) buildEvidence(ctx context.Context, r *Run, exportID string, crea
 
 func evidenceDecode(data []byte, target any) error {
 	allowed := map[string]bool{}
-	for _, key := range []string{"format_version", "export_kind", "export_id", "run_id", "created_at_utc", "run_state", "integrity", "contains_file_content", "contains_patch_content", "secret_free_guarantee", "source_not_modified", "content_export_not_included", "journal_present", "approved_plan_present", "report_persisted", "artifacts", "path", "sha256", "bytes", "max_files", "max_bytes", "warnings", "version", "created", "source_reference_sha256", "snapshot_sha256", "files", "directories", "status", "operations", "order", "type", "before", "after", "after_bytes", "present", "sequence", "timestamp", "operation", "entries", "mode"} {
+	for _, key := range []string{"format_version", "export_kind", "export_id", "run_id", "created_at_utc", "run_state", "integrity", "contains_file_content", "contains_patch_content", "secret_free_guarantee", "source_not_modified", "content_export_not_included", "journal_present", "approved_plan_present", "report_persisted", "artifacts", "path", "output_sha256", "artifact_sha256", "file_size_bytes", "artifact_size_bytes", "total_size_bytes", "max_files", "max_bytes", "warnings", "version", "created", "source_reference_sha256", "snapshot_sha256", "files", "directories", "status", "operations", "order", "type", "before_sha256", "after_sha256", "after_bytes", "present", "sequence", "timestamp", "operation", "entries", "mode"} {
 		allowed[key] = true
 	}
 	return strictJSON(data, target, allowed)

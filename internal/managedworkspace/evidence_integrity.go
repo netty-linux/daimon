@@ -51,7 +51,7 @@ func verifyEvidenceBaseline(items []evidenceInventoryEntry, ops []evidenceOperat
 			files++
 			if op.Type == "replace_file" {
 				replaceIndex = len(entries)
-				e.sha256 = op.Before
+				e.sha256 = op.BeforeSHA256
 			} else {
 				unchangedBytes += item.Bytes
 			}
@@ -153,28 +153,28 @@ func validateEvidenceBundle(root *os.Root, manifest EvidenceManifest, manifestHa
 	operations := map[string]evidenceOperation{}
 	creates, replaces := 0, 0
 	for i, op := range plan.Operations {
-		if op.Order != i+1 || !workspaceplan.ValidPath(op.Path, workspaceplan.DefaultLimits()) || operations[op.Path].Path != "" || op.Status != "succeeded" || !validHash(op.After) || op.AfterBytes < 0 || op.AfterBytes > MaxFileBytes {
+		if op.Order != i+1 || !workspaceplan.ValidPath(op.Path, workspaceplan.DefaultLimits()) || operations[op.Path].Path != "" || op.Status != "succeeded" || !validHash(op.AfterSHA256) || op.AfterBytes < 0 || op.AfterBytes > MaxFileBytes {
 			return ErrArtifact
 		}
 		if op.Type == "create_file" {
 			creates++
-			if op.Before != "" {
+			if op.BeforeSHA256 != "" {
 				return ErrArtifact
 			}
 		} else if op.Type == "replace_file" {
 			replaces++
-			if !validHash(op.Before) {
+			if !validHash(op.BeforeSHA256) {
 				return ErrArtifact
 			}
 		} else {
 			return ErrArtifact
 		}
 		entry := seen[op.Path]
-		if entry.Type != "file" || entry.SHA256 != op.After || entry.Bytes != op.AfterBytes {
+		if entry.Type != "file" || entry.SHA256 != op.AfterSHA256 || entry.Bytes != op.AfterBytes {
 			return ErrArtifact
 		}
 		operations[op.Path] = op
-		metadata = append(metadata, workspacejournal.Metadata{Type: op.Type, Path: op.Path, Before: op.Before, After: op.After})
+		metadata = append(metadata, workspacejournal.Metadata{Type: op.Type, Path: op.Path, BeforeSHA256: op.BeforeSHA256, AfterSHA256: op.AfterSHA256})
 	}
 	if creates > 1 || replaces > 1 {
 		return ErrArtifact
@@ -208,7 +208,7 @@ func validateEvidenceBundle(root *os.Root, manifest EvidenceManifest, manifestHa
 			return ErrArtifact
 		}
 		op := operations[rec.Operation.Path]
-		if op.Order == 0 || op.Order < lastOrder || rec.Operation.Type != op.Type || rec.Operation.Before != op.Before || rec.Operation.After != op.After || checker.Append(op.Path, rec.Status) != nil {
+		if op.Order == 0 || op.Order < lastOrder || rec.Operation.Type != op.Type || rec.Operation.BeforeSHA256 != op.BeforeSHA256 || rec.Operation.AfterSHA256 != op.AfterSHA256 || checker.Append(op.Path, rec.Status) != nil {
 			return ErrArtifact
 		}
 		lastOrder = op.Order

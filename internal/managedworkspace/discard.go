@@ -142,7 +142,7 @@ func (s *Store) PrepareDiscard(ctx context.Context, id string, enabled bool) (*D
 	if _, err = rand.Read(nonce); err != nil {
 		return nil, ErrState
 	}
-	display := fmt.Sprintf("Descarte explícito de uma única cópia gerenciada.\nstore=%s\nrun_id=%s\nrun_relative=%s\nformat=1; declared=%s; verified=%s\nmanifest=%t; journal=%t; approved_plan=%t; attempt.lock=%t; staging=%t\nfiles=%d; directories=%d; bytes=%d\nstate_sha256=%s\nlimits: entries=%d; bytes=%d; preview_bytes=%d\nSomente a cópia gerenciada será removida. A origem não será removida nem modificada.\nO UID proprietário e administradores são confiáveis. Sem rollback, retomada ou publicação.\n", strconv.QuoteToASCII(s.base), id, id, d.summary.Declared, d.summary.State, d.summary.Manifest, d.summary.Journal, d.summary.ApprovedPlan, d.summary.Lock, d.summary.Staging, d.inventory.Files, d.inventory.Directories, d.inventory.Bytes, d.inventory.Hash, MaxRunEntries, MaxRunBytes, MaxPreviewBytes)
+	display := fmt.Sprintf("Descarte explícito de uma única cópia gerenciada.\nstore=%s\nrun_id=%s\nrun_relative=%s\nformat=1; declared=%s; verified=%s\nmanifest=%t; journal=%t; approved_plan=%t; attempt.lock=%t; staging=%t\nfiles=%d; directories=%d; total_size_bytes=%d\nstate_sha256=%s\nlimits: entries=%d; total_size_bytes=%d; preview_bytes=%d\nSomente a cópia gerenciada será removida. A origem não será removida nem modificada.\nO UID proprietário e administradores são confiáveis. Sem rollback, retomada ou publicação.\n", strconv.QuoteToASCII(s.base), id, id, d.summary.Declared, d.summary.State, d.summary.Manifest, d.summary.Journal, d.summary.ApprovedPlan, d.summary.Lock, d.summary.Staging, d.inventory.Files, d.inventory.Directories, d.inventory.Bytes, d.inventory.Hash, MaxRunEntries, MaxRunBytes, MaxPreviewBytes)
 	if len(display) > MaxPreviewBytes {
 		return nil, ErrLimit
 	}
@@ -245,12 +245,12 @@ type tombstone struct {
 	Store       string    `json:"store"`
 	RunID       string    `json:"run_id"`
 	Permit      string    `json:"permit"`
-	StateHash   string    `json:"state_hash"`
-	PreviewHash string    `json:"preview_hash"`
+	StateHash   string    `json:"state_sha256"`
+	PreviewHash string    `json:"preview_sha256"`
 	Initial     string    `json:"initial"`
 	Files       int       `json:"files"`
 	Directories int       `json:"directories"`
-	Bytes       int64     `json:"bytes"`
+	Bytes       int64     `json:"total_size_bytes"`
 	Status      string    `json:"status"`
 	Reason      string    `json:"reason"`
 }

@@ -15,10 +15,10 @@ import (
 var ErrJournal = errors.New("workspace journal unavailable or invalid")
 
 type Metadata struct {
-	Type   string `json:"type"`
-	Path   string `json:"path"`
-	Before string `json:"before,omitempty"`
-	After  string `json:"after"`
+	Type         string `json:"type"`
+	Path         string `json:"path"`
+	BeforeSHA256 string `json:"before_sha256,omitempty"`
+	AfterSHA256  string `json:"after_sha256"`
 }
 type Record struct {
 	Version   int       `json:"version"`
@@ -60,10 +60,10 @@ func New(sink io.Writer, operations []Metadata) (*Journal, error) {
 	}
 	j := &Journal{sink: sink, states: make(map[string]string), metadata: make(map[string]Metadata)}
 	for _, op := range operations {
-		if !workspaceplan.ValidPath(op.Path, workspaceplan.DefaultLimits()) || !validHash(op.After) ||
+		if !workspaceplan.ValidPath(op.Path, workspaceplan.DefaultLimits()) || !validHash(op.AfterSHA256) ||
 			(op.Type != "create_file" && op.Type != "replace_file") ||
-			(op.Type == "create_file" && op.Before != "") ||
-			(op.Type == "replace_file" && !validHash(op.Before)) {
+			(op.Type == "create_file" && op.BeforeSHA256 != "") ||
+			(op.Type == "replace_file" && !validHash(op.BeforeSHA256)) {
 			return nil, ErrJournal
 		}
 		if _, exists := j.states[op.Path]; exists {

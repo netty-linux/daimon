@@ -56,7 +56,7 @@ func (s *Store) readTombstone(id string, metadata *tombstone) (state string, res
 		return "", ErrArtifact
 	}
 	allowed := map[string]bool{}
-	for _, key := range []string{"version", "sequence", "timestamp", "store", "run_id", "permit", "state_hash", "preview_hash", "initial", "files", "directories", "bytes", "status", "reason"} {
+	for _, key := range []string{"version", "sequence", "timestamp", "store", "run_id", "permit", "state_sha256", "preview_sha256", "initial", "files", "directories", "total_size_bytes", "status", "reason"} {
 		allowed[key] = true
 	}
 	records := make([]tombstone, len(lines))

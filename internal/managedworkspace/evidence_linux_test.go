@@ -19,7 +19,7 @@ import (
 	"github.com/netty-linux/daimon/internal/workspaceplan"
 )
 
-const evidenceSecret = "API_KEY=synthetic-only\npassword=synthetic-password\neyJhbGciOiJub25lIn0.eyJzdWIiOiJmaXh0dXJlIn0.synthetic\n-----BEGIN PRIVATE KEY-----\nsynthetic-private-key\n-----END PRIVATE KEY-----\n"
+const evidenceSecret = "API_KEY=synthetic-only\npassword=synthetic-password\neyJhbGciOiJub25lIn0.eyJzdWIiOiJmaXh0dXJlIn0.synthetic\nAPI_KEY=fixture-secret-value\npassword=fixture-password-value\nJWT-like-token=aaa.bbb.ccc\n-----BEGIN PRIVATE KEY-----\nsynthetic-private-key\nfixture-private-key-material\n-----END PRIVATE KEY-----\n"
 
 func TestEvidenceOverlapIncludesFilesystemRoot(t *testing.T) {
 	for _, paths := range [][2]string{{"/", "/tmp/review"}, {"/tmp/review", "/"}, {"/tmp/source", "/tmp/source/child"}, {"/tmp/source", "/tmp/source"}} {
@@ -113,7 +113,7 @@ func assertNoEvidenceDestination(t *testing.T, dest string) {
 	}
 }
 
-func TestEvidenceReadyAndLegacySucceededMetadataOnly(t *testing.T) {
+func TestEvidenceReadyAndSucceededMetadataOnly(t *testing.T) {
 	for _, succeeded := range []bool{false, true} {
 		t.Run(fmt.Sprint(succeeded), func(t *testing.T) {
 			ctx, source, base, s, r, dest := evidenceFixture(t, succeeded)
@@ -130,6 +130,11 @@ func TestEvidenceReadyAndLegacySucceededMetadataOnly(t *testing.T) {
 				t.Fatal(err)
 			}
 			p := evidencePrepare(t, ctx, s, r, dest, source)
+			for _, marker := range strings.Split(strings.TrimSpace(evidenceSecret), "\n") {
+				if strings.Contains(p.View().Display, marker) {
+					t.Fatal("fixture marker in preview")
+				}
+			}
 			for _, secret := range []string{evidenceSecret, "API_KEY=", "password=synthetic-password", "eyJhbGciOiJub25lIn0", "BEGIN PRIVATE KEY", "PRIVATE_SOURCE_CONTENT", "PRIVATE_ASSUMPTION_NOT_EXPORTED"} {
 				if strings.Contains(p.View().Display, secret) {
 					t.Fatal("content in preview")
@@ -162,6 +167,20 @@ func TestEvidenceReadyAndLegacySucceededMetadataOnly(t *testing.T) {
 					t.Fatal("unexpected file")
 				}
 				data := read(t, filepath.Join(dest, entry.Name()))
+				for _, marker := range strings.Split(strings.TrimSpace(evidenceSecret), "\n") {
+					if bytes.Contains(data, []byte(marker)) {
+						t.Fatal("fixture marker in package", entry.Name())
+					}
+				}
+				if entry.Name() == "journal.jsonl" {
+					for _, line := range bytes.Split(bytes.TrimSpace(data), []byte{'\n'}) {
+						if len(line) != 0 {
+							assertExplicitMetadata(t, line)
+						}
+					}
+				} else {
+					assertExplicitMetadata(t, data)
+				}
 				for _, secret := range []string{"API_KEY=", "password=synthetic-password", "eyJhbGciOiJub25lIn0", "BEGIN PRIVATE KEY", "PRIVATE_SOURCE_CONTENT", "PRIVATE_ASSUMPTION_NOT_EXPORTED", `"content"`, `"expected_content"`} {
 					if bytes.Contains(data, []byte(secret)) {
 						t.Fatal("content leaked", entry.Name())
@@ -173,6 +192,14 @@ func TestEvidenceReadyAndLegacySucceededMetadataOnly(t *testing.T) {
 				}
 			}
 			audit := read(t, filepath.Join(filepath.Dir(dest), evidenceAuditDirectory, p.View().ID+".jsonl"))
+			for _, marker := range strings.Split(strings.TrimSpace(evidenceSecret), "\n") {
+				if bytes.Contains(audit, []byte(marker)) {
+					t.Fatal("fixture marker in audit")
+				}
+			}
+			for _, line := range bytes.Split(bytes.TrimSpace(audit), []byte{'\n'}) {
+				assertExplicitMetadata(t, line)
+			}
 			for _, secret := range []string{"API_KEY=", "password=synthetic-password", "eyJhbGciOiJub25lIn0", "BEGIN PRIVATE KEY", "PRIVATE_SOURCE_CONTENT", "PRIVATE_ASSUMPTION_NOT_EXPORTED", source} {
 				if bytes.Contains(audit, []byte(secret)) {
 					t.Fatal("audit leak")

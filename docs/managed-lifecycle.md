@@ -5,6 +5,10 @@ proprietário, processos do mesmo UID e administradores são confiáveis.
 Não há isolamento contra processos hostis do mesmo UID. Apply em roots
 compartilhadas permanece bloqueado.
 
+List/inspect e tombstones usam `total_size_bytes` para tamanhos numéricos.
+Tombstones vinculam `state_sha256` e `preview_sha256`. Nomes legados são
+recusados sem reparação; veja o [contrato metadata-only](managed-evidence-export.md#schema-metadata-only-e-incompatibilidade-legada).
+
 ```text
 daimon managed-workspace --base /tmp/daimon-store create --source /input
 daimon managed-workspace --base /tmp/daimon-store apply --run <id> --plan /input-plan.json
