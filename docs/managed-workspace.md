@@ -134,6 +134,9 @@ final antes de registrar sucesso da operação. Não promete atomicidade do lote
 
 Journal JSONL v1 contém sequência, timestamp, paths relativos, tipos, hashes e
 status, sem conteúdo integral, mensagens de modelo, secrets ou erros livres.
+Os hashes de operação são `before_sha256` e `after_sha256`; o manifest usa
+`total_size_bytes` para a contagem numérica. Artefatos com nomes anteriores
+são recusados sem migração; veja a [incompatibilidade do schema metadata-only](managed-evidence-export.md#schema-metadata-only-e-incompatibilidade-legada).
 Antes de cada efeito, started precisa ser gravado e sincronizado. Falha de
 journal/sync impede operações seguintes. Failed após started é efeito
 desconhecido; confirmação anterior mais falha posterior é partial, sem rollback.

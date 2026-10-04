@@ -145,7 +145,7 @@ func (r *Run) Prepare(ctx context.Context, planBytes []byte) (result *Proposal, 
 			return nil, ErrLimit
 		}
 		p.prepared = append(p.prepared, prepared)
-		metadata = append(metadata, workspacejournal.Metadata{Type: op.Type, Path: op.Path, Before: op.Precondition.SHA256, After: op.Validation.SHA256})
+		metadata = append(metadata, workspacejournal.Metadata{Type: op.Type, Path: op.Path, BeforeSHA256: op.Precondition.SHA256, AfterSHA256: op.Validation.SHA256})
 	}
 	// All paths, preconditions and complete previews were checked without writes.
 	// Now claim this run once, including across processes; never remove the marker.
@@ -435,7 +435,7 @@ func (p *Permit) applyPrepared(ctx context.Context, i int) error {
 func (p *Proposal) newReport(status string) Report {
 	r := Report{Version: 1, Status: status, Operations: make([]OperationReport, 0, len(p.plan.Operations))}
 	for _, op := range p.plan.Operations {
-		r.Operations = append(r.Operations, OperationReport{Type: op.Type, Path: op.Path, Before: op.Precondition.SHA256, After: op.Validation.SHA256, Status: "not_started"})
+		r.Operations = append(r.Operations, OperationReport{Type: op.Type, Path: op.Path, BeforeSHA256: op.Precondition.SHA256, AfterSHA256: op.Validation.SHA256, Status: "not_started"})
 	}
 	return r
 }

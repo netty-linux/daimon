@@ -27,7 +27,7 @@ type evidenceAuditRecord struct {
 	ManifestHash    string    `json:"manifest_sha256"`
 	PackageHash     string    `json:"package_sha256"`
 	Files           int       `json:"files"`
-	Bytes           int       `json:"bytes"`
+	Bytes           int       `json:"total_size_bytes"`
 	Status          string    `json:"status"`
 }
 
@@ -43,7 +43,7 @@ func evidencePackageHash(files []evidenceFile) string {
 }
 func evidenceAuditDecode(data []byte, v *evidenceAuditRecord) error {
 	allowed := map[string]bool{}
-	for _, k := range []string{"version", "sequence", "timestamp", "export_id", "run_id", "run_state", "integrity", "approval", "destination_name", "store_reference_sha256", "run_binding_sha256", "preview_sha256", "manifest_sha256", "package_sha256", "files", "bytes", "status"} {
+	for _, k := range []string{"version", "sequence", "timestamp", "export_id", "run_id", "run_state", "integrity", "approval", "destination_name", "store_reference_sha256", "run_binding_sha256", "preview_sha256", "manifest_sha256", "package_sha256", "files", "total_size_bytes", "status"} {
 		allowed[k] = true
 	}
 	return strictJSON(data, v, allowed)

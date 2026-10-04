@@ -79,7 +79,7 @@ func TestLifecycleReadOnlyAndDiscard(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer p.Close()
-	for _, value := range []string{"store=", "run_id=", "run_relative=", "format=", "manifest=", "journal=", "attempt.lock=", "staging=", "files=", "directories=", "bytes=", "state_sha256=", "limits:", "origem"} {
+	for _, value := range []string{"store=", "run_id=", "run_relative=", "format=", "manifest=", "journal=", "attempt.lock=", "staging=", "files=", "directories=", "total_size_bytes=", "state_sha256=", "limits:", "origem"} {
 		if !strings.Contains(p.View().Display, value) {
 			t.Fatal("missing preview field", value)
 		}

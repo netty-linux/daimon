@@ -27,7 +27,7 @@ type EvidencePermit struct {
 type EvidenceResult struct {
 	State string `json:"state"`
 	Files int    `json:"files"`
-	Bytes int    `json:"bytes"`
+	Bytes int    `json:"total_size_bytes"`
 }
 type evidenceState struct {
 	mu               sync.Mutex
@@ -137,9 +137,9 @@ func (s *Store) PrepareEvidence(ctx context.Context, id, destination, sourceChec
 	deadline, _ := ctx.Deadline()
 	display := fmt.Sprintf("Exportação manual de evidências; sem conteúdo de arquivos ou patch.\noperation=export-evidence\nstore=%s\nrun_id=%s\nrun_state=%s\ndestination=%s\nsource_check=%s\nexport_id=%s\ncontains_file_content=false; contains_patch_content=false; secret_free_guarantee=not_applicable\n", strconv.QuoteToASCII(s.base), id, d.bundle.manifest.RunState, strconv.QuoteToASCII(destination), strconv.QuoteToASCII(sourceCheck), idExport)
 	for _, f := range d.bundle.files {
-		display += fmt.Sprintf("artifact=%s; bytes=%d; sha256=%s\n", f.path, len(f.data), workspaceplan.Hash(f.data))
+		display += fmt.Sprintf("artifact=%s; artifact_size_bytes=%d; artifact_sha256=%s\n", f.path, len(f.data), workspaceplan.Hash(f.data))
 	}
-	display += fmt.Sprintf("files=6; bytes=%d; limits: files=6, file_bytes=%d, total_bytes=%d, preview_bytes=%d\napproval_deadline_utc=%s\n", d.bundle.total, MaxEvidenceFileBytes, MaxEvidenceBytes, MaxPreviewBytes, deadline.UTC().Format(time.RFC3339Nano))
+	display += fmt.Sprintf("files=6; total_size_bytes=%d; limits: files=6, file_bytes=%d, total_bytes=%d, preview_bytes=%d\napproval_deadline_utc=%s\n", d.bundle.total, MaxEvidenceFileBytes, MaxEvidenceBytes, MaxPreviewBytes, deadline.UTC().Format(time.RFC3339Nano))
 	for _, warning := range d.bundle.manifest.Warnings {
 		display += warning + "\n"
 	}

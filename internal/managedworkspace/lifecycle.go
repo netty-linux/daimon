@@ -32,9 +32,9 @@ type Summary struct {
 	Staging              bool      `json:"staging"`
 	Files                int       `json:"files"`
 	Directories          int       `json:"directories"`
-	Bytes                int64     `json:"bytes"`
+	Bytes                int64     `json:"total_size_bytes"`
 	InventoryVerified    bool      `json:"inventory_verified"`
-	InventorySHA256      string    `json:"inventory_sha256"`
+	InventorySHA256      string    `json:"inventory_sha256,omitempty"`
 	SourceAccess         string    `json:"source_access"`
 	ThreatModel          string    `json:"threat_model"`
 }
