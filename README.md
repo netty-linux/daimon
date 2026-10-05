@@ -648,3 +648,5 @@ antes de efeitos. Veja [contrato, limites e falhas](docs/managed-evidence-export
 Validação restrita e opt-in de planos: `workspace --root <root> plan --validate-scope <pedido>` (flag também aceita após o pedido). [Contrato, template reconhecido e recuperação sem tools](docs/workspace-core.md#validação-opt-in-de-escopo-do-plano). Pedidos fora do template continuam planos livres; não há execução ou nova permissão.
 
 Retenção privada opt-in de pré-imagens de managed replace_file: [contrato experimental, Linux amd64 only](docs/managed-preimage-retention.md). Nenhuma pré-imagem é exportada.
+
+Output Export experimental de um único arquivo íntegro, Linux amd64 only: [contrato, aprovação reforçada e limites](docs/managed-output-export.md). Conteúdo potencialmente sensível; destino privado gerenciado; origem não modificada.
