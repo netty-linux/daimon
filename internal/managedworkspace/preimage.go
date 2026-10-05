@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 
 	"path/filepath"
 	"time"
@@ -102,14 +103,24 @@ func (r *Run) captureRead(name string, limit int) ([]byte, error) {
 	if err := r.check(); err != nil {
 		return nil, err
 	}
-	if checkPrivate(filepath.Join(r.directory, filepath.Dir(filepath.FromSlash(name)))) != nil {
+	data, err := readPrivateRegular(r.root, r.directory, name, limit)
+	if err != nil {
+		return nil, err
+	}
+	return data, r.check()
+}
+
+// Shared bounded regular-file reader; callers separately pin and revalidate
+// their run or managed export boundary before and after using it.
+func readPrivateRegular(root *os.Root, directory, name string, limit int) ([]byte, error) {
+	if checkPrivate(filepath.Join(directory, filepath.Dir(filepath.FromSlash(name)))) != nil {
 		return nil, ErrPrivate
 	}
-	i, err := r.root.Lstat(name)
+	i, err := root.Lstat(name)
 	if err != nil || !safeRegular(i) || i.Size() < 0 || i.Size() > int64(limit) {
 		return nil, ErrArtifact
 	}
-	f, err := openRead(r.root, name, false)
+	f, err := openRead(root, name, false)
 	if err != nil {
 		return nil, ErrArtifact
 	}
@@ -121,12 +132,12 @@ func (r *Run) captureRead(name string, limit int) ([]byte, error) {
 	data, readErr := io.ReadAll(io.LimitReader(f, int64(limit)+1))
 	end, endErr := f.Stat()
 	closeErr := f.Close()
-	current, pathErr := r.root.Lstat(name)
+	current, pathErr := root.Lstat(name)
 	if readErr != nil || endErr != nil || closeErr != nil || pathErr != nil ||
 		entryVersion(i) != entryVersion(end) || entryVersion(i) != entryVersion(current) || len(data) != int(i.Size()) || len(data) > limit {
 		return nil, ErrArtifact
 	}
-	return data, r.check()
+	return data, nil
 }
 
 func (p *Proposal) preimageWrite(ctx context.Context, name string, data []byte) error {

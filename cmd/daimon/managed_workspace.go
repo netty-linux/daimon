@@ -13,7 +13,7 @@ import (
 	"github.com/netty-linux/daimon/internal/workspaceplan"
 )
 
-var errManagedArguments = errors.New("Uso: managed-workspace --base <store-privado> create --source <origem> | apply --run <id> --plan <arquivo> [--enable-replace-file --enable-preimage-retention] | report --run <id> | list | inspect --run <id> | discard --run <id> --enable-discard | export-evidence --run <id> --destination <novo-diretório-absoluto> --source-check <origem-absoluta> --enable-export-evidence. Exportação de output, conteúdo e patch está fora do escopo")
+var errManagedArguments = errors.New("Uso: managed-workspace --base <store-privado> create --source <origem> | apply --run <id> --plan <arquivo> [--enable-replace-file --enable-preimage-retention] | report --run <id> | list | inspect --run <id> | discard --run <id> --enable-discard | export-evidence --run <id> --destination <novo-diretório-absoluto> --source-check <origem-absoluta> --enable-export-evidence. export-output --run <id> --path <output-relativo> --destination <nome-lógico> --source-check <origem-absoluta> --enable-output-export. Preimage e patch export estão fora do escopo")
 
 func managedArguments(args []string) (string, string, map[string]string, error) {
 	if len(args) < 3 || args[0] != "--base" || args[1] == "" {
@@ -40,12 +40,16 @@ func managedArguments(args []string) (string, string, map[string]string, error) 
 		allowed["--destination"] = true
 		allowed["--source-check"] = true
 		allowed["--enable-export-evidence"] = true
+	case "export-output":
+		for _, flag := range []string{"--run", "--path", "--destination", "--source-check", "--enable-output-export"} {
+			allowed[flag] = true
+		}
 	default:
 		return "", "", nil, errManagedArguments
 	}
 	values := map[string]string{}
 	for i := 3; i < len(args); {
-		if (command == "apply" && (args[i] == "--enable-replace-file" || args[i] == "--enable-preimage-retention")) || (args[i] == "--enable-discard" && command == "discard") || (args[i] == "--enable-export-evidence" && command == "export-evidence") {
+		if (command == "apply" && (args[i] == "--enable-replace-file" || args[i] == "--enable-preimage-retention")) || (args[i] == "--enable-discard" && command == "discard") || (args[i] == "--enable-export-evidence" && command == "export-evidence") || (args[i] == "--enable-output-export" && command == "export-output") {
 			if values[args[i]] != "" {
 				return "", "", nil, errManagedArguments
 			}
@@ -88,7 +92,7 @@ func runManagedWorkspace(ctx context.Context, args []string, input io.Reader, ou
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	if command == "list" || command == "inspect" || command == "discard" || command == "export-evidence" {
+	if command == "list" || command == "inspect" || command == "discard" || command == "export-evidence" || command == "export-output" {
 		store, err := managedworkspace.OpenStore(base)
 		if err != nil {
 			return err
@@ -99,6 +103,31 @@ func runManagedWorkspace(ctx context.Context, args []string, input io.Reader, ou
 				store.Close()
 			}
 		}()
+		if command == "export-output" {
+			proposal, err := store.PrepareOutput(ctx, values["--run"], values["--path"], values["--destination"], values["--source-check"], values["--enable-output-export"] == "true")
+			if err != nil {
+				return err
+			}
+			defer proposal.Close()
+			permit, err := proposal.Approve(ctx, &outputReviewer{input: input, display: display})
+			if err != nil {
+				return err
+			}
+			result, operationErr := permit.Export(ctx)
+			storeClosed = true
+			if store.Close() != nil {
+				result.State = "unknown_interrupted"
+				operationErr = errors.Join(operationErr, managedworkspace.ErrArtifact)
+			}
+			if e := ctx.Err(); e != nil {
+				result.State = "unknown_interrupted"
+				operationErr = errors.Join(operationErr, e)
+			}
+			if e := writeManagedResult(out, fmt.Sprintf("Estado do Output Export: %s\nArquivos de conteúdo: %d; bytes: %d\nConteúdo potencialmente sensível; origem não modificada.\n", result.State, result.Files, result.Bytes)); e != nil {
+				operationErr = errors.Join(operationErr, e)
+			}
+			return operationErr
+		}
 		if command == "export-evidence" {
 			proposal, err := store.PrepareEvidence(ctx, values["--run"], values["--destination"], values["--source-check"], values["--enable-export-evidence"] == "true")
 			if err != nil {
