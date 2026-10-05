@@ -650,3 +650,5 @@ Validação restrita e opt-in de planos: `workspace --root <root> plan --validat
 Retenção privada opt-in de pré-imagens de managed replace_file: [contrato experimental, Linux amd64 only](docs/managed-preimage-retention.md). Nenhuma pré-imagem é exportada.
 
 Output Export experimental de um único arquivo íntegro, Linux amd64 only: [contrato, aprovação reforçada e limites](docs/managed-output-export.md). Conteúdo potencialmente sensível; destino privado gerenciado; origem não modificada.
+
+Preimage Export experimental (Linux amd64): [contrato e limites](docs/managed-preimage-export.md).
