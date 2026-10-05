@@ -4,6 +4,8 @@ package managedworkspace
 
 import "os"
 
+func openPreimageNew(*os.Root, string) (*os.File, error) { return nil, ErrUnsupported }
+
 func exclusiveDirectory(*os.Root) (*os.File, error) { return nil, ErrUnsupported }
 
 func supported() bool                                   { return false }

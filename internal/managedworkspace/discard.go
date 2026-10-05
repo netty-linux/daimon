@@ -181,7 +181,7 @@ func (d *discardState) revalidate(ctx context.Context) error {
 		return ErrPrivate
 	}
 	summary, err := d.store.inspect(ctx, d.id, d.auditStarted)
-	if err != nil || summary != d.summary {
+	if err != nil || !sameSummary(summary, d.summary) {
 		return ErrDiscard
 	}
 	actual, err := inventoryRun(ctx, d.store.base, d.id, d.root)
@@ -505,4 +505,18 @@ func (p *DiscardPermit) Discard(ctx context.Context) (state string, resultErr er
 		return "unknown_interrupted", err
 	}
 	return "discarded", nil
+}
+
+// Compare optional metadata values, not the allocation address returned by inspect.
+func sameSummary(a, b Summary) bool {
+	ar, br := a.Retention, b.Retention
+	a.Retention = nil
+	b.Retention = nil
+	if a != b {
+		return false
+	}
+	if ar == nil || br == nil {
+		return ar == nil && br == nil
+	}
+	return *ar == *br
 }

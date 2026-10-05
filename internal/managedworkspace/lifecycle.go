@@ -14,29 +14,33 @@ import (
 // Summary separates a manifest's claim from evidence verified by Report.
 // Paths and file contents are deliberately absent.
 type Summary struct {
-	RunID                string    `json:"run_id"`
-	Version              int       `json:"version"`
-	Declared             string    `json:"declared"`
-	State                string    `json:"state"`
-	Reason               string    `json:"reason"`
-	Created              time.Time `json:"created"`
-	Audited              time.Time `json:"audited"`
-	Manifest             bool      `json:"manifest"`
-	ManifestVerified     bool      `json:"manifest_verified"`
-	Journal              bool      `json:"journal"`
-	JournalVerified      bool      `json:"journal_verified"`
-	ApprovedPlan         bool      `json:"approved_plan"`
-	ApprovedPlanVerified bool      `json:"approved_plan_verified"`
-	AuditVerified        bool      `json:"audit_verified"`
-	Lock                 bool      `json:"lock"`
-	Staging              bool      `json:"staging"`
-	Files                int       `json:"files"`
-	Directories          int       `json:"directories"`
-	Bytes                int64     `json:"total_size_bytes"`
-	InventoryVerified    bool      `json:"inventory_verified"`
-	InventorySHA256      string    `json:"inventory_sha256,omitempty"`
-	SourceAccess         string    `json:"source_access"`
-	ThreatModel          string    `json:"threat_model"`
+	RetentionRequested   bool              `json:"retention_requested,omitempty"`
+	PreimageCount        int               `json:"preimage_count,omitempty"`
+	RetentionState       string            `json:"retention_state,omitempty"`
+	Retention            *RetentionSummary `json:"preimage_retention,omitempty"`
+	RunID                string            `json:"run_id"`
+	Version              int               `json:"version"`
+	Declared             string            `json:"declared"`
+	State                string            `json:"state"`
+	Reason               string            `json:"reason"`
+	Created              time.Time         `json:"created"`
+	Audited              time.Time         `json:"audited"`
+	Manifest             bool              `json:"manifest"`
+	ManifestVerified     bool              `json:"manifest_verified"`
+	Journal              bool              `json:"journal"`
+	JournalVerified      bool              `json:"journal_verified"`
+	ApprovedPlan         bool              `json:"approved_plan"`
+	ApprovedPlanVerified bool              `json:"approved_plan_verified"`
+	AuditVerified        bool              `json:"audit_verified"`
+	Lock                 bool              `json:"lock"`
+	Staging              bool              `json:"staging"`
+	Files                int               `json:"files"`
+	Directories          int               `json:"directories"`
+	Bytes                int64             `json:"total_size_bytes"`
+	InventoryVerified    bool              `json:"inventory_verified"`
+	InventorySHA256      string            `json:"inventory_sha256,omitempty"`
+	SourceAccess         string            `json:"source_access"`
+	ThreatModel          string            `json:"threat_model"`
 }
 
 // Store pins the opened directory and checks that its pathname still names it.
@@ -199,6 +203,12 @@ func (s *Store) inspect(ctx context.Context, id string, ownAudit bool) (Summary,
 	result.ManifestVerified = true
 	result.Declared = m.Status
 	result.Created = m.Created
+	result.Retention = copyRetention(m.Retention)
+	if m.Retention != nil {
+		result.RetentionRequested = true
+		result.PreimageCount = m.Retention.Count
+		result.RetentionState = m.Retention.State
+	}
 	report, err := r.Report()
 	if err == nil {
 		if len(report.Operations) > 0 {

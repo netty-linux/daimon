@@ -14,6 +14,34 @@ import (
 
 func supported() bool { return runtime.GOARCH == "amd64" }
 
+// Fixed Linux amd64 openat2 ABI. No symlink or mount resolution is accepted
+// when exclusively creating private retained evidence below the pinned run.
+func openPreimageNew(root *os.Root, name string) (*os.File, error) {
+	if !supported() {
+		return nil, ErrUnsupported
+	}
+	dir, err := openRead(root, ".", true)
+	if err != nil {
+		return nil, ErrPrivate
+	}
+	p, err := syscall.BytePtrFromString(name)
+	if err != nil {
+		dir.Close()
+		return nil, ErrPrivate
+	}
+	how := [3]uint64{uint64(syscall.O_WRONLY | syscall.O_CREAT | syscall.O_EXCL | syscall.O_CLOEXEC | syscall.O_NOFOLLOW), 0600, 0x01 | 0x04 | 0x08}
+	fd, _, errno := syscall.Syscall6(437, dir.Fd(), uintptr(unsafe.Pointer(p)), uintptr(unsafe.Pointer(&how[0])), 24, 0, 0)
+	closed := dir.Close()
+	if errno != 0 {
+		return nil, ErrArtifact
+	}
+	if closed != nil {
+		syscall.Close(int(fd))
+		return nil, ErrArtifact
+	}
+	return os.NewFile(fd, "private-retained-artifact"), nil
+}
+
 // Advisory directory locks coordinate cooperating managed operations without
 // creating a lock artifact. The owning UID and administrators remain trusted.
 func exclusiveDirectory(root *os.Root) (*os.File, error) {
