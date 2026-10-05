@@ -15,7 +15,7 @@ import (
 // Strict bounded metadata decoding, not authentication against the trusted UID.
 func strictMetadata(data []byte, target any) error {
 	allowed := map[string]bool{}
-	for _, key := range []string{"version", "run_id", "created", "source_reference_sha256", "snapshot_sha256", "files", "directories", "total_size_bytes", "root_identity", "output_identity", "device", "inode", "status", "rules", "operations", "type", "path", "before_sha256", "after_sha256", "sequence", "timestamp", "operation"} {
+	for _, key := range []string{"version", "run_id", "created", "source_reference_sha256", "snapshot_sha256", "files", "directories", "total_size_bytes", "root_identity", "output_identity", "device", "inode", "status", "rules", "operations", "type", "path", "before_sha256", "after_sha256", "sequence", "timestamp", "operation", "preimage_retention", "preimage_format_version", "retention_requested", "preimage_count", "retention_state", "preimage_journal_sha256", "expected_before_sha256", "captured_before_sha256", "approved_after_sha256", "preimage_size_bytes", "operation_id", "plan_sha256", "approval_sha256"} {
 		allowed[key] = true
 	}
 	return strictJSON(data, target, allowed)
@@ -209,6 +209,9 @@ func (r *Run) verifyReport(report Report) error {
 		return err
 	}
 	if absent {
+		if r.manifest.Retention != nil && (report.Retention == nil || *report.Retention != *r.manifest.Retention) {
+			return ErrArtifact
+		}
 		if succeeded != 0 {
 			return ErrArtifact
 		}
@@ -218,6 +221,7 @@ func (r *Run) verifyReport(report Report) error {
 	if err != nil {
 		return err
 	}
+	dataForPlan := append([]byte(nil), data...)
 	plan, err := workspaceplan.Parse(data, workspaceplan.DefaultLimits())
 	if err != nil || len(plan.Operations) != len(metadata) || report.Status == "denied" {
 		return ErrArtifact
@@ -234,5 +238,5 @@ func (r *Run) verifyReport(report Report) error {
 			}
 		}
 	}
-	return nil
+	return r.verifyRetention(report, dataForPlan)
 }

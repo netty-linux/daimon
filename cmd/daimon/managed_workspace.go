@@ -13,7 +13,7 @@ import (
 	"github.com/netty-linux/daimon/internal/workspaceplan"
 )
 
-var errManagedArguments = errors.New("Uso: managed-workspace --base <store-privado> create --source <origem> | apply --run <id> --plan <arquivo> | report --run <id> | list | inspect --run <id> | discard --run <id> --enable-discard | export-evidence --run <id> --destination <novo-diretório-absoluto> --source-check <origem-absoluta> --enable-export-evidence. Exportação de output, conteúdo e patch está fora do escopo")
+var errManagedArguments = errors.New("Uso: managed-workspace --base <store-privado> create --source <origem> | apply --run <id> --plan <arquivo> [--enable-replace-file --enable-preimage-retention] | report --run <id> | list | inspect --run <id> | discard --run <id> --enable-discard | export-evidence --run <id> --destination <novo-diretório-absoluto> --source-check <origem-absoluta> --enable-export-evidence. Exportação de output, conteúdo e patch está fora do escopo")
 
 func managedArguments(args []string) (string, string, map[string]string, error) {
 	if len(args) < 3 || args[0] != "--base" || args[1] == "" {
@@ -27,6 +27,8 @@ func managedArguments(args []string) (string, string, map[string]string, error) 
 	case "apply":
 		allowed["--run"] = true
 		allowed["--plan"] = true
+		allowed["--enable-replace-file"] = true
+		allowed["--enable-preimage-retention"] = true
 	case "report", "inspect":
 		allowed["--run"] = true
 	case "list":
@@ -43,7 +45,7 @@ func managedArguments(args []string) (string, string, map[string]string, error) 
 	}
 	values := map[string]string{}
 	for i := 3; i < len(args); {
-		if (args[i] == "--enable-discard" && command == "discard") || (args[i] == "--enable-export-evidence" && command == "export-evidence") {
+		if (command == "apply" && (args[i] == "--enable-replace-file" || args[i] == "--enable-preimage-retention")) || (args[i] == "--enable-discard" && command == "discard") || (args[i] == "--enable-export-evidence" && command == "export-evidence") {
 			if values[args[i]] != "" {
 				return "", "", nil, errManagedArguments
 			}
@@ -57,7 +59,21 @@ func managedArguments(args []string) (string, string, map[string]string, error) 
 		values[args[i]] = args[i+1]
 		i += 2
 	}
-	if len(values) != len(allowed) {
+	required := len(allowed)
+	if command == "apply" {
+		required = 2
+		if values["--run"] == "" || values["--plan"] == "" || (values["--enable-preimage-retention"] != "" && values["--enable-replace-file"] == "") {
+			return "", "", nil, errManagedArguments
+		}
+		delete(allowed, "--enable-replace-file")
+		delete(allowed, "--enable-preimage-retention")
+		for k := range values {
+			if k == "--enable-replace-file" || k == "--enable-preimage-retention" {
+				required++
+			}
+		}
+	}
+	if len(values) != required {
 		return "", "", nil, errManagedArguments
 	}
 	return args[1], command, values, nil
@@ -107,6 +123,9 @@ func runManagedWorkspace(ctx context.Context, args []string, input io.Reader, ou
 			summaries, err := store.List(ctx)
 			if err != nil {
 				return err
+			}
+			for i := range summaries {
+				summaries[i].Retention = nil
 			}
 			return printManagedSummaries(out, summaries)
 		}
@@ -163,7 +182,7 @@ func runManagedWorkspace(ctx context.Context, args []string, input io.Reader, ou
 	if err != nil {
 		return managedPlanError(err)
 	}
-	p, err := r.Prepare(ctx, plan)
+	p, err := r.PrepareWithOptions(ctx, plan, managedworkspace.ApplyOptions{RetainPreimages: values["--enable-preimage-retention"] == "true", ReplaceEnabled: values["--enable-replace-file"] == "true"})
 	if err != nil {
 		return managedPlanError(err)
 	}
@@ -223,6 +242,11 @@ func printManagedSummaries(out io.Writer, summaries []managedworkspace.Summary) 
 var errManagedOutput = errors.New("Falha ao exibir resultado gerenciado")
 
 func printManagedReport(out io.Writer, report managedworkspace.Report) error {
+	if report.Retention != nil {
+		if err := writeManagedResult(out, fmt.Sprintf("Retenção privada: %s; pré-imagens: %d; conteúdo não exibido nem exportado.\n", report.Retention.State, report.Retention.Count)); err != nil {
+			return err
+		}
+	}
 	counts := map[string]int{}
 	for _, op := range report.Operations {
 		counts[op.Status]++

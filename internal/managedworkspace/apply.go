@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"strconv"
 	"sync/atomic"
 
 	"github.com/netty-linux/daimon/internal/createcontract"
@@ -21,16 +22,18 @@ type preparedOperation struct {
 	replace *editcontract.Proposal
 }
 type Proposal struct {
-	run         *Run
-	view        editcontract.Review
-	plan        workspaceplan.Plan
-	planBytes   []byte
-	prepared    []preparedOperation
-	journal     *workspacejournal.Journal
-	journalSink io.Writer
-	closers     []closer
-	attempted   *atomic.Bool
-	runContext  context.Context
+	run          *Run
+	view         editcontract.Review
+	plan         workspaceplan.Plan
+	planBytes    []byte
+	prepared     []preparedOperation
+	journal      *workspacejournal.Journal
+	journalSink  io.Writer
+	closers      []closer
+	attempted    *atomic.Bool
+	runContext   context.Context
+	retention    *RetentionSummary
+	preimageHook func(string) error
 }
 type Permit struct {
 	proposal        *Proposal
@@ -50,6 +53,16 @@ func (p *Proposal) View() editcontract.Review {
 // Prepare validates every operation and builds the entire exact preview. Its
 // metadata writes stay in this run; it makes no changes to output or source.
 func (r *Run) Prepare(ctx context.Context, planBytes []byte) (result *Proposal, resultErr error) {
+	return r.PrepareWithOptions(ctx, planBytes, ApplyOptions{})
+}
+
+func (r *Run) PrepareWithOptions(ctx context.Context, planBytes []byte, options ApplyOptions) (result *Proposal, resultErr error) {
+	if !Supported() {
+		return nil, ErrUnsupported
+	}
+	if options.RetainPreimages && !options.ReplaceEnabled {
+		return nil, ErrState
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if err := ctx.Err(); err != nil {
@@ -61,6 +74,17 @@ func (r *Run) Prepare(ctx context.Context, planBytes []byte) (result *Proposal, 
 	plan, err := workspaceplan.Parse(planBytes, workspaceplan.DefaultLimits())
 	if err != nil {
 		return nil, err
+	}
+	if options.RetainPreimages {
+		n := 0
+		for _, op := range plan.Operations {
+			if op.Type == "replace_file" {
+				n++
+			}
+		}
+		if n != 1 {
+			return nil, ErrState
+		}
 	}
 	if err := r.check(); err != nil {
 		return nil, err
@@ -101,6 +125,10 @@ func (r *Run) Prepare(ctx context.Context, planBytes []byte) (result *Proposal, 
 	// close them only after the batch finishes or is denied.
 	p := &Proposal{run: r, plan: plan, planBytes: append([]byte(nil), planBytes...), runContext: ctx, attempted: new(atomic.Bool)}
 	preview := fmt.Sprintf("Cópia gerenciada privada. A origem não será publicada.\nrun_id=%s\nsnapshot_sha256=%s\nplan_sha256=%s\nlimits: operations=2, creates=1, replaces=1, file_bytes=65536, total_bytes=131072, preview_bytes=1048576\n", r.manifest.RunID, snapshot, workspaceplan.Hash(planBytes))
+	if options.RetainPreimages {
+		p.retention = &RetentionSummary{Version: 1, Requested: true, State: "not_requested"}
+		preview += "Retenção privada de pré-imagem solicitada: 1 replace_file, limite 65536 bytes. Conteúdo potencialmente sensível; não exportado nem publicado. Descarte remove com o run, sem garantia de apagamento seguro.\n"
+	}
 	metadata := make([]workspacejournal.Metadata, 0, len(plan.Operations))
 	for _, op := range plan.Operations {
 		var prepared preparedOperation
@@ -138,7 +166,12 @@ func (r *Run) Prepare(ctx context.Context, planBytes []byte) (result *Proposal, 
 			}
 			prepared.replace = proposal
 			p.closers = append(p.closers, w)
-			preview += proposal.View().Display
+			if p.retention == nil {
+				preview += proposal.View().Display
+			} else {
+				v := proposal.View()
+				preview += fmt.Sprintf("Replace aprovado; alvo relativo=%s; original_sha256=%s; original_size_bytes=%d; mode=%04o; approved_after_sha256=%s; conteúdo original não exibido.\nConteúdo proposto (completo, escapes ASCII de Go): %s\n", strconv.QuoteToASCII(op.Path), v.Original.SHA256, v.Original.Bytes, v.Original.Mode, v.ProposedSHA256, strconv.QuoteToASCII(op.Content))
+			}
 		}
 		if len(preview) > MaxPreviewBytes {
 			p.closePrepared()
@@ -166,6 +199,7 @@ func (r *Run) Prepare(ctx context.Context, planBytes []byte) (result *Proposal, 
 		p.closePrepared()
 		return nil, ErrArtifact
 	}
+	r.manifest.Retention = copyRetention(p.retention)
 	r.manifest.Status = "prepared"
 	if err := r.saveManifest(); err != nil {
 		p.closePrepared()
@@ -326,6 +360,16 @@ func (p *Permit) Apply(ctx context.Context) (Report, error) {
 	if err := r.writeNew("artifacts/approved-plan.json", proposal.planBytes); err != nil {
 		return report, err
 	}
+	if proposal.retention != nil {
+		binding, _ := json.Marshal(struct {
+			Plan     string `json:"plan_sha256"`
+			Approval string `json:"approval_sha256"`
+			Run      string `json:"run_id"`
+		}{workspaceplan.Hash(proposal.planBytes), proposal.view.ID, r.manifest.RunID})
+		if err := proposal.preimageWrite(ctx, "artifacts/retention-approval.json", binding); err != nil {
+			return proposal.finishResult(report, err)
+		}
+	}
 	r.manifest.Status = "applying"
 	if err := r.saveManifest(); err != nil {
 		return report, err
@@ -349,6 +393,18 @@ func (p *Permit) Apply(ctx context.Context) (Report, error) {
 			return proposal.finishResult(report, ErrArtifact)
 		}
 		report.Operations[i].Status = "unknown"
+		if proposal.retention != nil && op.Type == "replace_file" {
+			err = proposal.capturePreimage(ctx, i)
+			if err != nil {
+				proposal.retention.State = "failed"
+				report.Status = "unknown"
+				if i > 0 {
+					report.Status = "partial"
+				}
+				_ = proposal.journal.Append(op.Path, "failed")
+				return proposal.finishResult(report, errors.Join(ErrArtifact, err))
+			}
+		}
 		if p.applyOne != nil {
 			err = p.applyOne(ctx, i)
 		} else {
@@ -407,6 +463,14 @@ func (p *Permit) Apply(ctx context.Context) (Report, error) {
 		}
 	}
 	report.Status = "succeeded"
+	if proposal.retention != nil {
+		report.Retention = copyRetention(proposal.retention)
+		if err := r.verifyReport(report); err != nil {
+			proposal.retention.State = "unknown"
+			report.Status = "unknown"
+			return proposal.finishResult(report, err)
+		}
+	}
 	report, err = proposal.finishResult(report, nil)
 	if err == nil {
 		err = errors.Join(ctx.Err(), p.approvalContext.Err(), proposal.runContext.Err())
@@ -440,6 +504,8 @@ func (p *Proposal) newReport(status string) Report {
 	return r
 }
 func (p *Proposal) finish(report Report) error {
+	report.Retention = copyRetention(p.retention)
+	p.run.manifest.Retention = copyRetention(p.retention)
 	data, err := json.Marshal(report)
 	if err != nil {
 		return ErrArtifact
@@ -454,6 +520,7 @@ func (p *Proposal) finish(report Report) error {
 // Preserve confirmed operations while refusing a complete-delivery claim when
 // report/manifest persistence failed. Never discard a context or artifact failure.
 func (p *Proposal) finishResult(report Report, cause error) (Report, error) {
+	report.Retention = copyRetention(p.retention)
 	if err := p.finish(report); err != nil {
 		report.Status = "unknown"
 		return report, errors.Join(cause, err)
