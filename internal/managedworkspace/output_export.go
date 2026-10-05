@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -69,6 +70,7 @@ type outputState struct {
 	areaExists, closed                     bool
 	ctx, approvalCtx                       context.Context
 	attempted                              atomic.Bool
+	preimage                               *preimageMetadata
 	manifest                               OutputManifest
 	owner, manifestBytes, auditBytes       []byte
 	view                                   editcontract.Review
@@ -91,13 +93,16 @@ func validOutputName(s string) bool {
 // PrepareOutput never writes the run, output, source or managed export area.
 // sourceCheck is structural only; its bytes are never opened or hashed.
 func (s *Store) PrepareOutput(ctx context.Context, id, path, destination, sourceCheck string, enabled bool) (*OutputProposal, error) {
+	return s.prepareContentExport(ctx, id, path, destination, sourceCheck, enabled, false)
+}
+func (s *Store) prepareContentExport(ctx context.Context, id, path, destination, sourceCheck string, enabled, preimage bool) (*OutputProposal, error) {
 	if !Supported() {
 		return nil, ErrUnsupported
 	}
 	if !enabled {
 		return nil, ErrOutputExport
 	}
-	if !validID(id) || !workspaceplan.ValidPath(path, workspaceplan.DefaultLimits()) || !validOutputName(destination) {
+	if !validID(id) || (!preimage && !workspaceplan.ValidPath(path, workspaceplan.DefaultLimits())) || (preimage && !validHash(path)) || !validOutputName(destination) {
 		return nil, ErrPrivate
 	}
 	if err := ctx.Err(); err != nil {
@@ -148,6 +153,9 @@ func (s *Store) PrepareOutput(ctx context.Context, id, path, destination, source
 		return nil, err
 	}
 	d.areaName = ".daimon-output-exports-" + workspaceplan.Hash([]byte(fmt.Sprintf("%s:%d:%d", s.base, s.identity.Device, s.identity.Inode)))
+	if preimage {
+		d.areaName = strings.Replace(d.areaName, "output-exports", "preimage-exports", 1)
+	}
 	d.areaPath = filepath.Join(d.parentPath, d.areaName)
 	if overlaps(d.areaPath, s.base) || overlaps(d.areaPath, sourceCheck) {
 		return nil, ErrPrivate
@@ -183,7 +191,15 @@ func (s *Store) PrepareOutput(ctx context.Context, id, path, destination, source
 	if err != nil || bundle.manifest.RunState != "succeeded" {
 		return nil, ErrOutputExport
 	}
-	data, err := r.captureRead("output/"+path, MaxFileBytes)
+	var data []byte
+	if preimage {
+		data, err = d.selectPreimage(path)
+		if err == nil {
+			path = d.preimage.Path
+		}
+	} else {
+		data, err = r.captureRead("output/"+path, MaxFileBytes)
+	}
 	if err != nil {
 		return nil, ErrArtifact
 	}
@@ -197,22 +213,32 @@ func (s *Store) PrepareOutput(ctx context.Context, id, path, destination, source
 			match = true
 		}
 	}
-	if !match {
+	if !match && !preimage {
 		return nil, ErrArtifact
 	}
 	d.manifest = OutputManifest{Version: 1, ExportID: exportID, RunID: id, Path: path, SHA256: workspaceplan.Hash(data), Bytes: len(data), Destination: destination, RunBinding: bundle.binding, Created: bundle.manifest.Created, Integrity: "verified_bytes", Warning: "Conteúdo potencialmente sensível; sem garantia de detecção de segredos, criptografia ou apagamento seguro. Origem não modificada."}
 	deadline, _ := ctx.Deadline()
 	display := fmt.Sprintf("Output Export experimental, Linux amd64. Um arquivo; não é publicação na origem.\nrun_id=%s\noutput_relative_path=%s\noutput_sha256=%s\noutput_size_bytes=%d\ndestination_name=%s\nmanaged_area=%s\nexport_id=%s\nlimits: files=1, file_bytes=%d, manifest_bytes=4096, audit_bytes=16384\napproval_deadline_utc=%s\n%s\nUID proprietário e administradores confiáveis; sem preimage/patch export, rollback, replay ou limpeza automática.\n", id, strconv.QuoteToASCII(path), d.manifest.SHA256, len(data), strconv.QuoteToASCII(destination), strconv.QuoteToASCII(d.areaName), exportID, MaxFileBytes, deadline.UTC().Format(time.RFC3339Nano), d.manifest.Warning)
+	operation := "export-output"
+	if preimage {
+		operation = "export-preimage"
+		display = strings.Replace(display, "Output Export", "Preimage Export", 1)
+		display = strings.Replace(display, "output_relative_path=", "relative_path=", 1)
+		display = strings.Replace(display, "output_sha256=", "captured_before_sha256=", 1)
+		display = strings.Replace(display, "output_size_bytes=", "preimage_size_bytes=", 1)
+		display = strings.Replace(display, "sem preimage/patch export", "sem patch export", 1)
+		display += d.preimageDisplay() + "Divulga conteúdo anterior privado; não é rollback. Discard remove captura interna, mas export final permanece. Sem criptografia ou secure erase.\n"
+	}
 	if len(display) > MaxPreviewBytes {
 		return nil, ErrLimit
 	}
 	binding := workspaceplan.Hash([]byte(display))
 	d.manifest.Approval = binding
-	d.manifestBytes, err = json.Marshal(d.manifest)
+	d.manifestBytes, err = d.encodedManifest()
 	if err != nil || len(d.manifestBytes) > 4096 {
 		return nil, ErrLimit
 	}
-	d.view = editcontract.Review{ID: binding, RunID: id, Operation: "export-output", Path: path, Display: display, ProposedSHA256: d.manifest.SHA256, RootID: workspaceplan.Hash([]byte(s.base))}
+	d.view = editcontract.Review{ID: binding, RunID: id, Operation: operation, Path: path, Display: display, ProposedSHA256: d.manifest.SHA256, RootID: workspaceplan.Hash([]byte(s.base))}
 	if err = d.revalidate(ctx, false); err != nil {
 		return nil, err
 	}
@@ -289,7 +315,7 @@ func (d *outputState) boundary() error {
 	return nil
 }
 func (d *outputState) revalidate(ctx context.Context, published bool) error {
-	encoded, encodeErr := json.Marshal(d.manifest)
+	encoded, encodeErr := d.encodedManifest()
 	if encodeErr != nil || !bytes.Equal(encoded, d.manifestBytes) || d.manifest.Approval != d.view.ID || workspaceplan.Hash([]byte(d.view.Display)) != d.view.ID {
 		return ErrOutputExport
 	}
@@ -308,7 +334,7 @@ func (d *outputState) revalidate(ctx context.Context, published bool) error {
 	if err != nil || bundle.manifest.RunState != "succeeded" || bundle.binding != d.manifest.RunBinding {
 		return ErrOutputExport
 	}
-	b, err := d.run.captureRead("output/"+d.manifest.Path, MaxFileBytes)
+	b, err := d.readContent()
 	if err != nil || len(b) != d.manifest.Bytes || workspaceplan.Hash(b) != d.manifest.SHA256 {
 		return ErrArtifact
 	}
@@ -485,7 +511,7 @@ func (d *outputState) verifyPackage(root *os.Root, directory string) error {
 	if e != nil || !bytes.Equal(m, d.manifestBytes) {
 		return ErrArtifact
 	}
-	b, e := readPrivateRegular(root, directory, "output.bin", MaxFileBytes)
+	b, e := readPrivateRegular(root, directory, d.contentName(), MaxFileBytes)
 	if e != nil || len(b) != d.manifest.Bytes || workspaceplan.Hash(b) != d.manifest.SHA256 {
 		return ErrArtifact
 	}
@@ -496,7 +522,23 @@ func (d *outputState) audit(ctx context.Context, f *os.File, sequence int, statu
 		return err
 	}
 	record := outputAudit{d.manifest, sequence, time.Now().UTC(), status, reason}
-	b, err := json.Marshal(record)
+	var b []byte
+	var err error
+	if d.preimage != nil {
+		metadata, e := d.encodedManifest()
+		if e != nil {
+			return ErrArtifact
+		}
+		b, err = json.Marshal(struct {
+			Manifest  json.RawMessage `json:"manifest"`
+			Sequence  int             `json:"sequence"`
+			Timestamp time.Time       `json:"timestamp"`
+			Status    string          `json:"status"`
+			Reason    string          `json:"reason"`
+		}{metadata, sequence, record.Timestamp, status, reason})
+	} else {
+		b, err = json.Marshal(record)
+	}
 	if err != nil {
 		return ErrArtifact
 	}
@@ -614,11 +656,11 @@ func (p *OutputPermit) Export(ctx context.Context) (result OutputResult, resultE
 	if err != nil {
 		return result, ErrArtifact
 	}
-	data, err := d.run.captureRead("output/"+d.manifest.Path, MaxFileBytes)
+	data, err := d.readContent()
 	if err != nil || len(data) != d.manifest.Bytes || workspaceplan.Hash(data) != d.manifest.SHA256 {
 		return result, ErrArtifact
 	}
-	if err = d.write(ctx, staging, "output.bin", data); err != nil {
+	if err = d.write(ctx, staging, d.contentName(), data); err != nil {
 		return result, err
 	}
 	if err = d.write(ctx, staging, "manifest.json", d.manifestBytes); err != nil {
