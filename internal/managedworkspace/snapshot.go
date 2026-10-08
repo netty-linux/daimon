@@ -123,14 +123,29 @@ func readSnapshot(ctx context.Context, directory string, private bool) ([]snapsh
 	if err != nil || !os.SameFile(initial, current) {
 		return nil, 0, 0, 0, "", ErrImport
 	}
-	h := sha256.New()
-	// Paths use a portable ASCII subset; framed lengths avoid concatenation ambiguity.
+	metadata := make([]snapshotHashEntry, 0, len(entries))
 	for _, e := range entries {
+		metadata = append(metadata, snapshotHashEntry{e.Path, e.Directory, len(e.Data), workspaceplan.Hash(e.Data)})
+	}
+	return entries, files, dirs, total, snapshotMetadataHash(metadata), nil
+}
+
+type snapshotHashEntry struct {
+	path      string
+	directory bool
+	bytes     int
+	sha256    string
+}
+
+// Same version-1 framing for import and metadata-only integrity verification.
+func snapshotMetadataHash(entries []snapshotHashEntry) string {
+	h := sha256.New()
+	for _, entry := range entries {
 		kind := "file"
-		if e.Directory {
+		if entry.directory {
 			kind = "directory"
 		}
-		fmt.Fprintf(h, "v1:%d:%s:%s:%d:%s\n", len(e.Path), e.Path, kind, len(e.Data), workspaceplan.Hash(e.Data))
+		fmt.Fprintf(h, "v1:%d:%s:%s:%d:%s\n", len(entry.path), entry.path, kind, entry.bytes, entry.sha256)
 	}
-	return entries, files, dirs, total, hex.EncodeToString(h.Sum(nil)), nil
+	return hex.EncodeToString(h.Sum(nil))
 }

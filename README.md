@@ -997,3 +997,51 @@ ambiente persistente; não é um gerenciador de arquivos.
 
 Veja [Product UI V2](docs/PRODUCT_UI_V2.md) para arquitetura, acessibilidade,
 validação e limitações. Nenhuma alteração de backend ou implementação da Phase 17.
+
+## Managed workspace — funcionalidades integradas
+
+```text
+daimon managed-workspace --base /tmp/daimon-store create --source /input
+daimon managed-workspace --base /tmp/daimon-store apply --run <id> --plan /input-plan.json
+daimon managed-workspace --base /tmp/daimon-store report --run <id>
+daimon managed-workspace --base /tmp/daimon-store list
+daimon managed-workspace --base /tmp/daimon-store inspect --run <id>
+daimon managed-workspace --base /tmp/daimon-store discard --run <id> --enable-discard
+```
+
+Aplicação determinística somente na cópia privada, com preview integral, aprovação
+de uso único, journal e relatório verificado. Não há publicação na origem, rollback,
+retomada após crash, limpeza automática ou suporte Windows. Veja
+[o contrato e as limitações](docs/managed-workspace.md) e
+[o formato do plano](docs/workspace-core.md).
+
+List e inspect são read-only. Discard remove somente uma cópia gerenciada,
+com opt-in, preview completo, confirmação única, revalidação e tombstone privado
+sincronizado fora do run. Não modifica a origem nem faz limpeza automática.
+Runs interrompidos ou inconsistentes permanecem bloqueados para descarte.
+Veja [estados, auditoria e limitações do lifecycle](docs/managed-lifecycle.md).
+
+### Evidence export — experimental, Linux amd64 only
+
+Os schemas metadata-only usam hashes `*_sha256` e tamanhos numéricos `*_bytes`.
+Artefatos com nomes legados ambíguos são recusados sem migração ou fallback.
+Veja a [incompatibilidade documentada](docs/managed-evidence-export.md#schema-metadata-only-e-incompatibilidade-legada).
+
+```text
+daimon managed-workspace --base /tmp/daimon-store export-evidence --run <id> --destination /tmp/daimon-review/evidence-1 --source-check /input --enable-export-evidence
+```
+
+Exige pai privado 0700 existente, destino novo fora da source/store e aprovação
+única. Exporta somente seis artefatos metadata-only de ready/succeeded íntegro,
+com hashes, inventário e auditoria externa; source is never modified. Conteúdo,
+output e patch não são exportados. Não implementa secret scanning nem promete
+ausência universal de segredos. Same-UID processes are trusted. Windows bloqueia
+antes de efeitos. Veja [contrato, limites e falhas](docs/managed-evidence-export.md).
+
+Validação restrita e opt-in de planos: `workspace --root <root> plan --validate-scope <pedido>` (flag também aceita após o pedido). [Contrato, template reconhecido e recuperação sem tools](docs/workspace-core.md#validação-opt-in-de-escopo-do-plano). Pedidos fora do template continuam planos livres; não há execução ou nova permissão.
+
+Retenção privada opt-in de pré-imagens de managed replace_file: [contrato experimental, Linux amd64 only](docs/managed-preimage-retention.md). Nenhuma pré-imagem é exportada.
+
+Output Export experimental de um único arquivo íntegro, Linux amd64 only: [contrato, aprovação reforçada e limites](docs/managed-output-export.md). Conteúdo potencialmente sensível; destino privado gerenciado; origem não modificada.
+
+Preimage Export experimental (Linux amd64): [contrato e limites](docs/managed-preimage-export.md).

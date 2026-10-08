@@ -179,7 +179,7 @@ func TestCancellationDuringLastJournalSync(t *testing.T) {
 	}
 	var metadata []workspacejournal.Metadata
 	for _, op := range p.plan.Operations {
-		metadata = append(metadata, workspacejournal.Metadata{Type: op.Type, Path: op.Path, Before: op.Precondition.SHA256, After: op.Validation.SHA256})
+		metadata = append(metadata, workspacejournal.Metadata{Type: op.Type, Path: op.Path, BeforeSHA256: op.Precondition.SHA256, AfterSHA256: op.Validation.SHA256})
 	}
 	p.journal, err = workspacejournal.New(&cancelOnCompletion{file: r.journalFile, cancel: cancel}, metadata)
 	if err != nil {

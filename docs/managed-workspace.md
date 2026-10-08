@@ -134,6 +134,9 @@ final antes de registrar sucesso da operação. Não promete atomicidade do lote
 
 Journal JSONL v1 contém sequência, timestamp, paths relativos, tipos, hashes e
 status, sem conteúdo integral, mensagens de modelo, secrets ou erros livres.
+Os hashes de operação são `before_sha256` e `after_sha256`; o manifest usa
+`total_size_bytes` para a contagem numérica. Artefatos com nomes anteriores
+são recusados sem migração; veja a [incompatibilidade do schema metadata-only](managed-evidence-export.md#schema-metadata-only-e-incompatibilidade-legada).
 Antes de cada efeito, started precisa ser gravado e sincronizado. Falha de
 journal/sync impede operações seguintes. Failed após started é efeito
 desconhecido; confirmação anterior mais falha posterior é partial, sem rollback.
@@ -167,5 +170,15 @@ operações foram aplicadas. Consulte o report/journal para distinguir isso.
 A saída e approved-plan podem conter dados sensíveis porque são o artefato
 deliberadamente solicitado; permanecem privados, nunca duplicados em logs.
 Revise output e artifacts antes de exportar. **Publicar no source é uma operação
-externa, fora de escopo, sem comando ou permissão na Daimon.** Remoção dos runs
-é manual pelo operador; a CLI não remove nem o source nem runs antigos.
+externa, fora de escopo, sem comando ou permissão na Daimon.** Descarte de um run
+é explícito, opt-in e aprovado; não existe remoção automática por idade.
+List/inspect são read-only. Consulte [o lifecycle](managed-lifecycle.md) para
+preview, confirmação, tombstones, estados e condições de bloqueio.
+
+Evidence export opt-in, experimental e Linux amd64 only está descrito no
+[contrato dedicado](managed-evidence-export.md). Exporta apenas metadados por
+serializers próprios, sem duplicar conteúdo, plano bruto, output ou patch.
+Destino privado novo fora da source/store, preview e aprovação single-use são
+obrigatórios. Origem/run/store não recebem writes de export; content export e
+patch permanecem fora do escopo. Source is never modified. Same-UID processes
+are trusted; não há isolamento contra proprietário/administradores hostis.

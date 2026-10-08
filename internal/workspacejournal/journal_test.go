@@ -11,7 +11,7 @@ import (
 )
 
 func fixture() []Metadata {
-	return []Metadata{{Type: "create_file", Path: "docs/new.txt", After: strings.Repeat("a", 64)}, {Type: "replace_file", Path: "src/config.txt", Before: strings.Repeat("b", 64), After: strings.Repeat("c", 64)}}
+	return []Metadata{{Type: "create_file", Path: "docs/new.txt", AfterSHA256: strings.Repeat("a", 64)}, {Type: "replace_file", Path: "src/config.txt", BeforeSHA256: strings.Repeat("b", 64), AfterSHA256: strings.Repeat("c", 64)}}
 }
 
 func TestOutcomesAndPrivacy(t *testing.T) {

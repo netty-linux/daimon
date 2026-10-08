@@ -40,27 +40,29 @@ type Identity struct {
 	Inode  uint64 `json:"inode"`
 }
 type Manifest struct {
-	Version         int       `json:"version"`
-	RunID           string    `json:"run_id"`
-	Created         time.Time `json:"created"`
-	SourceReference string    `json:"source_reference_sha256"`
-	Snapshot        string    `json:"snapshot_sha256"`
-	Files           int       `json:"files"`
-	Directories     int       `json:"directories"`
-	Bytes           int       `json:"bytes"`
-	Root            Identity  `json:"root_identity"`
-	Output          Identity  `json:"output_identity"`
-	Status          string    `json:"status"`
-	Rules           string    `json:"rules"`
+	Retention       *RetentionSummary `json:"preimage_retention,omitempty"`
+	Version         int               `json:"version"`
+	RunID           string            `json:"run_id"`
+	Created         time.Time         `json:"created"`
+	SourceReference string            `json:"source_reference_sha256"`
+	Snapshot        string            `json:"snapshot_sha256"`
+	Files           int               `json:"files"`
+	Directories     int               `json:"directories"`
+	Bytes           int               `json:"total_size_bytes"`
+	Root            Identity          `json:"root_identity"`
+	Output          Identity          `json:"output_identity"`
+	Status          string            `json:"status"`
+	Rules           string            `json:"rules"`
 }
 type OperationReport struct {
-	Type   string `json:"type"`
-	Path   string `json:"path"`
-	Before string `json:"before,omitempty"`
-	After  string `json:"after"`
-	Status string `json:"status"`
+	Type         string `json:"type"`
+	Path         string `json:"path"`
+	BeforeSHA256 string `json:"before_sha256,omitempty"`
+	AfterSHA256  string `json:"after_sha256"`
+	Status       string `json:"status"`
 }
 type Report struct {
+	Retention  *RetentionSummary `json:"preimage_retention,omitempty"`
 	Version    int               `json:"version"`
 	Status     string            `json:"status"`
 	Operations []OperationReport `json:"operations"`
@@ -73,6 +75,7 @@ type Run struct {
 	manifest                Manifest
 	closed                  bool
 	lock, journalFile       *os.File
+	active                  *os.File
 	pending                 *Proposal
 }
 
@@ -91,7 +94,9 @@ func (r *Run) Manifest() Manifest {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.manifest
+	m := r.manifest
+	m.Retention = copyRetention(m.Retention)
+	return m
 }
 func (r *Run) Close() error {
 	if r == nil {
@@ -103,6 +108,9 @@ func (r *Run) Close() error {
 		return nil
 	}
 	r.closed = true
+	if r.active != nil {
+		r.active.Close()
+	}
 	if r.pending != nil {
 		r.pending.closePrepared()
 	}
@@ -139,7 +147,7 @@ func Create(ctx context.Context, base, source string) (*Run, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	baseAbs, err := filepath.Abs(base)
+	baseAbs, err := canonicalBase(base)
 	if err != nil {
 		return nil, ErrPrivate
 	}
@@ -273,7 +281,7 @@ func Open(base, id string) (*Run, error) {
 	if !validID(id) {
 		return nil, ErrPrivate
 	}
-	base, err := filepath.Abs(base)
+	base, err := canonicalBase(base)
 	if err != nil {
 		return nil, ErrPrivate
 	}
@@ -349,12 +357,13 @@ func (r *Run) writeNew(name string, data []byte) error {
 	return r.syncDirectory(filepath.ToSlash(filepath.Dir(name)))
 }
 func (r *Run) syncDirectory(name string) error {
-	f, err := r.root.Open(name)
+	f, err := openRead(r.root, name, true)
 	if err != nil {
 		return ErrArtifact
 	}
-	defer f.Close()
-	if err := f.Sync(); err != nil {
+	syncErr := f.Sync()
+	closeErr := f.Close()
+	if syncErr != nil || closeErr != nil {
 		return ErrArtifact
 	}
 	return nil
@@ -420,6 +429,15 @@ func (r *Run) Report() (Report, error) {
 		return Report{Version: 1, Status: "unknown_interrupted", Operations: []OperationReport{}}, nil
 	}
 	if r.manifest.Status == "ready" {
+		if r.manifest.Retention != nil {
+			return Report{}, ErrArtifact
+		}
+		for _, name := range []string{"preimages", "artifacts/preimage-journal.jsonl", "artifacts/retention-approval.json"} {
+			absent, e := r.artifactAbsent(name)
+			if e != nil || !absent {
+				return Report{}, ErrArtifact
+			}
+		}
 		absent, err := r.artifactAbsent("attempt.lock")
 		if err != nil {
 			return Report{}, err
@@ -441,7 +459,7 @@ func (r *Run) Report() (Report, error) {
 		return Report{}, ErrArtifact
 	}
 	for _, op := range report.Operations {
-		if !workspaceplan.ValidPath(op.Path, workspaceplan.DefaultLimits()) || !validHash(op.After) || (op.Type != "create_file" && op.Type != "replace_file") || (op.Type == "create_file" && op.Before != "") || (op.Type == "replace_file" && !validHash(op.Before)) {
+		if !workspaceplan.ValidPath(op.Path, workspaceplan.DefaultLimits()) || !validHash(op.AfterSHA256) || (op.Type != "create_file" && op.Type != "replace_file") || (op.Type == "create_file" && op.BeforeSHA256 != "") || (op.Type == "replace_file" && !validHash(op.BeforeSHA256)) {
 			return Report{}, ErrArtifact
 		}
 		switch op.Status {
@@ -462,7 +480,7 @@ func validHash(s string) bool {
 }
 func decodeManifest(data []byte) (Manifest, error) {
 	var m Manifest
-	if strictMetadata(data, &m) != nil || m.Version != 1 || !validID(m.RunID) || !validHash(m.Snapshot) || !validHash(m.SourceReference) || m.Created.IsZero() || m.Files < 0 || m.Files > MaxFiles || m.Directories < 0 || m.Directories > MaxDirectories || m.Bytes < 0 || m.Bytes > MaxTotalBytes || m.Root.Inode == 0 || m.Output.Inode == 0 || m.Rules != "private-linux-v1; source-read-only; no-symlinks-special-hardlinks; files-0600; directories-0700; no-publication" {
+	if strictMetadata(data, &m) != nil || !retentionValid(m.Retention) || m.Version != 1 || !validID(m.RunID) || !validHash(m.Snapshot) || !validHash(m.SourceReference) || m.Created.IsZero() || m.Files < 0 || m.Files > MaxFiles || m.Directories < 0 || m.Directories > MaxDirectories || m.Bytes < 0 || m.Bytes > MaxTotalBytes || m.Root.Inode == 0 || m.Output.Inode == 0 || m.Rules != "private-linux-v1; source-read-only; no-symlinks-special-hardlinks; files-0600; directories-0700; no-publication" {
 		return Manifest{}, ErrArtifact
 	}
 	switch m.Status {

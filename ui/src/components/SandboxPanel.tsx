@@ -17,4 +17,3 @@ export function SandboxPanel(){
 }
 
 export function SandboxStatus({environment}:{environment?:EnvironmentMetadata}){if(!environment)return null;return <span className="badge" role="status">{environment.placement==='cloud'?copy["CLOUD"]:copy["Sandbox"]} · {label(environment.state)} · {label(environment.cleanup)}</span>;}
-

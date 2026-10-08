@@ -65,6 +65,24 @@ func TestFinalValidationAtMostOneRecovery(t *testing.T) {
 	}
 }
 
+func TestRecoveryRejectsEveryToolBeforeAuthorization(t *testing.T) {
+	for _, name := range []string{"read_file", "echo", "create_file", "replace_file", "apply_plan", "discard", "export_evidence"} {
+		t.Run(name, func(t *testing.T) {
+			l, m, sink := setup(t, final("invalid"), toolStep(call("forbidden", name, `{}`)))
+			l.ValidateFinal = func(string) (string, error) { return "correct scope", nil }
+			r, err := l.Run(context.Background(), "objective")
+			if !errors.Is(err, ErrInvalidResponse) || r.ToolCalls != 0 || r.FinalAnswer != "" || len(m.Requests()) != 2 || len(m.Requests()[1].Tools) != 0 {
+				t.Fatal("recovery allowed a tool", err)
+			}
+			for _, e := range sink.Events() {
+				if e.Kind == ToolRequested || e.Kind == ToolAllowed || e.Kind == ApprovalRequested || e.Kind == FinalAnswer {
+					t.Fatal("recovery reached authorization or execution")
+				}
+			}
+		})
+	}
+}
+
 func TestFinalValidationCancellation(t *testing.T) {
 	l, m, _ := setup(t, final("invalid"), final("must not run"))
 	ctx, cancel := context.WithCancel(context.Background())

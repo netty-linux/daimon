@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/netty-linux/daimon/internal/workspacejournal"
 	"github.com/netty-linux/daimon/internal/workspaceplan"
@@ -13,20 +14,44 @@ import (
 
 // Strict bounded metadata decoding, not authentication against the trusted UID.
 func strictMetadata(data []byte, target any) error {
-	d := json.NewDecoder(bytes.NewReader(data))
-	d.UseNumber()
 	allowed := map[string]bool{}
-	for _, key := range []string{"version", "run_id", "created", "source_reference_sha256", "snapshot_sha256", "files", "directories", "bytes", "root_identity", "output_identity", "device", "inode", "status", "rules", "operations", "type", "path", "before", "after", "sequence", "timestamp", "operation"} {
+	for _, key := range []string{"version", "run_id", "created", "source_reference_sha256", "snapshot_sha256", "files", "directories", "total_size_bytes", "root_identity", "output_identity", "device", "inode", "status", "rules", "operations", "type", "path", "before_sha256", "after_sha256", "sequence", "timestamp", "operation", "preimage_retention", "preimage_format_version", "retention_requested", "preimage_count", "retention_state", "preimage_journal_sha256", "expected_before_sha256", "captured_before_sha256", "approved_after_sha256", "preimage_size_bytes", "operation_id", "plan_sha256", "approval_sha256"} {
 		allowed[key] = true
 	}
-	var walk func(int) bool
-	walk = func(depth int) bool {
+	return strictJSON(data, target, allowed)
+}
+func strictJSON(data []byte, target any, allowed map[string]bool) error {
+	d := json.NewDecoder(bytes.NewReader(data))
+	d.UseNumber()
+	var walk func(int, string) bool
+	walk = func(depth int, field string) bool {
 		if depth > 4 {
 			return false
 		}
 		token, err := d.Token()
 		if err != nil || token == nil {
 			return false
+		}
+		if strings.HasSuffix(field, "_sha256") {
+			digest, ok := token.(string)
+			return ok && validHash(digest)
+		}
+		if strings.HasSuffix(field, "_bytes") {
+			number, ok := token.(json.Number)
+			if !ok {
+				return false
+			}
+			size, err := number.Int64()
+			limit := int64(MaxRunBytes)
+			switch field {
+			case "file_size_bytes", "after_bytes":
+				limit = MaxFileBytes
+			case "artifact_size_bytes":
+				limit = MaxEvidenceFileBytes
+			case "max_bytes":
+				limit = MaxEvidenceBytes
+			}
+			return err == nil && size >= 0 && size <= limit
 		}
 		delim, ok := token.(json.Delim)
 		if !ok {
@@ -38,6 +63,7 @@ func strictMetadata(data []byte, target any) error {
 		keys := map[string]bool{}
 		count := 0
 		for d.More() {
+			field := ""
 			count++
 			if count > 32 {
 				return false
@@ -49,15 +75,16 @@ func strictMetadata(data []byte, target any) error {
 					return false
 				}
 				keys[s] = true
+				field = s
 			}
-			if !walk(depth + 1) {
+			if !walk(depth+1, field) {
 				return false
 			}
 		}
 		end, err := d.Token()
 		return err == nil && end == map[json.Delim]json.Delim{'{': '}', '[': ']'}[delim]
 	}
-	if !walk(0) {
+	if !walk(0, "") {
 		return ErrArtifact
 	}
 	if _, err := d.Token(); err != io.EOF {
@@ -91,7 +118,7 @@ func (r *Run) verifyReport(report Report) error {
 	states := make(map[string]string)
 	succeeded, denied := 0, 0
 	for _, op := range report.Operations {
-		metadata = append(metadata, workspacejournal.Metadata{Type: op.Type, Path: op.Path, Before: op.Before, After: op.After})
+		metadata = append(metadata, workspacejournal.Metadata{Type: op.Type, Path: op.Path, BeforeSHA256: op.BeforeSHA256, AfterSHA256: op.AfterSHA256})
 		states[op.Path] = "prepared"
 		if op.Status == "succeeded" {
 			succeeded++
@@ -182,6 +209,9 @@ func (r *Run) verifyReport(report Report) error {
 		return err
 	}
 	if absent {
+		if r.manifest.Retention != nil && (report.Retention == nil || *report.Retention != *r.manifest.Retention) {
+			return ErrArtifact
+		}
 		if succeeded != 0 {
 			return ErrArtifact
 		}
@@ -191,21 +221,22 @@ func (r *Run) verifyReport(report Report) error {
 	if err != nil {
 		return err
 	}
+	dataForPlan := append([]byte(nil), data...)
 	plan, err := workspaceplan.Parse(data, workspaceplan.DefaultLimits())
 	if err != nil || len(plan.Operations) != len(metadata) || report.Status == "denied" {
 		return ErrArtifact
 	}
 	for i, op := range plan.Operations {
 		m := metadata[i]
-		if m.Type != op.Type || m.Path != op.Path || m.Before != op.Precondition.SHA256 || m.After != op.Validation.SHA256 {
+		if m.Type != op.Type || m.Path != op.Path || m.BeforeSHA256 != op.Precondition.SHA256 || m.AfterSHA256 != op.Validation.SHA256 {
 			return ErrArtifact
 		}
 		if report.Operations[i].Status == "succeeded" {
 			data, err := r.readArtifact("output/"+op.Path, MaxFileBytes)
-			if err != nil || workspaceplan.Hash(data) != m.After {
+			if err != nil || workspaceplan.Hash(data) != m.AfterSHA256 {
 				return ErrArtifact
 			}
 		}
 	}
-	return nil
+	return r.verifyRetention(report, dataForPlan)
 }
