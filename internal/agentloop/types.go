@@ -12,6 +12,13 @@ type Loop struct {
 	Budget     Budget
 	Sink       EventSink
 	Authorizer ToolAuthorizer
+	// InitialHistory is private context from prior turns: complete user/assistant
+	// text only, never tool calls/receipts. Run validates, budgets and clones it.
+	InitialHistory []model.Message
+	// ValidateFinal is optional and deterministic. A nonempty recovery message
+	// requests one additional, tool-free model step within the existing budget.
+	// The loop enforces at most one recovery, regardless of validator behavior.
+	ValidateFinal func(string) (recovery string, err error)
 }
 
 type Result struct {

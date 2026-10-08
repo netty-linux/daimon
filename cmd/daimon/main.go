@@ -15,8 +15,7 @@ import (
 	"github.com/netty-linux/daimon/internal/editcontract"
 	"github.com/netty-linux/daimon/internal/model"
 	"github.com/netty-linux/daimon/internal/policy"
-	"github.com/netty-linux/daimon/internal/providers/groq"
-	"github.com/netty-linux/daimon/internal/providers/openai"
+	"github.com/netty-linux/daimon/internal/providers"
 	"github.com/netty-linux/daimon/internal/tools"
 )
 
@@ -39,11 +38,15 @@ const maxResponseBytes int64 = 2 * 1024 * 1024
 // environment arrive injected so approval prompts and terminal answers are
 // testable without touching real terminals.
 func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, getenv func(string) string) (err error) {
+	if len(args) > 0 && args[0] == "serve" {
+		return runServe(ctx, args[1:], stdout, getenv)
+	}
 	if len(args) > 0 && args[0] == "managed-workspace" {
 		return runManagedWorkspace(ctx, args[1:], stdin, stdout, stderr)
 	}
 	started := time.Now()
 	workspaceMode := len(args) > 0 && args[0] == "workspace"
+	diagnostic := workspaceMode && len(args) > 3 && args[3] == "--diagnostic"
 	if workspaceMode {
 		defer func() { err = workspaceError(err) }()
 	}
@@ -55,6 +58,19 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 		}
 	}
 	sink := &agentloop.MemoryEventSink{}
+	validatedPlan := workspaceMode && len(args) == 4 && args[1] == "plan" && args[2] == "--validate-scope"
+	var scope *planScope
+	if validatedPlan {
+		scope = recognizePlanScope(args[3])
+		args = []string{"chat", "plan", args[3]}
+	}
+	if diagnostic {
+		defer func() {
+			if diagnosticErr := printWorkspaceDiagnostic(stderr, validatedPlan, scope != nil, sink.Events(), err); err == nil && diagnosticErr != nil {
+				err = diagnosticErr
+			}
+		}()
+	}
 	planMode := workspaceMode && len(args) == 3 && args[1] == "plan"
 	if planMode {
 		args = []string{"chat", args[2]}
@@ -74,6 +90,17 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 	if replacementEnabled {
 		args = []string{"chat", args[2]}
 	}
+	workspacePolicy := policy.WorkspacePolicy{Mode: policy.WorkspaceNormal, Create: creationEnabled, Replace: replacementEnabled}
+	if planMode {
+		workspacePolicy.Mode = policy.WorkspacePlan
+		if validatedPlan {
+			workspacePolicy.Mode = policy.WorkspaceValidatedPlan
+		}
+	}
+	if workspaceMode {
+		creationEnabled = workspacePolicy.Capability("create_file").Enabled
+		replacementEnabled = workspacePolicy.Capability("replace_file").Enabled
+	}
 	switch {
 	case demo:
 		authorizer = agentloop.AllowAllAuthorizer{}
@@ -90,15 +117,33 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 				err = &outputError{message: strings.ReplaceAll(err.Error(), apiKey, "[REDACTED]"), cause: err}
 			}
 		}()
+		var providerRegistry providers.Registry
+		if err := providerRegistry.Register(providers.CompatibleFactory(providers.OpenAI)); err != nil {
+			return err
+		}
+		if err := providerRegistry.Register(providers.GroqFactory()); err != nil {
+			return err
+		}
+		providerID := providers.OpenAI
 		if args[0] == "smoke" {
-			selected, err = groq.New(groq.Config{APIKey: apiKey,
+			providerID = providers.Groq
+		}
+		factory, factoryErr := providerRegistry.Get(providerID)
+		if factoryErr != nil {
+			return factoryErr
+		}
+		if args[0] == "smoke" {
+			selected, err = factory.New(providers.Config{APIKey: apiKey,
 				Model: getenv("DAIMON_GROQ_MODEL"), MaxResponseBytes: maxResponseBytes})
 		} else {
 			instruction := ""
 			if workspaceMode {
 				instruction = workspaceInstruction(planMode, creationEnabled, replacementEnabled)
+				if scope != nil {
+					instruction += scopeProtocol
+				}
 			}
-			selected, err = openai.New(openai.Config{
+			selected, err = factory.New(providers.Config{
 				BaseURL: getenv("DAIMON_BASE_URL"), Model: getenv("DAIMON_MODEL"),
 				APIKey: apiKey, MaxResponseBytes: maxResponseBytes,
 				SystemInstruction: instruction,
@@ -114,8 +159,12 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 		if creationEnabled {
 			cliPolicy.Rules["create_file"] = policy.RequireApproval
 		}
+		var toolPolicy policy.ToolPolicy = cliPolicy
+		if workspaceMode {
+			toolPolicy = workspacePolicy
+		}
 		composed = &policy.Authorizer{
-			Policy:    cliPolicy,
+			Policy:    toolPolicy,
 			Approvals: policy.NewTerminalApproval(bufferedInput, stderr),
 			Sink:      sink,
 		}
@@ -187,11 +236,17 @@ func runWithContext(ctx context.Context, args []string, stdin io.Reader, stdout,
 		composed.CreateReviews = createcontract.NewTerminal(bufferedInput, stderr)
 	}
 	loop := agentloop.Loop{Model: selected, Registry: registry, Budget: agentloop.DefaultBudget(), Sink: sink, Authorizer: authorizer}
+	if scope != nil {
+		loop.ValidateFinal = scope.validate
+	}
 	result, err := loop.Run(ctx, message)
 	if workspaceMode {
 		var planErr error
 		if planMode && err == nil {
 			plan := result.FinalAnswer
+			if scope != nil {
+				plan, _, _ = splitScopeAnswer(plan) // Already validated by the loop.
+			}
 			if apiKey != "" {
 				plan = strings.ReplaceAll(plan, apiKey, "[REDACTED]")
 			}

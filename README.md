@@ -392,21 +392,21 @@ segunda tentativa de proposta na mesma execução.
 O [contrato de edição](docs/workspace-edit-contract.md) descreve erros, cleanup,
 cancelamento, Linux como plataforma de escrita e limitações de concorrência/durabilidade.
 
-Esta fundação não oferece sandbox de processo, limite rígido de alocação de memória,
+Esta fundação não oferece isolamento de processo, limite rígido de alocação de memória,
 tokenização, sumarização ou persistência. Um componente pode alocar
 uma resposta grande antes de devolvê-la; o budget limita o que o loop aceita e armazena.
 Cancelamento é cooperativo e não interrompe um componente que ignora o contexto.
-Valores padrão são pontos de partida experimentais, não garantias de produção.
+Valores padrão são pontos de partida experimentais, não garantias de operação.
 
-os.Root não impede hard links nem transforma um workspace hostil em sandbox.
+os.Root não impede hard links nem isola um workspace hostil.
 Implementações fornecidas devem respeitar os contratos; não há recuperação de panics
 de código arbitrário nem suporte a interfaces contendo ponteiros nil tipados.
 
-Não existem banco, memória vetorial, gateway, subagentes, MCP, servidor, UI,
-streaming/SSE, Responses API, retry, fallback, múltiplos providers simultâneos,
+Não existem banco, memória vetorial, gateway, subagentes, transportes MCP remotos,
+streaming de tokens do provider, Responses API, retry, fallback, múltiplos providers simultâneos,
 shell, edição em lote, criação além de create_file, exclusão/movimentação de arquivos do usuário,
 aprovação permanente ou configuração de
-política em arquivo. A compatibilidade foi testada com servidores locais
+política nativa em arquivo. A compatibilidade foi testada com servidores locais
 simulados; os smokes Groq anteriores estão registrados no contrato. Nenhuma credencial
 é necessária para validar o projeto. O smoke de substituição usa servidor HTTP local
 e fixture temporária. Não há garantia de exclusão de escritores externos entre a
@@ -600,21 +600,400 @@ interrompida; nenhuma escrita ocorreu. Esses achados motivam o protocolo, mas n�
 comprovam sua eficácia: este corte é validado com httptest/fixtures, sem nova chamada
 real. A aprovação humana e os contratos de escrita continuam sendo a barreira.
 
-## Managed Workspace v1 — Experimental
+A orientação de plan inclui DAIMON plan discovery v2: o root já foi definido,
+caminhos fornecidos são alvos relativos e a investigação começa por list_dir "."
+quando faltar contexto, seguida apenas das listagens e leituras necessárias.
+Nomes vistos em listagem não confirmam conteúdo nem comportamento. Negativa,
+falha, limites ou dúvidas remanescentes são Bloqueios; não justificam insistir na
+aprovação. Não há sequência automática de ferramentas nem obrigatoriedade de ler
+arquivos sem necessidade. Os outros modos mantêm suas instruções anteriores.
 
-Somente Linux amd64. O proprietário, processos do mesmo UID e administradores
-são confiáveis; processos hostis do mesmo UID não são isolados. A Daimon nunca
-modifica conteúdo ou permissões da origem nem a abre para escrita; leituras podem
-atualizar atime. Apply em roots compartilhadas permanece bloqueado.
+Esse reforço responde ao relato operacional do usuário de uma sessão concluída
+em um passo, sem ferramentas ou escritas, que pediu um caminho já informado.
+O relato evidencia falta de adesão à tarefa, não um defeito confirmado do runtime.
+Os testes locais verificam o envio da orientação; melhora de adesão do modelo real
+continua pendente de nova validação pelo operador.
+
+### Validação restrita de escopo em plan (opt-in)
+
+`daimon workspace --root "diretório" plan --validate-scope "pedido"` habilita
+um contrato estruturado somente quando o pedido inteiro corresponde ao template.
+A forma equivalente `daimon workspace --root "diretório" plan "pedido" --validate-scope`
+também é aceita. Sem a flag, `plan "pedido"` mantém o comportamento anterior.
+Forneça exatamente um argumento de pedido não vazio: a CLI não junta argumentos
+nem remove espaços ou modifica UTF-8. Flags desconhecidas, duplicadas e argumentos
+extras são recusados. No shell Linux, use `"$DAIMON_PLAN_REQUEST"` para preservar
+o pedido inteiro como um argumento; a variável precisa estar definida no processo
+do shell que executa o binário.
+
+Template reconhecido:
 
 ```text
-daimon managed-workspace --base /tmp/daimon-store create --source /input
-daimon managed-workspace --base /tmp/daimon-store apply --run <id> --plan /input-plan.json
-daimon managed-workspace --base /tmp/daimon-store report --run <id>
+Analise esta fixture. Proponha criar um arquivo curto de documentacao em <diretorio>/ e alterar somente <arquivo> de <antigo> para <novo>. Nao execute alteracoes. Use ferramentas somente quando precisar de evidencia. Registre incertezas em Bloqueios.
 ```
 
-Aplicação determinística somente na cópia privada, com preview integral, aprovação
-de uso único, journal e relatório verificado. Não há publicação na origem, rollback,
-retomada após crash, limpeza automática ou suporte Windows. Veja
-[o contrato e as limitações](docs/managed-workspace.md) e
-[o formato do plano](docs/workspace-core.md).
+A grafia, pontuação e espaços do template são intencionais: não há interpretação
+geral de linguagem natural. Caminhos são relativos canônicos ASCII (letras,
+dígitos, ponto, hífen, underscore e barra); os literais têm de 1 a 128 caracteres
+ASCII alfanuméricos ou `_`, `=`, `+`, `-`. Pedidos diferentes, inclusive outra
+grafia, continuam no fluxo anterior sem essa validação. A flag não é permissão
+de ferramenta nem ativa escrita. Sem a flag, mesmo o template mantém o fluxo antigo.
+Cada caminho tem no máximo 4096 bytes. Componentes com ponto final e nomes de
+dispositivo Windows (CON, PRN, AUX, NUL, COM1–COM9, LPT1–LPT9, inclusive com
+extensão) são recusados para evitar interpretações diferentes entre plataformas.
+
+O modelo mantém as sete seções humanas em texto simples, com títulos únicos e
+em ordem, e acrescenta exatamente um bloco final. Cada delimitador ocupa uma
+linha própria; não há cercas markdown na resposta. Exemplo do bloco interno:
+
+```text
+<daimon-plan-scope>
+{"create":["docs/NOTES.md"],"modify":["src/config.txt"],"delete":[],"operations":[{"path":"src/config.txt","old":"mode=initial","new":"mode=final"}],"blockers":[]}
+</daimon-plan-scope>
+```
+
+Todos os campos são obrigatórios. O validador exige uma criação diretamente no
+diretório indicado, uma única modificação no arquivo indicado, a troca literal
+exata e nenhuma exclusão. Rejeita JSON ambíguo com chaves duplicadas, campos
+desconhecidos, caminhos não canônicos e operações adicionais. Bloqueios são
+códigos fechados: `information_missing`, `read_denied`, `read_failed` ou
+`budget_exhausted`; falta de acesso de escrita não é bloqueio.
+O JSON tem limite de 16384 bytes e profundidade máxima de quatro níveis. Os
+campos têm nomes exatos: cinco no objeto principal e três por operação. Há uma
+criação, uma modificação, uma operação, zero exclusões e até quatro bloqueios
+distintos. A resposta inteira permanece limitada pelo budget de resposta final.
+
+O contrato é conferido antes da exibição. Uma resposta incompatível é retida e
+permite no máximo uma recuperação explícita no mesmo histórico, sem repetir ou
+resumir o pedido original. Essa chamada conta como passo/request dentro do budget
+existente, usa schema sem ferramentas e rejeita qualquer tool call antes da
+autorização. Não há reserva adicional de passos, retry de transporte ou fallback.
+Nova incompatibilidade, interrupção ou limite impede exibir o plano. Erros de
+transporte ou JSON HTTP inválido encerram sem retry, inclusive na recuperação.
+Eventos e resumo continuam contendo somente contadores. O bloco interno é
+validado, retido no histórico necessário ao protocolo e removido da exibição;
+somente as seções humanas são apresentadas como plano deliberado.
+
+Limitação: a validação cobre o contrato estruturado e a presença/ordem das sete
+seções, não a semântica da prosa livre, a verdade dos diagnósticos nem a fidelidade
+da prosa ao bloco. Um modelo pode contradizer o bloco no texto; a revisão humana
+continua necessária. O bloco não aprova, prepara ou executa escrita e não valida
+existência dos alvos. A comparação de paths é lexical: não resolve symlinks,
+não segue o filesystem e não comprova confinamento físico de uma futura escrita.
+As ferramentas de leitura continuam confinadas pelo contrato existente de
+os.Root; o validador não concede acesso a nenhum path. Este corte é testado apenas com fixtures e provider HTTP
+simulado local; aderência de um LLM real não foi validada nesta rodada.
+
+### Capabilities, diagnóstico e trabalho de conclusão do núcleo
+
+A sessão workspace usa `policy.WorkspacePolicy`: leitura exige aprovação por
+chamada; create/replace continuam exigindo suas flags e preview vinculado. Plan
+nunca habilita escrita, mesmo com configuração interna inconsistente. Recovery
+nunca recebe tools. Chat, smoke e demo mantêm a política anterior.
+
+`daimon workspace --root "diretório" --diagnostic plan --validate-scope "pedido"`
+ativa diagnóstico deliberado no stderr, apenas com reconhecimento, categorias de
+falha e contagens. Não imprime prompt, paths, arquivos, IDs remotos ou chaves.
+HTTP 404 indica endpoint ou modelo não encontrado, sem inferir qual é a causa.
+Erros TLS, transporte, timeout, autenticação, rate limit, serviço e protocolo são
+classificados quando existe evidência tipada, preservando a causa e StopReason.
+
+O formato versionado e os limites internos de plano estão descritos em
+[docs/workspace-core.md](docs/workspace-core.md). **Não existe comando apply-plan
+habilitado neste estado.** Há um journal independente de metadados para sink
+fornecido pelo chamador, sem abertura automática de arquivos nem execução de apply.
+O requisito forte de confinamento
+sob mutação externa concorrente ainda está bloqueado: mover um pai após a última
+verificação pode causar escrita transitória pelo descritor aberto. A revalidação
+detecta o problema e a limpeza pode remover o arquivo, mas não impede aquela
+escrita. Os executores existentes continuam exigindo workspace controlado;
+não há isolamento de processo/filesystem.
+
+### Pedido longo em PowerShell e Docker
+
+O fluxo offline de cópia privada está disponível separadamente como
+`managed-workspace --base <store> create|apply|report`, somente em Linux amd64.
+O proprietário, processos do mesmo UID e administradores são confiáveis.
+A Daimon nunca modifica conteúdo ou permissões da origem nem a abre para escrita;
+leituras podem atualizar atime. Apply em roots compartilhadas continua
+bloqueado; publicação na origem não existe. Sintaxe, limites, artefatos e riscos
+estão em [docs/managed-workspace.md](docs/managed-workspace.md).
+
+Para testes manuais, prepare um diretório de artefatos fora do repositório com o
+binário Linux recompilado, `plan.env` e `run-plan.sh`. Use `--env-file` e um script
+montado readonly, em vez de embutir o pedido longo em `sh -lc`: PowerShell, Docker
+e o shell do container podem interpretar quoting em etapas diferentes.
+
+`plan.env` contém somente pedido e configuração não secreta. A sintaxe de
+`docker --env-file` não é expansão de shell: **não coloque aspas em torno do
+valor** e não espere interpolação de outras variáveis. Mantenha o pedido numa
+única linha. Não inclua API keys nesse arquivo, não o versione nem o imprima.
+
+```text
+DAIMON_BASE_URL=https://api.groq.com/openai/v1
+DAIMON_MODEL=openai/gpt-oss-20b
+DAIMON_PLAN_REQUEST=Analise esta fixture. Proponha criar um arquivo curto de documentacao em docs/ e alterar somente src/config.txt de mode=initial para mode=final. Nao execute alteracoes. Use ferramentas somente quando precisar de evidencia. Registre incertezas em Bloqueios.
+```
+
+Salve `run-plan.sh` com finais de linha LF. O shell é preparação manual do
+operador, não ferramenta concedida ao modelo. Este exemplo instala certificados
+no container para o teste manual; não foi executado contra provider externo nesta
+rodada. Nunca desative a verificação TLS.
+
+```sh
+#!/bin/sh
+set -eu
+: "${DAIMON_PLAN_REQUEST:?pedido ausente}"
+apt-get update
+apt-get install -y --no-install-recommends ca-certificates
+exec /artifact/daimon-linux-amd64 workspace --root /workspace plan \
+  --validate-scope "$DAIMON_PLAN_REQUEST"
+```
+
+No PowerShell, com credencial já configurada pelo operador somente no ambiente:
+
+```powershell
+$artifact = '<diretório absoluto de artefatos fora do repositório>'
+$fixture = '<workspace descartável absoluto>'
+docker run --rm -it `
+  --env-file (Join-Path $artifact 'plan.env') `
+  --env DAIMON_API_KEY `
+  --mount "type=bind,source=$artifact,target=/artifact,readonly" `
+  --mount "type=bind,source=$fixture,target=/workspace,readonly" `
+  debian:bookworm sh /artifact/run-plan.sh
+```
+
+O pedido é expandido **dentro** do container por `"$DAIMON_PLAN_REQUEST"`, formando
+um único argumento. A CLI preserva seus bytes. Plan e os dois mounts são
+read-only; a credencial não aparece no comando nem nos arquivos do exemplo.
+
+## Architecture direction
+
+**Experimental — Current:** reliable local agent core em Go.
+**Planned — Target:** plataforma local provider-agnostic Daimon Bots.
+DAIMON não é um modelo; é o ambiente onde modelos externos se tornam agentes.
+
+**Implemented:** contrato independente `model.Model`, loop com budget explícito,
+tools/policies/aprovação, contratos locais de workspace, adapter OpenAI-compatible
+e wrapper Groq. **Foundation implemented:** registry explícito de providers com
+IDs estáveis, factories e configuração por chamada; o CLI usa essa construção
+sem mudar comandos, flags, defaults ou autorização. Endpoints compatíveis podem
+ser configurados explicitamente; isso não certifica todos os servidores/modelos.
+
+**Implemented — Bot Domain:** `internal/bots` define configuração reutilizável,
+validação central e store JSON local versionado com CRUD. Bot referencia provider
+e modelo; não contém configuração de credenciais. Ferramentas e modos `ask` e
+`read-only` são declarativos e não concedem autorização. Existência de providers
+e ferramentas é resolvida pelo Session Runtime, separadamente da validação do domínio.
+
+O store recebe caminho explícito em diretório existente e controlado. Arquivo
+ausente significa coleção vazia; dados inválidos/versão desconhecida são recusados.
+Listagem é ordenada por ID e resultados têm cópias defensivas. Gravação usa
+temporário no mesmo diretório, modo 0600 onde aplicável, Sync/Close/rename, sem
+truncar o arquivo anterior. Uso sequencial por um escritor; sem garantia de
+atomicidade Windows, isolamento de escritores externos ou durabilidade de diretório.
+Não coloque segredos nos textos livres: o schema não detecta credenciais em prosa.
+O domínio ainda não tem comandos CLI, execução de bots ou interface de conversa.
+
+**Implemented — Thread Domain:** `internal/threads` define metadata persistente
+de conversa: ID, BotID, workspace explícito, título opcional e timestamps UTC.
+Validação é estrutural; não consulta Bot Store nem abre workspace. O store JSON
+versionado fornece CRUD, listagem ordenada e valores independentes, com limites
+de 256 threads e 2 MiB. BotID, workspace e CreatedAt permanecem fixos; UpdatedAt
+não retrocede e os timestamps são fornecidos pelo chamador. A gravação segue
+temporário/Sync/Close/rename, com os mesmos limites de concorrência e plataforma
+do Bot Store. Nenhum caminho padrão ou diretório do usuário é acessado implicitamente.
+
+Thread continua sendo apenas metadata. A execução ocorre pelo Session Runtime
+interno; mensagens persistentes pertencem ao Conversation Store separado. Cada Session fixa sua
+própria configuração do Bot; não há snapshot de provider/model persistido na Thread.
+Novos turns usam um sufixo limitado do transcript com o Bot atual.
+
+**Implemented — Session Runtime:** `internal/sessions` monta Thread → Bot →
+Provider/Model → ferramentas/policy → agentloop por código interno, com Start
+assíncrono, lifecycle, binding por execução, cancelamento, Wait/Close e buffer ring
+de eventos tipados com sequências e indicação explícita de gaps. Uma sessão ativa
+por Thread; Budget e limites de buffer/sessões são explícitos. Leitura exige aprovação
+individual; escrita exige opt-in por Start, Linux e preview completo aprovado.
+`read-only` resolve somente ferramentas classificadas explicitamente como leitura.
+
+Snapshots contêm apenas metadata/contadores; resposta final e histórico não são
+retidos pelo manager. Configuração de credenciais é injetada separadamente, sem
+persistência. O runtime permanece em memória: restart perde Sessions e buffers.
+O runtime interno não possui UI. A Phase 5 adiciona o transporte HTTP descrito abaixo.
+Veja [Session Runtime](docs/SESSION_RUNTIME.md)
+para ownership, resolução, permissões e limites de cancelamento cooperativo.
+
+**Implemented — Local HTTP Server:** `go run ./cmd/daimon serve` escuta somente em
+`127.0.0.1:3000`. Aceita `--port` e `--data-dir`; padrão de estado `~/.daimon`, com
+stores de Bots/Threads/conversas/Memory e Sessions somente em memória. `/api/v1` oferece
+health, providers, CRUD Bots/Threads com PUT completo, início/consulta/abort de
+Sessions e polling JSON limitado de eventos. Shutdown por SIGINT/SIGTERM drena
+HTTP e cancela/aguarda o Manager. Os comandos anteriores mantêm seu comportamento.
+
+Servidor local sem autenticação, destinado a clientes confiáveis; não exponha
+publicamente nem por reverse proxy. Não há CORS nem API de credenciais.
+`serve` exige aprovação individual para leitura; escrita nativa exige opt-in explícito. Instruções de Bot são aceitas
+como configuração, mas omitidas nas respostas; binding nunca é retornado.
+Transcript/resposta são dados deliberados somente no endpoint GET messages. Thread CRUD mostra deliberadamente o workspace configurado.
+Config de provider vem somente do ambiente da CLI; modelo vem do Bot.
+Veja [HTTP API v1](docs/HTTP_API_V1.md) para schemas, limites e segurança.
+
+**Implemented — SSE Event Streaming:** GET `/api/v1/sessions/{id}/events/stream`
+acompanha os mesmos eventos do ring, com sequência, Last-Event-ID/after, replay_gap
+explícito e heartbeat. Disconnect não cancela Session. Estado terminal envia os
+eventos restantes e stream_end; shutdown encerra streams antes de fechar o Manager.
+Até 64 streams, payloads/deadlines limitados, sem filas por cliente ou polling ocupado.
+O polling JSON permanece disponível. Não há streaming de tokens do provider.
+Veja [SSE v1](docs/SSE_V1.md) para protocolo, limites e reconexão.
+
+**Implemented — Web UI:** abra `/` após `go run ./cmd/daimon serve` para gerenciar
+Bots e Threads, iniciar/abortar Sessions e observar eventos SSE. React/TypeScript/
+Vite compila assets locais versionados e embutidos em Go; runtime não precisa Node.
+`cd ui`, `npm ci`, `npm run typecheck`, `npm test`, `npm run build` recompila a UI.
+Desenvolvimento: servidor Go e `npm run dev` em terminais separados, com proxy SSE.
+Host loopback, Origin/Fetch Metadata e CSP restringem acesso pelo navegador.
+
+A tela mostra transcript persistente e activity SSE separada. Reload preserva
+Bots/Threads/mensagens e limpa acompanhamento local, sem abortar Sessions.
+Limitações explícitas: sem tool history ou summarization; Memory manual é separada.
+Editar Bot exige reentrada das instruções privadas. Veja [Web UI v1](docs/WEB_UI_V1.md).
+
+**Implemented — Phase 8 Conversation History + Response Persistence:** mensagens
+user/assistant imutáveis, UTF-8 exato e sequência por Thread em JSON versionado
+separado (`conversations/<thread-id>.json`). User persiste antes da execução;
+assistant somente após sucesso e cleanup. Failed/aborted pode deixar apenas user.
+Falha de persistência é explícita; não existe transação ACID ou replay de Session.
+GET `/api/v1/threads/{id}/messages?after=0&limit=40` fornece páginas privadas;
+POST Sessions aceita message_id para duplicatas. Contexto contínuo inclui somente
+mensagens recentes inteiras dentro do Budget; arquivos ausentes são histórico vazio.
+32 KiB/user, 256 KiB/assistant, 1024 mensagens e 16 MiB por Thread; um escritor local.
+Transcript sobrevive a reload/restart. Threads com mensagens não podem ser removidas.
+Veja [Conversation History v1](docs/CONVERSATION_HISTORY_V1.md).
+
+**Implemented — Phase 9 Web Approval Flow:** revisão individual de leitura e preview completo dos contratos de escrita. Flags serve --enable-replace-file / --enable-create-file habilitam somente capacidade (Linux); decisão humana continua obrigatória, única e efêmera. Reload recupera pendência; Abort/deadline/shutdown invalidam. Veja [Web Approval v1](docs/WEB_APPROVAL_V1.md).
+
+**Implemented — Phase 10 MCP Tool Integration:** servidores stdio configurados localmente em mcp.json, discovery real, ferramentas namespaced e seleção no Bot. MCP read exige aprovação individual; write/other são negados. Settings / MCP mostra somente catálogo e status. Subprocessos usam ambiente explícito sem credenciais do provider e encerram após Sessions. Veja [MCP v1](docs/MCP_V1.md).
+
+**Implemented:** Phase 11 — Memory Foundation. Computer Use Foundation está implementada na Phase 12; Intelligent Memory permanece futura.
+O transporte permanece em `internal/providers/openai`, compartilhado pelo Groq.
+Não há descoberta automática, persistência de chaves ou mudança de permissões.
+
+Consulte a [arquitetura V2 e migração incremental](docs/DAIMON_ARCHITECTURE_V2.md).
+
+## Phase 11 — Memory Foundation
+
+Memory manual, persistente e separada do transcript: escopos global/Bot/Thread,
+kinds fact/preference/instruction/note, CRUD explícito na UI e HTTP. `serve` abre
+`memory.json` versionado no data-dir: 2048 registros, 16 KiB por conteúdo, 32 MiB
+por arquivo. Contexto congelado por Session, recuperação lexical determinística,
+registros integrais, até 16 candidatos/32 KiB com reserva para mensagem/final/history.
+Nada é salvo automaticamente. Memory não altera ferramentas, policy ou aprovação.
+Armazenamento local em texto claro; registros selecionados vão ao provider.
+Veja [Memory v1](docs/MEMORY_V1.md) para contratos, limites e validação offline.
+`cd ui && npm run smoke:memory` valida UI/runtime reais com provider local fake.
+Phase 13 — Live Computer View + Human Takeover está implementada abaixo. Intelligent Memory (Extraction + Summarization + Semantic Retrieval) permanece futura.
+
+
+## Phase 12 — Computer Use Foundation + CUA Driver
+
+Computer é uma capability opcional de cada Bot, com backend local CUA Driver pelo
+MCP stdio existente. ComputerManager possui disponibilidade e lease exclusiva;
+Session congela seu binding; policy e aprovação humana individual continuam
+obrigatórias. Nomes em Bot.Tools, Memory e mensagens não habilitam Computer.
+
+Settings / Computer mostra status/capabilities e instalação manual; o editor do
+Bot habilita explicitamente Computer e seleciona ferramentas. Observações textuais,
+click, type_text e bring_to_front exigem revisão por chamada, incluindo preview
+integral da digitação. Desktop real, permissões do usuário: sem sandbox guarantee.
+Nenhuma imagem entra no modelo, histórico, Memory, logs, snapshots ou SSE.
+
+Configure um único servidor em mcp.json com computer_backend "cua-local", caminho
+absoluto para cua-driver[.exe] e args ["mcp"]. O perfil optional computer_profile do
+Bot referencia esse ID. O MCP genérico permanece read-only; CUA usa o perfil legado
+2025-06-18 explicitamente. GET /api/v1/computers é apenas metadata, sem action API.
+
+Veja [Computer Use v1](docs/COMPUTER_USE_V1.md) para configuração completa, ferramentas
+reais suportadas, aprovação, lease, falhas e limites. Testes offline usam fake CUA
+MCP; ui/npm run smoke:computer verifica o percurso no navegador sem ações reais.
+
+Phase 13 — Live Computer View + Human Takeover está implementada abaixo.
+Intelligent Memory, Subagents e External
+Agents permanecem futuros, sem instalação automática ou permissões permanentes.
+
+## Phase 13 — Live Computer View + Human Takeover
+
+Implemented: optional local CUA RCDP v2 media, Chat / Computer / Activity tabs,
+independent ephemeral viewers and exclusive human control with explicit Take /
+Give Back. Driver MCP agent actions retain individual policy/approval. Media
+and human input use dedicated same-origin sockets; frames never enter Session
+SSE, transcript or Memory. Driver-only use remains available without media.
+
+Configure an existing local media daemon with `serve --computer-media-url
+http://127.0.0.1:3211` and server-only `DAIMON_CUA_MEDIA_TOKEN`; no daemon or
+Space is created. See [Computer View v1](docs/COMPUTER_VIEW_V1.md) for contracts,
+limits, FSL external-component licensing, configuration and validation.
+
+Offline browser check: `npm run smoke:computer-view` in ui. Simulated frames
+and input verify ownership and reload; real CUA media remains operator opt-in.
+Phase 14 — Sandboxed Computers is implemented below.
+
+## Phase 14 — local sandboxed computers
+
+Optional Bot SandboxProfile provisions a disposable per-Session Linux gVisor
+Computer through the public CUA CLI. Host Computer mode remains available.
+Enable on an already configured Linux host with
+`serve --data-dir /controlled/data --sandbox-cua /absolute/path/to/cua`.
+Settings / Sandboxes exposes safe runtime/ownership/cleanup state. Existing live
+view and human takeover are reused when the guest provides compatible media.
+Cleanup is automatic; failures remain journaled for startup reconciliation.
+
+Local only, Linux first, gVisor only. No cloud, pools, persistent volumes, host
+mounts or snapshots. Runtime installation is manual. Outbound network remains
+enabled; no egress firewall/disk quota/digest pinning is claimed. Real runtime
+smoke has not been executed here. See [Sandbox Computers](docs/SANDBOX_COMPUTERS_V1.md).
+
+## Phase 15 — Cloud Computers
+
+Cloud is explicit Sandbox placement through official CUA Fleet. Configure an
+already installed CLI with `serve --cloud-cua /absolute/cua` on Linux and external
+process credentials; DAIMON performs no login or installation. Cloud Bot mode
+shows paid capacity before Send, fixed 2 CPU/4 GiB or 4 CPU/8 GiB presets and
+a 15-minute claim TTL. Two cloud reservations, no warm provisioning, no fallback
+to host/local. Claim release may retain billable managed pool capacity until GC.
+Existing approval, live view, takeover and owned cleanup/reconciliation are reused.
+See [Cloud Computers V1](docs/CLOUD_COMPUTERS_V1.md). Offline fake browser check:
+`npm run smoke:cloud` in ui. **real CUA Fleet not validated**.
+Next recommended: Phase 17 — Background Tasks + Long-Running Agent Runs.
+
+
+## Persistent Environments — Phase 16
+
+See [Persistent Environments v1](docs/PERSISTENT_ENVIRONMENTS_V1.md) for durable Thread-owned local workspace
+revisions, bounded official filesystem transfer, expected-revision commits,
+explicit enable/delete, hydration before model, successful sync before compute
+cleanup and assistant persistence. Existing Threads are not automatically imported.
+Session failures/abort before commit preserve the prior revision; an already
+confirmed workspace commit survives later cleanup/persistence failure or abort and
+is reported explicitly. Compute remains disposable; no persistent processes.
+
+Authorized inspection exception: a fixed DAIMON helper may run in the guest only
+through official ProcessService, solely to verify metadata absent from the filesystem
+API (inode/device/hard-link count). Fixed executable/code/arguments; no user/model
+command strings, shell, arbitrary command tool, stdin or content transfer. Structured
+bounded output, timeout and cancellation/kill-on-disconnect are required. Unsupported
+or unproven metadata fails closed. All content transfer uses FilesystemService.
+No paid CUA smoke, installation or login is automatic. Phase 17 Background Tasks +
+Long-Running Agent Runs, Intelligent Memory, Subagents and External Agents stay deferred.
+
+
+## Interface de produto — Phase 16.5
+
+A interface local prioriza Bots, Conversas e Chat, com visual escuro e textos em
+PT-BR. Computador, Arquivos, Memória e Atividade ficam em abas; provedores, MCP
+e detalhes de infraestrutura ficam em Configurações. Aprovações individuais e
+previews completos continuam obrigatórios. Arquivos apresenta metadados do
+ambiente persistente; não é um gerenciador de arquivos.
+
+Veja [Product UI V2](docs/PRODUCT_UI_V2.md) para arquitetura, acessibilidade,
+validação e limitações. Nenhuma alteração de backend ou implementação da Phase 17.

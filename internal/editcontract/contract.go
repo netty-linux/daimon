@@ -20,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/netty-linux/daimon/internal/diffview"
+	"github.com/netty-linux/daimon/internal/workspacefs"
 )
 
 var (
@@ -81,14 +82,17 @@ type Reviewer interface {
 }
 
 // Workspace owns a root opened by the caller; it must outlive all proposals.
-type Workspace struct{ root *os.Root }
+type Workspace struct {
+	root    *os.Root
+	binding *workspacefs.Binding
+}
 
 func Open(directory string) (*Workspace, error) {
-	r, err := os.OpenRoot(directory)
+	r, binding, err := workspacefs.Open(directory)
 	if err != nil {
 		return nil, ErrFile
 	}
-	return &Workspace{root: r}, nil
+	return &Workspace{root: r, binding: binding}, nil
 }
 func (w *Workspace) Close() error {
 	if w == nil || w.root == nil {
@@ -153,6 +157,14 @@ func validPath(p string) bool {
 // inspect refuses every symlink component, both internal and external. Root
 // confines resolution; these checks do not eliminate hostile filesystem races.
 func (w *Workspace) inspect(p string) (os.FileInfo, error) {
+	if w.binding != nil {
+		if err := w.binding.Check(); err != nil {
+			if errors.Is(err, workspacefs.ErrRoot) {
+				return nil, ErrFile
+			}
+			return nil, ErrChanged
+		}
+	}
 	prefix := ""
 	for _, component := range strings.Split(p, "/") {
 		prefix = path.Join(prefix, component)
@@ -239,7 +251,7 @@ func (w *Workspace) Prepare(ctx context.Context, p string, proposed []byte, limi
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if w == nil || w.root == nil || !limits.valid() {
+	if w == nil || w.root == nil || w.binding == nil || !limits.valid() {
 		return nil, ErrInvalid
 	}
 	if !validPath(p) {
@@ -267,7 +279,7 @@ func (w *Workspace) Prepare(ctx context.Context, p string, proposed []byte, limi
 		}
 		return nil, ErrInvalid
 	}
-	r := Review{Path: p, Original: version(info, original), ProposedSHA256: digest(content), Limits: limits}
+	r := Review{Path: p, Original: version(info, original), ProposedSHA256: digest(content), Limits: limits, RootID: w.binding.RootID(), RunID: w.binding.RunID(), Operation: "replace_file"}
 	nonce := make([]byte, 16)
 	if _, err := rand.Read(nonce); err != nil {
 		return nil, ErrInvalid

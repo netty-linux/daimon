@@ -19,6 +19,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/netty-linux/daimon/internal/editcontract"
+	"github.com/netty-linux/daimon/internal/workspacefs"
 )
 
 var (
@@ -44,6 +45,7 @@ func (l Limits) Validate() error {
 
 type Review struct {
 	ID, RootID, Path, ProposedSHA256 string
+	RunID, Operation                 string
 	TargetAbsent                     bool
 	Bytes                            int
 	Limits                           Limits
@@ -63,21 +65,16 @@ type Reviewer interface {
 }
 
 type Workspace struct {
-	root *os.Root
-	id   string
+	root    *os.Root
+	binding *workspacefs.Binding
 }
 
 func Open(directory string) (*Workspace, error) {
-	r, err := os.OpenRoot(directory)
+	r, binding, err := workspacefs.Open(directory)
 	if err != nil {
 		return nil, ErrFile
 	}
-	nonce := make([]byte, 16)
-	if _, err = rand.Read(nonce); err != nil {
-		r.Close()
-		return nil, ErrFile
-	}
-	return &Workspace{root: r, id: hex.EncodeToString(nonce)}, nil
+	return &Workspace{root: r, binding: binding}, nil
 }
 func (w *Workspace) Close() error {
 	if w == nil || w.root == nil {
@@ -132,6 +129,15 @@ func validPath(p string) bool {
 
 // Observe every parent without following symlinks, including the root identity.
 func (w *Workspace) parents(ctx context.Context, p string) ([]os.FileInfo, error) {
+	if w.binding == nil {
+		return nil, ErrInvalid
+	}
+	if err := w.binding.Check(); err != nil {
+		if errors.Is(err, workspacefs.ErrRoot) {
+			return nil, ErrFile
+		}
+		return nil, ErrChanged
+	}
 	var infos []os.FileInfo
 	names := []string{"."}
 	dir := path.Dir(p)
@@ -218,7 +224,7 @@ func (w *Workspace) Prepare(ctx context.Context, p string, content []byte, limit
 	if err := w.absent(p); err != nil {
 		return nil, err
 	}
-	r := Review{RootID: w.id, Path: p, TargetAbsent: true, Bytes: len(data), ProposedSHA256: digest(data), Limits: limits}
+	r := Review{RootID: w.binding.RootID(), RunID: w.binding.RunID(), Operation: "create_file", Path: p, TargetAbsent: true, Bytes: len(data), ProposedSHA256: digest(data), Limits: limits}
 	nonce := make([]byte, 16)
 	if _, err := rand.Read(nonce); err != nil {
 		return nil, ErrInvalid

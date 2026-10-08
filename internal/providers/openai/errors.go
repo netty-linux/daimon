@@ -3,7 +3,10 @@ package openai
 import "fmt"
 
 // Diagnostics contain only controlled text, never configuration values or bodies.
-type ConfigError struct{ Field string }
+type ConfigError struct {
+	Field   string
+	Missing bool
+}
 
 func (e *ConfigError) Error() string {
 	return "openai-compatible: invalid configuration field " + e.Field

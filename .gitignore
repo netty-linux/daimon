@@ -4,6 +4,8 @@
 !.env.example
 
 # Go build artifacts
+/daimon
+/daimon-linux-amd64
 bin/
 dist/
 *.exe
@@ -28,3 +30,8 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Frontend dependencies and local test artifacts; embedded production assets stay tracked
+node_modules/
+ui/coverage/
+ui/test-results/

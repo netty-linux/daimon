@@ -14,6 +14,7 @@ import (
 // Provider contains configuration only; each Generate owns its request state.
 type Provider struct {
 	systemInstruction string
+	additionalContext string
 	endpoint          string
 	apiKey            string
 	model             string
@@ -27,7 +28,7 @@ func (p *Provider) Generate(ctx context.Context, input model.ModelRequest) (mode
 	if err := ctx.Err(); err != nil {
 		return model.ModelResponse{}, err
 	}
-	body, err := encodeRequestWithSystem(p.model, input, p.systemInstruction)
+	body, err := encodeRequestWithContext(p.model, input, p.systemInstruction, p.additionalContext)
 	if err != nil {
 		return model.ModelResponse{}, err
 	}

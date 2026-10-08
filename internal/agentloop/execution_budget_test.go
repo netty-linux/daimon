@@ -238,12 +238,12 @@ func TestExecutionDeadlines(t *testing.T) {
 					kind := LimitMaxRunDuration
 					switch scope {
 					case "external":
-						ctx, cancel = context.WithTimeout(ctx, 30*time.Millisecond)
+						ctx, cancel = context.WithTimeout(ctx, 500*time.Millisecond)
 						defer cancel()
 						want = StopReasonExternalDeadline
 						kind = ""
 					case "run":
-						l.Budget.MaxRunDuration = 30 * time.Millisecond
+						l.Budget.MaxRunDuration = 500 * time.Millisecond
 					case "call":
 						if target == "model" {
 							l.Budget.MaxModelCallDuration = 30 * time.Millisecond

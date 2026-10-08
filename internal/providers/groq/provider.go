@@ -12,10 +12,12 @@ const BaseURL = "https://api.groq.com/openai/v1"
 const DefaultModel = "openai/gpt-oss-20b"
 
 type Config struct {
-	APIKey           string
-	Model            string
-	MaxResponseBytes int64
-	HTTPClient       *http.Client
+	APIKey            string
+	Model             string
+	MaxResponseBytes  int64
+	HTTPClient        *http.Client
+	SystemInstruction string
+	AdditionalContext string // Explicit bounded contextual data, separate from instructions/history.
 }
 
 // New keeps HTTP, protocol validation and typed errors in the shared adapter.
@@ -27,5 +29,5 @@ func New(cfg Config) (*openai.Provider, error) {
 		cfg.Model = DefaultModel
 	}
 	return openai.New(openai.Config{BaseURL: BaseURL, APIKey: cfg.APIKey,
-		Model: cfg.Model, MaxResponseBytes: cfg.MaxResponseBytes, HTTPClient: cfg.HTTPClient})
+		Model: cfg.Model, MaxResponseBytes: cfg.MaxResponseBytes, HTTPClient: cfg.HTTPClient, SystemInstruction: cfg.SystemInstruction, AdditionalContext: cfg.AdditionalContext})
 }

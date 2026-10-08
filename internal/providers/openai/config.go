@@ -20,21 +20,28 @@ type Config struct {
 	// Optional caller-owned operational guidance, separate from conversation.
 	// Bounded independently; it is not loop history and grants no capabilities.
 	SystemInstruction string
+	AdditionalContext string // Explicit bounded contextual data, separate from instructions/history.
 	// An injected client owns its redirect, TLS, proxy and timeout policies.
 	// Configure it before New and do not mutate its transport during use.
 	HTTPClient *http.Client
 }
 
 func New(cfg Config) (*Provider, error) {
+	if strings.TrimSpace(cfg.BaseURL) == "" {
+		return nil, &ConfigError{Field: "BaseURL", Missing: true}
+	}
 	if len(cfg.SystemInstruction) > 8192 || !utf8.ValidString(cfg.SystemInstruction) {
 		return nil, &ConfigError{Field: "SystemInstruction"}
+	}
+	if len(cfg.AdditionalContext) > 32*1024 || !utf8.ValidString(cfg.AdditionalContext) {
+		return nil, &ConfigError{Field: "AdditionalContext"}
 	}
 	endpoint, err := completionURL(cfg.BaseURL)
 	if err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(cfg.Model) == "" || !utf8.ValidString(cfg.Model) {
-		return nil, &ConfigError{Field: "Model"}
+		return nil, &ConfigError{Field: "Model", Missing: strings.TrimSpace(cfg.Model) == ""}
 	}
 	// Leave room for the extra byte used to detect an oversized body.
 	if cfg.MaxResponseBytes <= 0 || cfg.MaxResponseBytes == 1<<63-1 {
@@ -60,7 +67,7 @@ func New(cfg Config) (*Provider, error) {
 		}
 	}
 	clientCopy := *client
-	return &Provider{endpoint: endpoint, apiKey: cfg.APIKey, model: cfg.Model, maxResponseBytes: cfg.MaxResponseBytes, client: &clientCopy, systemInstruction: cfg.SystemInstruction}, nil
+	return &Provider{endpoint: endpoint, apiKey: cfg.APIKey, model: cfg.Model, maxResponseBytes: cfg.MaxResponseBytes, client: &clientCopy, systemInstruction: cfg.SystemInstruction, additionalContext: cfg.AdditionalContext}, nil
 }
 
 func completionURL(base string) (string, error) {

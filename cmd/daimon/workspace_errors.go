@@ -7,6 +7,7 @@ import (
 	"github.com/netty-linux/daimon/internal/createcontract"
 	"github.com/netty-linux/daimon/internal/editcontract"
 	"github.com/netty-linux/daimon/internal/policy"
+	"github.com/netty-linux/daimon/internal/providers/openai"
 )
 
 // Only typed causes select a public explanation. Cleanup takes precedence:
@@ -17,6 +18,10 @@ func workspaceError(err error) error {
 	}
 	message := "Não foi possível concluir a operação; consulte os contadores de escritas confirmadas."
 	switch {
+	case errors.Is(err, errWorkspace):
+		message = "Argumentos ou diretório de workspace inválidos. Uso de plan: workspace --root \"diretório\" plan [--validate-scope] \"pedido\" ou plan \"pedido\" --validate-scope. Forneça um único pedido não vazio; a única flag de plan é --validate-scope, no máximo uma vez."
+	case errors.Is(err, errPlanScope):
+		message = "Plano recusado: o contrato de escopo não foi validado após a recuperação única."
 	case errors.Is(err, createcontract.ErrCleanup), errors.Is(err, editcontract.ErrCleanup):
 		message = "Falha de limpeza; pode haver resíduo. Consulte as escritas confirmadas."
 	case errors.Is(err, context.Canceled):
@@ -39,7 +44,40 @@ func workspaceError(err error) error {
 		var auth *agentloop.AuthorizationError
 		if errors.As(err, &auth) {
 			message = "Não foi possível autorizar a operação."
+		} else if providerMessage := workspaceProviderError(err); providerMessage != "" {
+			message = providerMessage
 		}
 	}
 	return &outputError{message: message, cause: err}
+}
+
+func workspaceProviderError(err error) string {
+	switch openai.Classify(err) {
+	case openai.FailureMissingConfiguration:
+		return "Configuração do provider ausente."
+	case openai.FailureConfiguration:
+		return "Configuração do provider inválida."
+	case openai.FailureURL:
+		return "Endpoint do provider inválido."
+	case openai.FailureTLS:
+		return "Falha ao validar a conexão TLS com o provider."
+	case openai.FailureTimeout:
+		return "Tempo de espera do provider excedido."
+	case openai.FailureTransport:
+		return "Falha de transporte na conexão com o provider."
+	case openai.FailureAuthentication:
+		return "Provider recusou a autenticação ou o acesso (HTTP 401/403)."
+	case openai.FailureNotFound:
+		return "Endpoint ou modelo não encontrado pelo provider (HTTP 404)."
+	case openai.FailureRateLimit:
+		return "Limite de requisições do provider atingido (HTTP 429)."
+	case openai.FailureServer:
+		return "Falha no serviço do provider (HTTP 5xx)."
+	case openai.FailureHTTP:
+		return "Provider recusou a requisição HTTP."
+	case openai.FailurePayload:
+		return "Requisição ou resposta incompatível com o protocolo do provider."
+	default:
+		return ""
+	}
 }
