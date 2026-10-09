@@ -1,6 +1,6 @@
 # DAIMON
 
-**CUA Persistent Bots:** auditoria concluída; integração pendente de decisões de contrato.
+**Native Routines Foundation:** agendador diário DAIMON implementado; Space/Volume pendentes.
 Veja [auditoria e proposta](docs/cua-persistent-bots.md).
 
 DAIMON é a fundação experimental de um **Sovereign Personal Agent** em Go:

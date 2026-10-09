@@ -1,6 +1,7 @@
 # CUA Persistent Bots — auditoria de integração
 
-Status em 2026-10-09: auditoria e baseline concluídas; integração ainda não implementada.
+Status em 2026-10-09: agendador nativo diário implementado para revisão; associação
+Bot/Space e cópia de Memory/Volume continuam pendentes, sem implementação funcional.
 Branch: `feature/cua-persistent-bots`, a partir de `main` em `66481c0`.
 Nenhum merge ou push para main faz parte deste trabalho.
 
@@ -52,10 +53,13 @@ encaminhe cada ToolCall desses harnesses ao authorizer do DAIMON.
 Portanto, usar `routineAdd` porque a API existe conflita com manter
 Model.Generate/AgentLoop, ToolPolicy e aprovação de uso único como autoridade.
 Marcadores `[[ask]]`, `[[login]]` e `[[handoff]]` não corrigem essa fronteira.
-A alternativa proposta é um agendador DAIMON que somente chama SessionManager.Start,
+A alternativa aprovada é um agendador DAIMON que somente chama SessionManager.Start,
 com os mesmos budgets, capabilities e aprovações, e funciona apenas enquanto
 o servidor está aberto. Essa alternativa requer alterar a condição do prompt
-que exige usar rotinas CUA sempre que estiverem disponíveis. Decisão pendente.
+que exige usar rotinas CUA sempre que estiverem disponíveis. O usuário autorizou
+explicitamente esse desvio em 2026-10-09: aprovação por chamada é requisito central,
+portanto disponibilidade de routineAdd não autoriza seu uso. Também proibiu
+Space.agentStart, persistentAgentCreate/Send e qualquer harness externo para turns.
 
 ## Arquitetura proposta para revisão
 
@@ -107,16 +111,58 @@ VolumeService separa montagem do Volume da escrita no store remoto. O proto
 documenta montagem Windows como preview desabilitado por padrão. Não ativar
 `CUA_VOLUME_WINDOWS_PREVIEW` automaticamente nem inferir suporte validado.
 
-## Rotinas propostas
+## Agendador nativo implementado
 
-Se aprovada a alternativa nativa: store explícito/versionado/limitado, no máximo
-4 rotinas ativas/Bot e 32 totais, intervalo mínimo 15 minutos, horário diário
-com timezone explícito e sem catch-up silencioso. Reserva de execução e exclusão
-devem compartilhar admission com Bot/Thread e SessionManager.
-Uma pendência de aprovação usa WaitingApproval existente, sem segundo canal.
-Shutdown cancela/join o scheduler antes de fechar Sessions; restart não restaura
-execuções nem approvals. UI PT-BR mostra estado, associação e ativar/pausar,
-preservando Chat/Computador/Arquivos. Esse desenho ainda não foi implementado.
+`internal/routines` possui store JSON v1 explícito em `<data-dir>/routines.json`,
+com 32 registros totais, 4 ativos/Bot, prompt até 32 KiB, título até 256 bytes,
+arquivo até 2 MiB, horário diário HH:MM e timezone IANA obrigatório (tzdata da
+biblioteca padrão embutido, inclusive para Windows). Sem cron genérico, shell,
+novas ferramentas, fila de execução ou segundo loop. Intervalo de 15 minutos
+entre tentativas do mesmo Bot; último horário é persistido por registro para
+preservar o limite ao reiniciar. Exclusão explícita de registros não promete
+retenção perpétua de um ledger de tentativas.
+
+Cada disparo usa SessionManager.Start com ScheduledBotID e IDs aleatórios de
+Session/mensagem, o budget configurado e os opt-ins de exposição de escrita do
+processo. ToolPolicy, aprovação de uso único, Linux-only para escrita, transcript,
+Memory e ComputerManager são os existentes. O agendador não chama `Space.agentStart`,
+`routineAdd` ou persistent agents. Computer continua exclusivamente via ferramentas
+MCP aprovadas do runtime existente; Volume nunca vira comando ou autoridade.
+Cloud paga não é aceita para rotinas: ainda não existe consentimento de custo
+persistente apropriado. A resolução revalida esse bloqueio no Bot congelado.
+
+Admissão atômica no Manager reserva o Bot durante o turno agendado. Sessions
+ativas do mesmo Bot, incluindo startup/approval/cleanup, bloqueiam a rotina;
+durante rotina ativa, outro turn manual do mesmo Bot também é recusado. Reservas
+de mutação de metadata sem identidade conhecida bloqueiam rotinas conservadoramente.
+Isso não altera a possibilidade de turns manuais paralelos em Threads diferentes
+quando nenhuma rotina daquele Bot está ativa. Não há filesystem I/O sob lock do
+Manager. Negar uma ferramenta não aborta automaticamente o loop.
+
+WaitingApproval mantém a rotina devida aguardando e visível; não abre outro turno,
+não resolve, reenvia ou contorna a pendência. Uma vez admitido um turno, pausar ou
+excluir a rotina altera só agenda futura, nunca a decisão humana/Session em curso.
+Falha de admissão após consumir o slot é explícita e não faz retry. O consumo
+persiste antes de Start: crash nesse intervalo pode perder um disparo, mas não
+repeti-lo automaticamente. Não há promessa de exactly-once/ACID entre stores.
+
+O servidor possui o scheduler, com tick de 15 segundos. Shutdown cancela/join
+antes de fechar Sessions. Reinício pula slots vencidos: rotinas só rodam com o
+servidor do DAIMON aberto, sem catch-up, restauração de Sessions ou approvals.
+Falha do armazenamento encerra o scheduler e o servidor de modo controlado.
+Um processo possui o diretório; JSON estrito, arquivo regular/parent imediato
+sem symlink observado, temporário 0600 + Sync/Close/rename e cleanup explícito.
+Sem sandbox de filesystem, exclusão de escritores externos, diretório fsync,
+atomicidade Windows ou garantia de desligamento forçado de componentes não cooperativos.
+
+API: GET/POST `/api/v1/routines`, PUT `{enabled:boolean}` e DELETE
+`/api/v1/routines/{id}`. GET é metadata deliberada (inclui título e correlação
+de Session, não prompt, instruções, conteúdo Memory ou secrets). Create valida
+Bot/Thread e vínculo; remoção Bot/Thread é bloqueada por qualquer rotina vinculada,
+sem cascata. Endpoint preserva Host/Origin same-origin e JSON bounded estrito.
+UI PT-BR na aba Atividade oferece criação diária, status, pausar/ativar, exclusão
+confirmada e Abrir execução para o fluxo normal de aprovação. Chat, Computador
+e Arquivos mantêm layout/autoridade. Prompts não vão para storage do browser.
 
 ## Baseline executada antes de alterações
 
@@ -133,8 +179,8 @@ Linux real via Docker `golang:1.27.1`, rede desabilitada, checkout read-only:
 Docker estava fechado na primeira tentativa; a tentativa retornou erro de conexão.
 Após iniciar o Docker já instalado, a baseline acima executou integralmente.
 O CI do commit base também concluiu com sucesso.
-Mudanças desta auditoria são somente documentação: sem alteração de UI/API/runtime,
-sem necessidade de regenerar assets ou repetir testes de código já aprovado.
+Essa baseline foi executada antes da implementação. Validação posterior é
+registrada no relatório de implementação abaixo.
 
 ## Opt-ins e limites de validação
 
@@ -142,9 +188,63 @@ Nenhuma chamada CUA, Space real, Fleet pago, instalação, login ou download CUA
 foi executado. Clonar fontes para leitura não verifica compatibilidade binária.
 Windows real, montagem de Volume, gVisor real, Fleet, durabilidade remota e
 encaminhamento de aprovações de harness externo não foram validados.
-Não há novas flags, endpoints ou comandos DAIMON para features não implementadas.
+Não há flags ou comandos para associação de Spaces/Memory/Volume não implementadas.
 Não usar exemplos de API desta auditoria como garantia de integração funcional.
 
 Arquivos locais preexistentes preservados: `.zcodeignore` e `IDEA.md`.
-Decisões pendentes: agendador nativo em vez de rotinas do daemon; contrato de
-exportação/importação de Memory; preflight de criação sem downloads implícitos.
+Decisões pendentes: contrato de exportação/importação de Memory e preflight de
+criação de Spaces sem downloads implícitos. O recorte atual implementa o próximo
+passo autorizado (agendador), sem anunciar integração persistente CUA completa.
+
+## Relatório da implementação nativa (2026-10-09)
+
+Diff por pacote:
+
+- `internal/routines`: store privado, schedule diário, slots/intervalo persistidos,
+  driver do SessionManager, metadata sem prompt e testes offline/concorrrência.
+- `internal/sessions`: ScheduledBotID interno, admissão atômica por Bot,
+  consulta segura de status, bloqueio de cloud em turn agendado. Start comum
+  preserva resolução assíncrona. Nenhuma alteração em agentloop/model/policy/tools.
+- `internal/server`: CRUD de rotinas, validação JSON e referências para remoção.
+- `cmd/daimon`: store explícito e ownership/stop/join do scheduler no serve.
+- `ui`: painel em Atividade, PT-BR, recuperação da execução/approval existente,
+  testes de controles/metadata/escaping e assets embutidos regenerados.
+- `docs`, README e AGENTS: decisão aprovada, escopo, limites e evidência de execução.
+
+Resultados finais, em Linux real Docker `golang:1.27.1` sem rede:
+
+| Comando | Resultado |
+| --- | --- |
+| `gofmt -w .` | passou, sem alterações necessárias |
+| `gofmt -l .` | vazio |
+| `go vet ./...` | passou |
+| `go test -count=1 ./...` | passou |
+| `go test -race -count=1 ./...` | passou |
+| `go run ./cmd/daimon demo` | completed, DAIMON, 2 passos, 1 tool call |
+| `go build -o /tmp/daimon ./cmd/daimon` | passou |
+
+Resultados UI em Windows com fixtures locais, sem CUA real/credenciais:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | 72 testes em 15 arquivos passaram |
+| `npm run typecheck` | passou (executado pelo build) |
+| `npm run build` | passou, assets versionados atualizados |
+| `DAIMON_SMOKE_CHANNEL=msedge node scripts/smoke.mjs` | passou, incluindo criar/pausar/reload/excluir rotina |
+| `DAIMON_SMOKE_CHANNEL=msedge node scripts/approval-smoke.mjs` | passou, preview integral, allow/deny, reload, duas abas, abort/shutdown |
+| `git diff --check` | passou |
+
+Testes de regressão específicos incluem: rotina real com model fake local e
+read_file exigindo decisão Allow/Deny, nenhuma nova Session durante pendência,
+reserva do Bot contra outro turn, admissão de metadata, resolução assíncrona de
+Start normal, limites 4/32, intervalo após restart, Tick concorrente, slots
+consumidos em falha, cancelamento, JSON corrupto/versionado, symlinks reais Linux
+e modo 0600. Teste AST impede imports de execução CUA/processo e os identificadores
+agentStart/routineAdd/persistentAgentCreate/Send no código do agendador.
+
+Riscos para revisão: Manager mantém o limite existente de 128 Sessions retidas
+por processo no serve. Ao alcançar capacidade, disparo falha explicitamente;
+não há eviction, retries, retomada durável, catch-up offline ou exactly-once.
+Criar/pausar/excluir agenda não autoriza effects nem decide approvals. Horários
+dependem do relógio/timezone do servidor. CUA real, cua-driver Windows real,
+Space/Volume e Fleet permanecem não validados; nenhum smoke pago foi executado.

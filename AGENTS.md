@@ -1,5 +1,19 @@
 # DAIMON
 
+## Native Routines Foundation — escopo autorizado em 2026-10-09
+
+- Rotinas só agendam SessionManager.Start; nunca Space.agentStart, routineAdd ou
+  agentes persistentes/harnesses CUA. ToolPolicy, budget e aprovação por call intactos.
+- Agendador possui lifetime da aplicação e só funciona com servidor aberto, sem
+  catch-up de slots vencidos. Uma Session agendada reserva seu Bot; approval/startup/
+  cleanup bloqueiam novo disparo. Pausar rotina não decide aprovação nem aborta Session.
+- Store explícito/versionado limitado a 32 rotinas, 4 ativas/Bot, intervalo mínimo
+  de 15 minutos entre tentativas por Bot; horário diário e timezone IANA explícitos.
+- Cloud paga permanece bloqueada em rotina; escrita nativa permanece Linux-only
+  opt-in por processo e aprovação individual. Nenhuma permissão vem da agenda/Volume.
+- Memory/Volume controlado e associação Bot/Space continuam separados e pendentes;
+  não antecipar importação automática, comandos, retries ou agentes externos.
+
 Visão: plataforma local experimental Daimon Bots, sob controle do usuário,
 com runtime nativo provider-agnostic e contratos fortes de execução local.
 Escopo atual: Reliable Agent Loop + Execution Budget + OpenAI-compatible
