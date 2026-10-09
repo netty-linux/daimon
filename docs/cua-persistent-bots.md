@@ -248,3 +248,73 @@ não há eviction, retries, retomada durável, catch-up offline ou exactly-once.
 Criar/pausar/excluir agenda não autoriza effects nem decide approvals. Horários
 dependem do relógio/timezone do servidor. CUA real, cua-driver Windows real,
 Space/Volume e Fleet permanecem não validados; nenhum smoke pago foi executado.
+
+
+## Smoke CUA real no Windows — bloqueio de discovery
+
+Preparação executada após as validações offline, no Windows, com o DAIMON em
+`57bd5c22a1e1dbad1dee30a452cfe0daad9dc2c5` e CUA Driver oficial 0.34.0 x86_64.
+O ZIP foi conferido contra SHA256SUMS oficial
+(`F96CC1632BC88E6F268EAB745277C1FC302BB0F7D123E04373E35AFECAD6439F`);
+os três executáveis possuem assinatura Authenticode válida de Cua AI, Inc.
+O driver foi instalado fora do repositório, com telemetria desativada.
+
+Foi iniciado um daemon CUA em modo standard, sem bypass de aprovação, e um
+servidor DAIMON de smoke na porta 3001, com dados separados do servidor existente.
+O mcp.json usa executável absoluto, args exatos ["mcp"], computer_backend
+"cua-local" e classificação read para as quatro observações suportadas.
+Health e API de rotinas respondem, mas Computer informa startup_failed e MCP
+informa unavailable, sem capabilities disponíveis.
+
+O diagnóstico executou somente initialize e tools/list; nenhuma tools/call.
+O driver aceitou 2025-06-18, anunciou 59 ferramentas com nomes válidos e schemas
+object de até 4476 bytes. O catálogo padrão inclui descrições acima do limite
+existente de 1024 bytes de internal/mcp/tools.go: list_apps retorna 1478 bytes;
+get_window_state, 3636 bytes; click, 2866 bytes. Discovery rejeita integralmente
+o catálogo, inclusive por ferramentas que não foram selecionadas no Bot.
+Nenhum limite, contrato, política ou código foi alterado para contornar a falha.
+
+Não foram criados Bot, Thread ou rotina de smoke. Observação real, aprovação
+pela UI, ordem approval/action, bloqueio de novo disparo por pendência e reinício
+com slot vencido não foram executados. Portanto, o smoke end-to-end com CUA real
+no Windows permanece **bloqueado e não validado**. A instalação e o handshake
+real não equivalem à validação de uma ação aprovada. Space, Volume e Fleet
+continuam não executados nesta rodada.
+
+### Restrição oficial do catálogo encontrada — não aplicada
+
+A versão 0.34.0 oferece a variável CUA_DRIVER_POLICY_FILE e política YAML com
+allow.tools, deny.tools e allow.rules. A implementação determina a elegibilidade
+para tools/list pela política; ferramentas negadas ou sem caminho de allow são
+ocultadas. O teste tools_list_hides_policy_denied_tools_and_calls_stay_denied
+confirma que uma ferramenta explicitamente negada não é anunciada e continua
+negada na invocação. Exemplo de lista restrita, ainda não aplicado:
+
+```yaml
+allow:
+  tools: [list_windows]
+```
+
+```powershell
+$env:CUA_DRIVER_POLICY_FILE = 'C:\Users\01 Bigode\AppData\Local\DAIMON\smoke-cua-windows\policy.yaml'
+& 'C:\Users\01 Bigode\AppData\Local\DAIMON\tools\cua-driver\0.34.0\cua-driver-rs-0.34.0-windows-x86_64\cua-driver.exe' serve
+```
+
+Esse arquivo não foi criado e o comando acima não foi executado. O daemon
+existente não foi reconfigurado. Não foi encontrada uma flag direta de lista
+no subcomando mcp. A ajuda também apresenta --capability-manifest e
+--permission-mode bounded, mas essas opções são contratos de autorização;
+não foram usadas nem demonstradas como solução deste bloqueio de discovery.
+
+DAIMON não encaminha CUA_DRIVER_* ao subprocesso MCP e mcp.json não aceita env;
+a configuração acima pertence ao lançamento manual do daemon CUA, não ao
+mcp.json nem às permissões DAIMON. Uma política CUA não substitui ToolPolicy,
+budget ou aprovação individual. O catálogo filtrado não foi verificado no
+binário instalado neste Windows; sua compatibilidade permanece pendente.
+O código oficial também informa que erro ao carregar política pode manter o
+catálogo visível; não inferir filtragem bem-sucedida apenas da variável definida.
+
+Fontes oficiais, fixadas na versão instalada:
+- [policy.rs: variável e filtragem do catálogo](https://github.com/trycua/cua/blob/cua-driver-rs-v0.34.0/libs/cua-driver/rust/crates/cua-driver-core/src/policy.rs#L110).
+- [policy_tools_list_test.rs: teste de ferramentas ocultas e invocação negada](https://github.com/trycua/cua/blob/cua-driver-rs-v0.34.0/libs/cua-driver/rust/crates/cua-driver/tests/policy_tools_list_test.rs).
+- [cli.rs: opções de lançamento e manifesto](https://github.com/trycua/cua/blob/cua-driver-rs-v0.34.0/libs/cua-driver/rust/crates/cua-driver/src/cli.rs).
