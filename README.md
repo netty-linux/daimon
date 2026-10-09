@@ -1,5 +1,8 @@
 # DAIMON
 
+**CUA Persistent Bots:** auditoria concluída; integração pendente de decisões de contrato.
+Veja [auditoria e proposta](docs/cua-persistent-bots.md).
+
 DAIMON é a fundação experimental de um **Sovereign Personal Agent** em Go:
 execução sob controle do usuário e contratos independentes de provedor.
 **Ainda não é um agente pessoal pronto.**
