@@ -50,6 +50,12 @@ func (s *Server) requireNoScopedMemory(ctx context.Context, scope memory.Scope, 
 func (s *Server) deleteBot(ctx context.Context, id bots.ID) error {
 	s.referenceMu.Lock()
 	defer s.referenceMu.Unlock()
+	if s.deps.Routines != nil {
+		used, e := s.deps.Routines.HasReference(string(id), "")
+		if e != nil || used {
+			return errRoutineReference
+		}
+	}
 	if err := s.requireNoScopedMemory(ctx, memory.Bot, string(id)); err != nil {
 		return err
 	}

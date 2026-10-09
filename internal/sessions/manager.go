@@ -9,11 +9,14 @@ import (
 	"unicode/utf8"
 
 	"github.com/netty-linux/daimon/internal/agentloop"
+	"github.com/netty-linux/daimon/internal/bots"
 	"github.com/netty-linux/daimon/internal/model"
 	"github.com/netty-linux/daimon/internal/providers"
 )
 
 type state struct {
+	admissionBot   bots.ID
+	scheduled      bool
 	snapshot       Snapshot
 	binding        Binding
 	events         eventBuffer
@@ -81,6 +84,24 @@ func (m *Manager) Start(ctx context.Context, req StartRequest) (Snapshot, error)
 	if err := ctx.Err(); err != nil {
 		return Snapshot{}, &Error{Kind: Canceled, Cause: err}
 	}
+	// Preserve asynchronous Thread resolution for ordinary starts. Only the
+	// new scheduled admission or an existing scheduled lease needs this read.
+	needsIdentity := req.ScheduledBotID != ""
+	m.mu.Lock()
+	for _, id := range m.active {
+		if current := m.sessions[id]; current != nil && current.scheduled {
+			needsIdentity = true
+			break
+		}
+	}
+	m.mu.Unlock()
+	var admissionBot bots.ID
+	if needsIdentity {
+		admissionBot = m.admissionBot(req.ThreadID)
+	}
+	if req.ScheduledBotID != "" && (admissionBot == "" || admissionBot != req.ScheduledBotID) {
+		return Snapshot{}, &Error{Kind: ThreadResolution}
+	}
 	m.mu.Lock()
 	if m.closed {
 		m.mu.Unlock()
@@ -94,6 +115,21 @@ func (m *Manager) Start(ctx context.Context, req StartRequest) (Snapshot, error)
 		m.mu.Unlock()
 		return Snapshot{}, &Error{Kind: ThreadBusy}
 	}
+	for _, activeID := range m.active {
+		current := m.sessions[activeID]
+		if current == nil {
+			if req.ScheduledBotID != "" {
+				m.mu.Unlock()
+				return Snapshot{}, &Error{Kind: ThreadBusy}
+			}
+			continue
+		}
+		if (req.ScheduledBotID != "" && (current.admissionBot == "" || current.admissionBot == admissionBot)) ||
+			(current.scheduled && (admissionBot == "" || current.admissionBot == admissionBot)) {
+			m.mu.Unlock()
+			return Snapshot{}, &Error{Kind: ThreadBusy}
+		}
+	}
 	if len(m.sessions) >= m.options.MaxSessions {
 		m.mu.Unlock()
 		return Snapshot{}, &Error{Kind: Capacity}
@@ -101,6 +137,7 @@ func (m *Manager) Start(ctx context.Context, req StartRequest) (Snapshot, error)
 	runCtx, cancel := context.WithCancelCause(ctx)
 	s := &state{snapshot: Snapshot{ID: req.SessionID, ThreadID: req.ThreadID, Status: Created, StartedAt: nowUTC()},
 		events: eventBuffer{items: make([]Event, m.options.EventCapacity)}, cancel: cancel, done: make(chan struct{}), changed: make(chan struct{})}
+	s.admissionBot, s.scheduled = admissionBot, req.ScheduledBotID != ""
 	m.sessions[req.SessionID] = s
 	m.active[string(req.ThreadID)] = req.SessionID
 	initial := s.snapshot

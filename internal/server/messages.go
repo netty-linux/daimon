@@ -23,6 +23,12 @@ type idleThreadGuard interface {
 func (s *Server) deleteThread(ctx context.Context, id threads.ID) error {
 	s.referenceMu.Lock()
 	defer s.referenceMu.Unlock()
+	if s.deps.Routines != nil {
+		used, e := s.deps.Routines.HasReference("", string(id))
+		if e != nil || used {
+			return errRoutineReference
+		}
+	}
 	if err := s.requireNoScopedMemory(ctx, memory.Thread, string(id)); err != nil {
 		return err
 	}

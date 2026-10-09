@@ -133,10 +133,13 @@ type Snapshot struct {
 }
 
 type StartRequest struct {
-	SessionID ID
-	ThreadID  threads.ID
-	Message   string
-	MessageID conversations.ID
+	// ScheduledBotID requests atomic Bot-wide admission for a native routine.
+	// It is internal application intent, never an HTTP Session field.
+	ScheduledBotID bots.ID
+	SessionID      ID
+	ThreadID       threads.ID
+	Message        string
+	MessageID      conversations.ID
 	// Exposure only: one-shot full preview approval remains mandatory.
 	EnableReplaceFile, EnableCreateFile bool
 }

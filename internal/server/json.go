@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/netty-linux/daimon/internal/computer"
 	"github.com/netty-linux/daimon/internal/memory"
+	"github.com/netty-linux/daimon/internal/routines"
 	"github.com/netty-linux/daimon/internal/sandbox"
 	"io"
 	"mime"
@@ -47,6 +48,15 @@ func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
 		value, err := memory.DecodeInput(data)
 		if err != nil {
 			failure(w, 400, "invalid_memory")
+			return false
+		}
+		*input = value
+		return true
+	}
+	if input, ok := dst.(*routines.Input); ok {
+		value, e := routines.DecodeInput(data)
+		if e != nil {
+			failure(w, 400, "invalid_routine")
 			return false
 		}
 		*input = value
@@ -98,6 +108,10 @@ func strictObject(data []byte, keys map[string]bool) bool {
 				return false
 			}
 		case string:
+		case bool:
+			if key != "enabled" {
+				return false
+			}
 		case []any:
 			for _, item := range v {
 				if _, ok := item.(string); !ok {

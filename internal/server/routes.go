@@ -64,6 +64,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	allow := ""
 	switch resource {
+	case "routines":
+		if len(p) == 3 {
+			allow = "GET, POST"
+		} else if len(p) == 4 {
+			allow = "PUT, DELETE"
+		}
 	case "sandboxes":
 		if len(p) == 3 || len(p) == 4 {
 			allow = "GET"
@@ -147,6 +153,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if resource == "sandboxes" {
 		s.sandboxes(w, r, id)
+		return
+	}
+	if resource == "routines" {
+		s.routines(w, r, id)
 		return
 	}
 	if resource == "computers" {
@@ -257,6 +267,10 @@ func (s *Server) bots(w http.ResponseWriter, r *http.Request, id bots.ID) {
 		respond(w, status, viewBot(b))
 	case "DELETE":
 		if err := s.deleteBot(r.Context(), id); err != nil {
+			if errors.Is(err, errRoutineReference) {
+				failure(w, 409, "resource_has_routines")
+				return
+			}
 			if errors.Is(err, errScopedMemory) {
 				failure(w, 409, "bot_has_memories")
 				return
@@ -313,6 +327,10 @@ func (s *Server) threads(w http.ResponseWriter, r *http.Request, id threads.ID) 
 		respond(w, status, viewThread(t))
 	case "DELETE":
 		if err := s.deleteThread(r.Context(), id); err != nil {
+			if errors.Is(err, errRoutineReference) {
+				failure(w, 409, "resource_has_routines")
+				return
+			}
 			if errors.Is(err, errThreadEnvironment) {
 				failure(w, 409, "thread_has_environment")
 				return

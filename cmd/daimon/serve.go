@@ -13,6 +13,7 @@ import (
 	"github.com/netty-linux/daimon/internal/mcp"
 	"github.com/netty-linux/daimon/internal/memory"
 	"github.com/netty-linux/daimon/internal/providers"
+	"github.com/netty-linux/daimon/internal/routines"
 	"github.com/netty-linux/daimon/internal/sandbox"
 	"github.com/netty-linux/daimon/internal/server"
 	"github.com/netty-linux/daimon/internal/sessions"
@@ -252,6 +253,14 @@ func serveApplication(ctx context.Context, args []string, out io.Writer, getenv 
 		return errServe
 	}
 	managerClosed := false
+	routineStore, err := routines.Open(filepath.Join(dir, "routines.json"))
+	if err != nil {
+		return errServe
+	}
+	scheduler, err := routines.New(routineStore, manager, sharedThreads, sharedBots, *replace, *create)
+	if err != nil {
+		return errServe
+	}
 	defer func() {
 		if managerClosed {
 			return
@@ -260,7 +269,7 @@ func serveApplication(ctx context.Context, args []string, out io.Writer, getenv 
 		defer end()
 		_ = manager.Close(closeCtx)
 	}()
-	httpServer, err := server.New(server.Dependencies{Environments: environmentStore, Bots: sharedBots, Threads: sharedThreads, Providers: registry, Sessions: manager, SessionContext: sessionCtx, Conversations: conversationStore, EnableReplaceFile: *replace, EnableCreateFile: *create, MCP: mcpManager, Computers: computers, Sandboxes: sandboxes, Memory: memoryStore})
+	httpServer, err := server.New(server.Dependencies{Routines: scheduler, Environments: environmentStore, Bots: sharedBots, Threads: sharedThreads, Providers: registry, Sessions: manager, SessionContext: sessionCtx, Conversations: conversationStore, EnableReplaceFile: *replace, EnableCreateFile: *create, MCP: mcpManager, Computers: computers, Sandboxes: sandboxes, Memory: memoryStore})
 	if err != nil {
 		return errServe
 	}
@@ -269,6 +278,16 @@ func serveApplication(ctx context.Context, args []string, out io.Writer, getenv 
 		return errServe
 	}
 	defer listener.Close()
+	routineCtx, stopRoutines := context.WithCancel(sessionCtx)
+	routineDone := make(chan error, 1)
+	go func() { routineDone <- scheduler.Run(routineCtx) }()
+	routinesJoined := false
+	defer func() {
+		stopRoutines()
+		if !routinesJoined {
+			<-routineDone
+		}
+	}()
 	done := make(chan error, 1)
 	go func() { done <- httpServer.Serve(listener) }()
 	if _, err := fmt.Fprintf(out, "DAIMON local HTTP: http://%s/\n", listener.Addr().String()); err != nil {
@@ -283,14 +302,27 @@ func serveApplication(ctx context.Context, args []string, out io.Writer, getenv 
 		}
 		return nil
 	case <-ctx.Done():
+	case <-routineDone:
+		routinesJoined = true
+		_ = httpServer.Close()
+		<-done
+		return errServe
 	}
 	shutdownCtx, end := context.WithTimeout(context.Background(), serveShutdownTimeout)
 	defer end()
+	stopRoutines()
 	httpErr := httpServer.Shutdown(shutdownCtx)
 	if httpErr != nil {
 		_ = httpServer.Close()
 	}
 	serveErr := <-done
+	var routineErr error
+	select {
+	case routineErr = <-routineDone:
+	case <-shutdownCtx.Done():
+		routineErr = errServe
+	}
+	routinesJoined = true
 	// Same explicit overall deadline bounds HTTP draining plus Manager joining.
 	mediaErr := computers.StopMedia(shutdownCtx)
 	managerErr := manager.Close(shutdownCtx)
@@ -299,7 +331,7 @@ func serveApplication(ctx context.Context, args []string, out io.Writer, getenv 
 	sandboxErr := sandboxes.Close(shutdownCtx)
 	computerErr := computers.Close(shutdownCtx)
 	mcpErr := mcpManager.Close(shutdownCtx)
-	if httpErr != nil || serveErr != nil || mediaErr != nil || managerErr != nil || sandboxErr != nil || computerErr != nil || mcpErr != nil {
+	if routineErr != nil || httpErr != nil || serveErr != nil || mediaErr != nil || managerErr != nil || sandboxErr != nil || computerErr != nil || mcpErr != nil {
 		return errServe
 	}
 	return nil
