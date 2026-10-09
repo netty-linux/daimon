@@ -2,6 +2,7 @@ import {Icon} from './design/Icon';
 import { copy } from './i18n/copy';
 
 import {EnvironmentPanel} from './components/EnvironmentPanel';
+import {RoutinePanel} from './components/RoutinePanel';
 import { useEffect, useState } from 'react';
 import { api, safeError } from './api/client';
 import { bytes, eventLabels, newID, terminal, type Bot, type ProviderSummary, type SessionSnapshot, type SessionStatus, type Thread } from './api/types';
@@ -151,7 +152,7 @@ export function App() {
             {tab==='computer'&&<div className="feature-surface"><ComputerViewer computerID={computerID} onNotice={setToast}/>{bot?.sandbox_profile&&!active&&<p className="hint">{copy["O computador isolado é preparado ao enviar uma tarefa."]}</p>}<details><summary>{pt.details}</summary><p>{bot?.sandbox_profile?.placement==='cloud'?copy["Nuvem"]:bot?.sandbox_profile?'Isolado local':bot?.computer_profile?.enabled?'Computador local':'Desativado'}</p><button onClick={()=>openSettings('computer')}>{pt.settings}</button></details></div>}
             {tab==='files'&&<div className="feature-surface">{thread?<EnvironmentPanel key={thread.id} threadID={thread.id} active={active} sandboxEnabled={!!bot?.sandbox_profile} snapshot={snapshot} cloud={bot?.sandbox_profile?.placement==='cloud'} onNotice={setToast}/>:<p className="empty">{pt.chooseHint}</p>}</div>}
             {tab==='memory'&&<MemoryPanel bots={bots} threads={threads} threadID={thread?.id} botID={bot?.id} inline onNotice={setToast} onClose={()=>changeTab('chat')}/>}
-            {tab==='activity'&&<Activity events={stream.events} snapshot={snapshot}/>}
+            {tab==='activity'&&<><RoutinePanel botID={bot?.id} threads={threads} onOpen={(target,id)=>{selectThread(target);void api.session(id).then(snapshot=>setRuns(r=>({...r,[target]:{snapshot,message:''}}))).catch(e=>setRunError(safeError(e)));}}/><Activity events={stream.events} snapshot={snapshot}/></>}
           </div>}
         <ApprovalPanel snapshot={snapshot} onAbort={()=>void abort()}/>
         {!settings&&tab==='chat'&&<>

@@ -48,7 +48,7 @@ export interface StreamEnd { status: 'completed' | 'failed' | 'aborted'; last_se
 export interface APIErrorEnvelope { error: { code: string; message: string } }
 export const terminal = (status: SessionStatus) => ['completed', 'failed', 'aborted'].includes(status);
 export const bytes = (text: string) => new TextEncoder().encode(text).length;
-export const newID = (kind: 'bot' | 'thread' | 'session' | 'message' | 'memory') => `${kind}-${crypto.randomUUID()}`;
+export const newID = (kind: 'bot' | 'thread' | 'session' | 'message' | 'memory' | 'routine') => `${kind}-${crypto.randomUUID()}`;
 export interface ConversationMessage {
   id: string; thread_id: string; sequence: number; role: 'user' | 'assistant';
   content: string; created_at: string; session_id: string;

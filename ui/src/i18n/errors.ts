@@ -1,4 +1,6 @@
 export const errorMessages: Record<string, string> = {
+  invalid_routine: 'Confira os dados e limites da rotina; computadores pagos na nuvem exigem execução manual.',
+  resource_has_routines: 'Exclua as rotinas vinculadas antes de excluir este recurso.',
   environment_unavailable: 'O ambiente desta conversa está indisponível.', environment_not_found: 'Nenhum ambiente foi ativado.',
   environment_exists: 'Esta conversa já tem um ambiente.', environment_busy: 'Os arquivos estão em uso.',
   invalid_environment: 'Não foi possível processar o pedido de ambiente.', thread_has_environment: 'Exclua o ambiente em Arquivos antes de excluir esta conversa.',
