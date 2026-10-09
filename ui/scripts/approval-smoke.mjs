@@ -85,6 +85,16 @@ try {
     console.log('MCP browser smoke passed: discovery, selection, approval, denial, persistent history and process shutdown.');
   } else {
   await send('Read allow'); assert.equal(await page.getByText('READ-MARKER', { exact: true }).count(), 0);
+  // Pen frame 16: dismiss only the display, keep server approval pending.
+  const beforeReview = await pending();
+  await page.getByRole('button',{name:'Fechar diálogo',exact:true}).click();
+  await page.getByRole('heading',{name:'Aprovação pendente',exact:true}).waitFor();
+  assert.equal(await page.getByLabel('Mensagem',{exact:true}).isDisabled(),true);
+  assert.equal((await pending()).id,beforeReview.id);
+  assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);
+  await page.getByRole('button',{name:'Revisar ação pendente',exact:true}).click();
+  await page.getByRole('heading',{name:'Ação requer sua aprovação',exact:true}).waitFor();
+
   assert.equal(await page.locator('.approval-target').innerText(), '"read.txt"');
   await decide("Permitir uma vez"); await page.getByText('Read allowed', { exact: true }).first().waitFor();
   await send('Read deny'); await decide("Negar"); await page.getByText('Read denied', { exact: true }).waitFor();

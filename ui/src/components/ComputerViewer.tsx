@@ -1,3 +1,4 @@
+import { penCopy } from '../i18n/pen';
 import {label} from '../i18n/pt-BR';
 import { copy } from '../i18n/copy';
 import { useEffect, useRef, useState } from 'react';
@@ -38,7 +39,7 @@ export function ComputerViewer({computerID,onNotice}:{computerID?:string;onNotic
  const point=(e:{clientX:number;clientY:number})=>{const b=canvas.current!.getBoundingClientRect();return {x_normalized:Math.max(0,Math.min(1,(e.clientX-b.left)/Math.max(1,b.width))),y_normalized:Math.max(0,Math.min(1,(e.clientY-b.top)/Math.max(1,b.height)))}};
  const mine=controlling&&state?.controller_view_id===view.current?.id&&state?.owner==='human_control';
  return <section className="computer-viewer" aria-label={copy["Computer viewer"]}><header><h3>{copy["Computer"]}</h3><p role="status">{label(status)} · {mine?copy["Human in control"]:state?.owner==='human_control'?copy["Human in control in another viewer"]:state?.owner==='agent_control'?copy["Agent in control"]:state?.owner==='transitioning'?copy["Transferring control"]:copy["View only"]}</p></header>
-  {!computerID?<p>{copy["This Bot has no Computer enabled."]}</p>:state?.available===false?<p>{copy["Computer actions available when the Driver is connected. Live view unavailable."]}</p>:null}
+  {!computerID?<p>{copy["This Bot has no Computer enabled."]}</p>:state?.available===false?<div className="computer-unavailable"><h3>{penCopy.unavailable}</h3><p>{penCopy.unavailableHint}</p><p>{copy["Computer actions available when the Driver is connected. Live view unavailable."]}</p><span>{penCopy.controlUnavailable}</span></div>:null}
   {error&&<p role="alert">{error}</p>}
   <canvas hidden={!computerID||state?.available===false} ref={canvas} width={640} height={360} tabIndex={mine?0:-1} aria-label={mine?copy["Computer desktop — human input enabled"]:copy["Computer desktop — view only"]} className={mine?'human-input':''}
    onClick={e=>{if(!mine)return;canvas.current?.focus();const at=point(e),button='left';input({kind:'pointer',phase:'down',button,...at,modifiers:modifiers(e)});input({kind:'pointer',phase:'up',button,...at,modifiers:modifiers(e)})}}

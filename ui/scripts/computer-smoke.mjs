@@ -20,12 +20,18 @@ try{
  page.on('pageerror',e=>pageErrors.push(e.message));page.on('request',r=>{if(!r.url().startsWith(base))external.push(r.url())});
  await page.goto(base);await page.getByText("Crie seu primeiro bot").waitFor();await page.locator(".topbar").getByRole("button",{name:"Configurações",exact:true}).click();await page.getByRole("tab",{name:"Computador",exact:true}).click();await page.getByText("Conexão e recursos do computador",{exact:true}).click();
  await page.getByText(missing?"Instalação ausente":"Disponível",{exact:true}).waitFor();
- assert.equal(await page.locator('canvas,img,video').count(),0);await page.getByRole('button',{name:'Fechar',exact:true}).click();
+ assert.equal(await page.locator('canvas,video,.computer-viewer img').count(),0);await page.getByRole('button',{name:'Fechar',exact:true}).click();
  await page.getByRole('button',{name:"Novo bot",exact:true}).click();await page.getByLabel("Nome",{exact:true}).fill('Computer Bot');await page.getByLabel("Instruções",{exact:true}).fill('Offline controlled computer fixture.');await page.getByRole("tab",{name:"Modelo",exact:true}).click(); await page.getByLabel("Provedor",{exact:true}).selectOption('fixture');await page.getByRole("textbox",{name:"Modelo",exact:true}).fill('offline');await page.getByRole("dialog").getByRole("tab",{name:"Computador",exact:true}).click(); await page.getByLabel("Ativar computador",{exact:true}).check();
  if(!missing){for(const tool of ['list_apps','click','type_text'])await page.getByRole('checkbox',{name:new RegExp('^mcp__cua__'+tool+' ')}).check();assert.equal(await page.getByRole('checkbox',{name:/^mcp__cua__future_untrusted/}).isDisabled(),true)}
  await page.getByRole('button',{name:"Salvar bot",exact:true}).click();await page.locator(".console-heading h2").waitFor();
  await page.getByRole('button',{name:"Nova conversa",exact:true}).click();await page.getByLabel("Título",{exact:true}).fill('Computer A');await page.getByLabel("Pasta local",{exact:true}).fill('/fixture/workspace');await page.getByRole('button',{name:"Salvar conversa",exact:true}).click();
  await page.waitForURL(url=>new URLSearchParams(url.hash.slice(1)).has('thread'));
+ // Pen frame 15: real server metadata fixture, deliberately no media service.
+ await page.getByRole('heading',{name:'Visualização indisponível',exact:true}).waitFor();
+ assert.equal(await page.getByRole('button',{name:'Assumir controle',exact:true}).isDisabled(),true);
+ assert.equal(await page.locator('.computer-companion canvas:visible').count(),0);
+ assert.equal(await page.getByLabel('Mensagem',{exact:true}).isEnabled(),true);
+
  const thread=new URLSearchParams(new URL(page.url()).hash.slice(1)).get('thread');
  const pending=async()=>{const active=await(await page.request.get(base+`api/v1/threads/${thread}/session`)).json();return(await(await page.request.get(base+`api/v1/sessions/${active.session.id}/approval`)).json()).approval};
  const send=async text=>{await page.getByLabel("Mensagem",{exact:true}).fill(text);await page.getByRole('button',{name:"Enviar",exact:true}).click();if(!missing){await page.getByRole('heading',{name:"Ação requer sua aprovação"}).waitFor();return await pending()}};
