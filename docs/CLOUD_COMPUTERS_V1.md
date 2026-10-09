@@ -172,7 +172,7 @@ Validated on 2026-10-08:
 No paid claim, actual desktop, credentials, external provider or real Fleet smoke
 was used. Actual CUA authentication/provisioning/media/account behavior remains
 unverified. **real CUA Fleet not validated**.
-Next recommended phase: Phase 17 — Background Tasks + Long-Running Agent Runs.
+Phase 17 — Background Tasks: parte Native Routines Foundation implementada (escopo restrito); próximo passo é a validação com CUA real.
 
 ## Files created
 
@@ -220,5 +220,5 @@ API (inode/device/hard-link count). Fixed executable/code/arguments; no user/mod
 command strings, shell, arbitrary command tool, stdin or content transfer. Structured
 bounded output, timeout and cancellation/kill-on-disconnect are required. Unsupported
 or unproven metadata fails closed. All content transfer uses FilesystemService.
-No paid CUA smoke, installation or login is automatic. Phase 17 Background Tasks +
-Long-Running Agent Runs, Intelligent Memory, Subagents and External Agents stay deferred.
+No paid CUA smoke, installation or login is automatic. Phase 17 — Background Tasks: parte Native Routines Foundation implementada; execução autônoma longa e runs em background fora do servidor continuam adiados.
+Intelligent Memory, Subagents and External Agents stay deferred.

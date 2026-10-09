@@ -189,7 +189,7 @@ is opt-in only; do not login, install, provision or spend automatically.
 Storage is local plaintext without secret detection. Persist files only, not
 processes/VM state. Defer import/export, live sync, mounts, NFS/SMB/FUSE, warm pools,
 Cua Volume, revision browser, background/scheduled work, collaboration, automatic
-Git, Intelligent Memory, Subagents and External Agents. Next: Phase 17 Background
+Git, Intelligent Memory, Subagents and External Agents. (histórico) Next: Phase 17 Background
 Tasks + Long-Running Agent Runs, requiring its own explicit scope.
 
 Planned source areas: internal/environments; scoped transfer in internal/sandbox;

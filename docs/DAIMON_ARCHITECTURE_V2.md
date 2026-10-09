@@ -606,7 +606,7 @@ of complete messages within byte/count limits and keeps stored records intact.
 No tokenizer, summarization, tool replay or advanced agents; manual Memory is separate. Web Approval and MCP are separate additions in Phases 9 and 10.
 Offline tests and local fake-provider browser smoke cover reload/restart/multi-turn
 continuity, bounded context, concurrency, failure semantics and content privacy.
-Phase 10 MCP is implemented separately below; Phases 14/15 are implemented below; Phase 16 is implemented below; next recommended is Phase 17 — Background Tasks.
+Phase 10 MCP is implemented separately below; Phases 14/15 are implemented below; Phase 16 is implemented below; Phase 17 — Background Tasks: parte Native Routines Foundation implementada (escopo restrito); próximo passo é a validação com CUA real.
 
 
 ## Phase 9 Web Approval
@@ -636,7 +636,7 @@ Bot names → Session capability resolution → per-run Tool Registry
 
 The application owns the MCP Manager and validated local configuration. Discovery builds a bounded private catalog; Session resolution freezes an exact eligible intersection. Only explicitly classified read tools can request human approval. Write/other/unclassified entries fail closed; native process write flags do not change MCP policy. The server exposes readonly metadata, React displays/selects names, and the existing ApprovalProvider binds the human decision to the original call. Neither browser nor protocol metadata grants authority. Loop, model, provider, Registry and persistence contracts remain unchanged.
 
-Close HTTP, then join Sessions, then close/join MCP clients/processes. Malformed protocol, timeout or crash retires only that server without restart. Environment is explicit and excludes provider secrets; no sandbox guarantee. See [MCP v1](MCP_V1.md) for strict configuration, selected 2025-11-25 profile, protocol/result limits, deliberate displays, process lifecycle, offline validation and limitations. Phases 14/15 are implemented below. Phase 16 is implemented below; Next: Phase 17 Background Tasks (deferred).
+Close HTTP, then join Sessions, then close/join MCP clients/processes. Malformed protocol, timeout or crash retires only that server without restart. Environment is explicit and excludes provider secrets; no sandbox guarantee. See [MCP v1](MCP_V1.md) for strict configuration, selected 2025-11-25 profile, protocol/result limits, deliberate displays, process lifecycle, offline validation and limitations. Phases 14/15 are implemented below. Phase 16 is implemented below; Phase 17 — Background Tasks: parte Native Routines Foundation implementada (escopo restrito); próximo passo é a validação com CUA real.
 
 ## Phase 11 Memory Foundation
 
@@ -733,7 +733,7 @@ Linux gVisor guest → existing Sandbox Computer adapter/ComputerManager → fro
 Session binding. Model and AgentLoop do not select destinations. Explicit cloud
 profiles, quota/TTL, private gateway media and exact owned-reference recovery
 preserve the existing authorization boundary. See [Cloud Computers](CLOUD_COMPUTERS_V1.md).
-Phase 16 is implemented below; Next: Phase 17 Background Tasks, intentionally deferred.
+Phase 16 is implemented below; Phase 17 — Background Tasks: parte Native Routines Foundation implementada (escopo restrito); próximo passo é a validação com CUA real.
 
 
 ## Persistent Environments — Phase 16
@@ -752,5 +752,5 @@ API (inode/device/hard-link count). Fixed executable/code/arguments; no user/mod
 command strings, shell, arbitrary command tool, stdin or content transfer. Structured
 bounded output, timeout and cancellation/kill-on-disconnect are required. Unsupported
 or unproven metadata fails closed. All content transfer uses FilesystemService.
-No paid CUA smoke, installation or login is automatic. Phase 17 Background Tasks +
-Long-Running Agent Runs, Intelligent Memory, Subagents and External Agents stay deferred.
+No paid CUA smoke, installation or login is automatic. Phase 17 — Background Tasks: parte Native Routines Foundation implementada; execução autônoma longa e runs em background fora do servidor continuam adiados.
+Intelligent Memory, Subagents and External Agents stay deferred.
