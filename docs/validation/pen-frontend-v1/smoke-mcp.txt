@@ -1,0 +1,5 @@
+
+> daimon-ui@0.1.0 smoke:mcp
+> node scripts/approval-smoke.mjs --mcp
+
+MCP browser smoke passed: discovery, selection, approval, denial, persistent history and process shutdown.

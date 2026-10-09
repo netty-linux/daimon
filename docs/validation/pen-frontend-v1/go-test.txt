@@ -1,0 +1,31 @@
+ok  	github.com/netty-linux/daimon/cmd/daimon	115.441s
+ok  	github.com/netty-linux/daimon/internal/agentloop	4.203s
+ok  	github.com/netty-linux/daimon/internal/bots	0.454s
+ok  	github.com/netty-linux/daimon/internal/computer	4.449s
+?   	github.com/netty-linux/daimon/internal/computer/mediatest	[no test files]
+ok  	github.com/netty-linux/daimon/internal/computer/socket	0.031s
+ok  	github.com/netty-linux/daimon/internal/conversations	1.766s
+ok  	github.com/netty-linux/daimon/internal/createcontract	0.224s
+ok  	github.com/netty-linux/daimon/internal/diffview	0.021s
+ok  	github.com/netty-linux/daimon/internal/editcontract	0.398s
+ok  	github.com/netty-linux/daimon/internal/environments	3.194s
+ok  	github.com/netty-linux/daimon/internal/managedworkspace	149.306s
+ok  	github.com/netty-linux/daimon/internal/mcp	0.662s
+?   	github.com/netty-linux/daimon/internal/mcp/cuatest	[no test files]
+?   	github.com/netty-linux/daimon/internal/mcp/mcptest	[no test files]
+ok  	github.com/netty-linux/daimon/internal/memory	1.746s
+ok  	github.com/netty-linux/daimon/internal/model	0.004s
+ok  	github.com/netty-linux/daimon/internal/policy	0.039s
+ok  	github.com/netty-linux/daimon/internal/providers	0.022s
+ok  	github.com/netty-linux/daimon/internal/providers/groq	0.020s
+ok  	github.com/netty-linux/daimon/internal/providers/openai	0.196s
+ok  	github.com/netty-linux/daimon/internal/routines	1.219s
+ok  	github.com/netty-linux/daimon/internal/sandbox	5.102s
+ok  	github.com/netty-linux/daimon/internal/server	6.626s
+ok  	github.com/netty-linux/daimon/internal/sessions	6.886s
+ok  	github.com/netty-linux/daimon/internal/threads	0.335s
+ok  	github.com/netty-linux/daimon/internal/tools	0.031s
+ok  	github.com/netty-linux/daimon/internal/workspacefs	0.018s
+ok  	github.com/netty-linux/daimon/internal/workspacejournal	0.006s
+ok  	github.com/netty-linux/daimon/internal/workspaceplan	0.007s
+?   	github.com/netty-linux/daimon/ui/scripts/cua-fixture	[no test files]

@@ -1,0 +1,16 @@
+Resposta final: DAIMON
+Passos do modelo: 2
+Chamadas de ferramenta: 1
+Resultados truncados: 0
+Motivo de parada: completed
+Eventos:
+  loop_started (step=0, tool=0, stop_reason=)
+  model_requested (step=1, tool=0, stop_reason=)
+  model_responded (step=1, tool=0, stop_reason=)
+  tool_allowed (step=1, tool=1, stop_reason=)
+  tool_requested (step=1, tool=1, stop_reason=)
+  tool_completed (step=1, tool=1, stop_reason=)
+  model_requested (step=2, tool=0, stop_reason=)
+  model_responded (step=2, tool=0, stop_reason=)
+  final_answer (step=2, tool=0, stop_reason=)
+  loop_stopped (step=2, tool=0, stop_reason=completed)

@@ -1,0 +1,17 @@
+
+> daimon-ui@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.3 D:/Nullysh.DEV/PROGRAMAÇÃO/daimon-agent-personal/ui
+
+
+ Test Files  15 passed (15)
+      Tests  75 passed (75)
+   Start at  19:01:43
+   Duration  11.21s (environment 49%, tests 25%, import 14%, transform 12%)
+
+Environment  jsdom was created 15 times · 30.09s total, 49% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+
