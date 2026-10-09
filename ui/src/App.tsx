@@ -1,4 +1,5 @@
 import {Icon} from './design/Icon';
+import wordmark from './design/assets/x6AmZ.png';
 import { copy } from './i18n/copy';
 
 import {EnvironmentPanel} from './components/EnvironmentPanel';
@@ -15,7 +16,8 @@ import {MemoryPanel} from './components/MemoryPanel';
 
 import { ComputerViewer } from './components/ComputerViewer';
 import { pt, statusLabels, resolutionMessages } from './i18n/pt-BR';
-import { BotNavigation, ConversationNavigation } from './features/navigation/Navigation';
+import { WorkspaceNavigation } from './features/navigation/WorkspaceNavigation';
+import { penCopy } from './i18n/pen';
 import { Chat, Composer } from './features/chat/Chat';
 import { Activity } from './features/activity/Activity';
 import { Settings, type SettingsSection } from './features/settings/Settings';
@@ -126,29 +128,29 @@ export function App() {
   const computerID=bot?.sandbox_profile ? (active?snapshot?.computer?.id:undefined) : active?snapshot?.computer?.id:bot?.computer_profile?.enabled?bot.computer_profile.mcp_server_id:undefined;
   const failure=snapshot?.error_category ? resolutionMessages[snapshot.error_category]??pt.failed : '';
   return <div className={'app-shell'+(botsCollapsed?' bots-collapsed':'')+(conversationsCollapsed?' conversations-collapsed':'')}>
-    <header className="topbar"><div className="brand"><span className="brand-mark" aria-hidden="true">◇</span><strong>{copy["DAIMON"]}</strong></div>
+    <header className="topbar"><div className="brand"><img className="brand-wordmark" src={wordmark} alt={copy["DAIMON"]}/></div>
       <div className="navigation-toggles"><button className="icon-button" aria-label={botsCollapsed?pt.expandBots:pt.collapseBots} aria-expanded={!botsCollapsed} onClick={()=>setBotsCollapsed(v=>!v)}><Icon name="menu"/></button>
         <button className="icon-button" aria-label={conversationsCollapsed?pt.expandConversations:pt.collapseConversations} aria-expanded={!conversationsCollapsed} onClick={()=>setConversationsCollapsed(v=>!v)}><Icon name="conversations"/></button></div>
       <span className="server-state">{copy["● Execução local"]}</span><button className="icon-button" aria-label={pt.settings} onClick={()=>openSettings()}><Icon name="settings"/></button>
     </header>
     <main className="workspace">
-      {!botsCollapsed&&<BotNavigation bots={bots} selected={botID} loading={loading} error={botError} canCreate={!loading&&!providerError&&providers.length>0}
-        onSelect={selectBot} onCreate={()=>setEditor({kind:'bot'})} onSettings={()=>openSettings()} onMemory={()=>changeTab('memory')} onComputers={()=>openSettings('computer')} onEdit={bot=>setEditor({kind:'bot',bot})} onDelete={bot=>chooseDelete('bot',bot.id,bot.name)}/>}
-      {!conversationsCollapsed&&<ConversationNavigation threads={threads} bot={bot} selected={thread?.id??''} loading={loading} error={threadError}
-        onSelect={selectThread} onCreate={()=>setEditor({kind:'thread'})} onEdit={thread=>setEditor({kind:'thread',thread})} onDelete={thread=>chooseDelete('thread',thread.id,thread.title||pt.unnamed)}/>}
+      {!(botsCollapsed&&conversationsCollapsed)&&<WorkspaceNavigation hideBots={botsCollapsed} hideConversations={conversationsCollapsed} bots={{bots,selected:botID,loading,error:botError,canCreate:!loading&&!providerError&&providers.length>0,
+        onSelect:selectBot,onCreate:()=>setEditor({kind:'bot'}),onSettings:()=>openSettings(),onMemory:()=>changeTab('memory'),onComputers:()=>openSettings('computer'),onEdit:bot=>setEditor({kind:'bot',bot}),onDelete:bot=>chooseDelete('bot',bot.id,bot.name)}}
+        conversations={{threads,bot,selected:thread?.id??'',loading,error:threadError,onSelect:selectThread,onCreate:()=>setEditor({kind:'thread'}),onEdit:thread=>setEditor({kind:'thread',thread}),onDelete:thread=>chooseDelete('thread',thread.id,thread.title||pt.unnamed)}}/>}
       <section className="console" aria-label={pt.chat}>
         <header className="console-heading"><div><h2>{bot?.name??copy["DAIMON"]}</h2><p>{thread?.title??pt.welcomeText}</p></div>
           <div className="header-actions">{snapshot?<StatusBadge status={snapshot.status}/>:<span className="badge">● {pt.available}</span>}
-            {bot&&<details className="header-menu"><summary aria-label={copy["Ações do bot"]}><Icon name="more"/></summary><div><button onClick={()=>setEditor({kind:'bot',bot})}>{pt.editBot}</button><button onClick={()=>setEditor({kind:'thread'})}>{pt.newConversation}</button><button onClick={()=>openSettings()}>{pt.settings}</button><button className="danger-text" onClick={()=>chooseDelete('bot',bot.id,bot.name)}>{pt.deleteBot}</button></div></details>}
+            {bot&&<details className="header-menu"><summary aria-label={copy["Ações do bot"]}><Icon name="more"/></summary><div><button onClick={event=>{event.currentTarget.closest('details')?.removeAttribute('open');setEditor({kind:'bot',bot});}}>{pt.editBot}</button><button onClick={event=>{event.currentTarget.closest('details')?.removeAttribute('open');setEditor({kind:'thread'});}}>{pt.newConversation}</button><button onClick={event=>{event.currentTarget.closest('details')?.removeAttribute('open');openSettings();}}>{pt.settings}</button><button className="danger-text" onClick={event=>{event.currentTarget.closest('details')?.removeAttribute('open');chooseDelete('bot',bot.id,bot.name);}}>{pt.deleteBot}</button></div></details>}
           </div></header>
         {!settings&&<ProductTabs id="main" label="Recursos da conversa" items={tabs} value={tab} onChange={changeTab}/>}
         {stream.connection==='Reconnecting'&&<p className="connection-notice" role="status">{pt.reconnecting}</p>}
         <ErrorMessage message={stream.error}/>{stream.notice&&<p className="notice" role="status">{stream.notice}</p>}
         {failure&&<div className="execution-error"><ErrorMessage message={failure}/>{snapshot?.status==='failed'&&<button disabled={active} onClick={()=>{setDraft(run?.message??'');changeTab('chat');}}>{pt.retry}</button>}<button onClick={()=>changeTab('activity')}>{pt.details}</button></div>}
         {settings?<Settings key={settings} initial={settings} providers={providers} bot={bot} onEdit={()=>{if(bot)setEditor({kind:'bot',bot});}} onClose={()=>setSettings(undefined)} onRefresh={()=>setReload(n=>n+1)}/>:
-          <div className="main-content" role="tabpanel" id={'main-panel-'+tab} aria-labelledby={'main-tab-'+tab} tabIndex={0}>
+          <div className={'main-content'+(tab==='chat'&&!!computerID?' with-computer':'')} role="tabpanel" id={'main-panel-'+tab} aria-labelledby={'main-tab-'+tab} tabIndex={0}>
             {tab==='chat'&&<Chat bot={bot} thread={thread} messages={conversation.messages} loading={conversation.loading} error={conversation.error} noBots={!loading&&!bots.length}
               onCreateBot={()=>{if(providers.length)setEditor({kind:'bot'});else openSettings('models');}} onCreateConversation={()=>setEditor({kind:'thread'})}/>}
+            {tab==='chat'&&computerID&&<aside className="computer-companion"><ComputerViewer computerID={computerID} onNotice={setToast}/><button onClick={()=>changeTab('computer')}>{pt.computer}</button></aside>}
             {tab==='computer'&&<div className="feature-surface"><ComputerViewer computerID={computerID} onNotice={setToast}/>{bot?.sandbox_profile&&!active&&<p className="hint">{copy["O computador isolado é preparado ao enviar uma tarefa."]}</p>}<details><summary>{pt.details}</summary><p>{bot?.sandbox_profile?.placement==='cloud'?copy["Nuvem"]:bot?.sandbox_profile?'Isolado local':bot?.computer_profile?.enabled?'Computador local':'Desativado'}</p><button onClick={()=>openSettings('computer')}>{pt.settings}</button></details></div>}
             {tab==='files'&&<div className="feature-surface">{thread?<EnvironmentPanel key={thread.id} threadID={thread.id} active={active} sandboxEnabled={!!bot?.sandbox_profile} snapshot={snapshot} cloud={bot?.sandbox_profile?.placement==='cloud'} onNotice={setToast}/>:<p className="empty">{pt.chooseHint}</p>}</div>}
             {tab==='memory'&&<MemoryPanel bots={bots} threads={threads} threadID={thread?.id} botID={bot?.id} inline onNotice={setToast} onClose={()=>changeTab('chat')}/>}
@@ -156,6 +158,7 @@ export function App() {
           </div>}
         <ApprovalPanel snapshot={snapshot} onAbort={()=>void abort()}/>
         {!settings&&tab==='chat'&&<>
+          {snapshot?.status==='waiting_approval'&&<p className="pending-composer" role="status">{penCopy.pendingComposer}</p>}
           {bot?.sandbox_profile?.placement==='cloud'&&<details className="cloud-disclosure"><summary>Nuvem · Pode gerar cobrança</summary><p>{pt.cloudCost}</p></details>}
           {missingProvider&&<div className="model-notice"><ErrorMessage message={pt.missingModel}/><button onClick={()=>openSettings('models')}>{pt.configureModel}</button></div>}
           {!loading&&!providers.length&&<div className="model-notice"><p>{pt.noModel}</p><button onClick={()=>openSettings('models')}>{pt.configureModel}</button></div>}
