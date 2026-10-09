@@ -38,7 +38,7 @@ registry/configuração de providers; 2 Bots; 3 Threads; 4 Sessions; 5 servidor 
 11 Memory Foundation manual; 12 Computer Use Foundation + CUA Driver local;
 13 Live Computer View + Human Takeover explícito e efêmero.
 Phases 0–13 estão estabelecidas, com transcript persistente separado
-e controle de input humano exclusivo no ComputerManager. Phases 14/15 adicionam sandbox local/cloud; Phase 16 adds durable workspace revisions; próxima: Phase 17 Background Tasks.
+e controle de input humano exclusivo no ComputerManager. Phases 14/15 adicionam sandbox local/cloud; Phase 16 adds durable workspace revisions; Phase 17 — Background Tasks: parte Native Routines Foundation implementada (escopo restrito, ver seção própria); execução autônoma longa, runs em background fora do servidor e demais partes da Phase 17 continuam adiadas. Próximo passo: validação com CUA real.
 As fases futuras exigem escopo explícito próprio; não criam autorização para efeitos.
 Não criar adapters vazios, abstrações especulativas ou dependências sem necessidade.
 
@@ -415,7 +415,7 @@ a cada push e pull request. Não substitua execução real por comandos simulado
 - Discovery não executa tools. Protocol 2025-11-25, frames/pending/queues/results bounded, IDs correlacionados; timeout/cancel/protocol violation aposentam conexão, sem restart ou retry.
 - Exec direto, ambiente operacional injetado sem DAIMON_*; stderr descartado; subprocessos encerram após Sessions e são aguardados. Sem promessa de sandbox ou limite de memória externo.
 - Eventos/snapshots/erros públicos sem argumentos/resultados/protocolo/segredos. Aprovação e catálogo são displays deliberados mínimos.
-- Testes offline com subprocesso real, incluindo Linux cleanup, autorização, persistência, falhas e navegador opt-in. Memory é extensão separada da Phase 11; Computer possui contrato próprio na Phase 12. Phase 13 é implementada pelo contrato Computer View; Phases 14/15 seguem os contratos de sandbox/cloud abaixo; não antecipar Phase 17.
+- Testes offline com subprocesso real, incluindo Linux cleanup, autorização, persistência, falhas e navegador opt-in. Memory é extensão separada da Phase 11; Computer possui contrato próprio na Phase 12. Phase 13 é implementada pelo contrato Computer View; Phases 14/15 seguem os contratos de sandbox/cloud abaixo; Phase 17 — Background Tasks: parte Native Routines Foundation implementada (escopo restrito, ver seção própria); execução autônoma longa, runs em background fora do servidor e demais partes da Phase 17 continuam adiadas.
 
 ## Memory Foundation — Phase 11
 
@@ -529,8 +529,7 @@ a cada push e pull request. Não substitua execução real por comandos simulado
 - Existing action approval/media/takeover gates; TLS official gateway only, no redirects.
 - Cost visible before Send. Managed pool billing may continue until Fleet GC.
 - Offline tests/smokes only by default; real paid smoke needs operator opt-in.
-- See docs/CLOUD_COMPUTERS_V1.md. Phase 16 is implemented below; Phase 17 Background Tasks
-  is the next recommended phase, not implemented in this cut.
+- See docs/CLOUD_COMPUTERS_V1.md. Phase 16 is implemented below; Phase 17 — Background Tasks: parte Native Routines Foundation implementada (escopo restrito, ver seção própria); execução autônoma longa, runs em background fora do servidor e demais partes da Phase 17 continuam adiadas.
 
 
 ## Persistent Environments — Phase 16
@@ -549,8 +548,8 @@ API (inode/device/hard-link count). Fixed executable/code/arguments; no user/mod
 command strings, shell, arbitrary command tool, stdin or content transfer. Structured
 bounded output, timeout and cancellation/kill-on-disconnect are required. Unsupported
 or unproven metadata fails closed. All content transfer uses FilesystemService.
-No paid CUA smoke, installation or login is automatic. Phase 17 Background Tasks +
-Long-Running Agent Runs, Intelligent Memory, Subagents and External Agents stay deferred.
+No paid CUA smoke, installation or login is automatic. Phase 17 — Background Tasks: parte Native Routines Foundation implementada (escopo restrito, ver seção própria); execução autônoma longa, runs em background fora do servidor e demais partes da Phase 17 continuam adiadas.
+Intelligent Memory, Subagents and External Agents stay deferred.
 
 
 ## Product UI V2 — Phase 16.5
