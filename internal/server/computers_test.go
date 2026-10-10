@@ -3,8 +3,10 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/netty-linux/daimon/internal/computer"
 	"github.com/netty-linux/daimon/internal/mcp"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -73,5 +75,35 @@ func TestBotHTTPOptionalProfileIsExactAndNoComputerActionFields(t *testing.T) {
 	}
 	if request(f.server, "POST", "/api/v1/sessions", `{"id":"run","thread_id":"thread","message":"act","computer":true}`).Code != 400 {
 		t.Fatal("browser grants computer")
+	}
+}
+
+func TestComputerStartupReasonReadOnlyMetadata(t *testing.T) {
+	f := setup(t, finalModel, 32)
+	executable := filepath.Join(t.TempDir(), "cua-driver")
+	if err := os.WriteFile(executable, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	secret := `C:\private\driver https://secret.invalid CUA_DRIVER_TOKEN=hidden stderr-private`
+	source, err := mcp.NewManager(t.Context(), mcp.Config{Version: 1, Servers: []mcp.ServerConfig{{ID: "cua", ComputerBackend: "cua-local", Command: executable, Args: []string{"mcp"}, Enabled: true, Tools: map[string]mcp.ToolConfig{}}}}, mcp.DefaultOptions(), func(context.Context, string) ([]string, error) {
+		return nil, fmt.Errorf("%s: %w", secret, mcp.ErrConfig)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer source.Close(context.Background())
+	backend, _ := computer.NewCUA(source)
+	manager, _ := computer.NewManager(backend)
+	f.server.deps.Computers = manager
+	for _, path := range []string{"/api/v1/computers", "/api/v1/computers/cua"} {
+		w := request(f.server, "GET", path, nil)
+		if w.Code != 200 || !strings.Contains(w.Body.String(), `"reason":"environment_failed"`) || !strings.Contains(w.Body.String(), `"status":"startup_failed"`) {
+			t.Fatal(w.Code, w.Body.String())
+		}
+		for _, value := range strings.Fields(secret) {
+			if strings.Contains(w.Body.String(), value) {
+				t.Fatal("private error exposed")
+			}
+		}
 	}
 }

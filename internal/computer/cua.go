@@ -37,6 +37,9 @@ func (c *CUA) Probe(ctx context.Context) (Info, error) {
 	for _, s := range c.source.ComputerSources() {
 		if s.ID == c.server && s.Backend == string(CUALocal) {
 			info.Status = s.Status
+			if s.Status == "startup_failed" {
+				info.Reason = safeStartupReason(s.Reason)
+			}
 		}
 	}
 	for _, t := range c.source.Tools() {
@@ -123,4 +126,13 @@ func imageValue(value any) bool {
 		}
 	}
 	return false
+}
+
+// Defensive projection: transport metadata never supplies free text to HTTP.
+func safeStartupReason(value string) string {
+	switch value {
+	case "environment_failed", "handshake_failed", "discovery_failed", "discovery_too_large", "tool_limit_exceeded", "timeout", "cancelled", "protocol_error", "unknown":
+		return value
+	}
+	return "unknown"
 }
