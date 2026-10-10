@@ -254,7 +254,7 @@ func check(items []Routine) error {
 			return ErrStore
 		}
 		if r.MissedAt.IsZero() != r.MissedDetectedAt.IsZero() || r.MissedAt.Location() != time.UTC || r.MissedDetectedAt.Location() != time.UTC ||
-			(!r.MissedAt.IsZero() && (r.MissedDetectedAt.Before(r.MissedAt) || !r.MissedAt.Before(r.NextAt))) {
+			(!r.MissedAt.IsZero() && r.MissedDetectedAt.Before(r.MissedAt)) {
 			return ErrStore
 		}
 		seen[r.ID] = true
