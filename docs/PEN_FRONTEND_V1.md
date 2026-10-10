@@ -1,5 +1,13 @@
 # Pen frontend v1 — integração e limites
 
+## Rebase e revalidação para merge — 2026-10-10
+
+O PR #23 foi rebaseado de 809dbec sobre 169dc45 (base atual do #22). O conflito foi somente no index.html gerado; o build final substituiu os assets intermediários, incluindo o bundle herdado da base. As ocorrências perdidas de rotinas e as causas fixas de falha do Computer permanecem no frontend integrado. Nenhum contrato do runtime foi alterado pelo rebase.
+
+npm ci, typecheck, 80 testes / 15 arquivos e build passaram. O bundle atual usa index-CqpeXhAo.js e index-B7VX4gBZ.css. Não contém os três marcadores de fixtures nem x6AmZ; ui/src não importa scripts de teste. Hashes e saídas desta rodada estão em validation/stacked-prs-merge-2026-10-10. A validação completa e os smokes serão registrados nessa mesma pasta antes do merge.
+
+A autorização do usuário nesta conversa permite atualizar, revalidar, enviar e mesclar os PRs #22 e #23. CUA real continua pendente e não foi declarado como validado. A ordem de merge será #22 em main e, após mudar a base do #23 para main, #23 em main.
+
 ## Atualização em 2026-10-10
 
 Após remover o PNG fonte sem uso, `npm run build` foi reexecutado e produziu exatamente os mesmos assets já versionados (`index-B7VX4gBZ.css`, `index-CfJl7WzH.js` e `index.html`). A remoção do arquivo não importado não altera o bundle. `assets-after.sha256` foi atualizado porque ainda registrava o build anterior à mudança do título e à remoção do import/PNG do build; essa divergência era do registro desatualizado, não deste rebuild. `npm test` passou com 76 testes / 15 arquivos; `npm run typecheck` passou sem diagnósticos.
