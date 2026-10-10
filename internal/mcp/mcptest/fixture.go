@@ -101,6 +101,12 @@ func Run() bool {
 				name = "BAD.tool"
 			}
 			list := []any{map[string]any{"name": name, "description": "Offline lookup", "inputSchema": schema}, map[string]any{"name": "mutate", "description": "Unapproved write", "inputSchema": map[string]string{"type": "object"}}, map[string]any{"name": "unknown", "inputSchema": map[string]string{"type": "object"}}}
+			if mode == "description-limit" {
+				list[0].(map[string]any)["description"] = strings.Repeat("x", 1025)
+			}
+			if mode == "description-boundary" {
+				list[0].(map[string]any)["description"] = strings.Repeat("x", 1024)
+			}
 			if mode == "duplicate" {
 				list = append(list, list[0])
 			}

@@ -14,6 +14,7 @@ type EnvironmentResolver func(context.Context, string) ([]string, error)
 type serverState struct {
 	backend string
 	startup string
+	reason  string
 	id      string
 	enabled bool
 	client  *Client
@@ -57,12 +58,14 @@ func NewManager(ctx context.Context, config Config, options Options, env Environ
 			if _, e := os.Stat(s.Command); errors.Is(e, os.ErrNotExist) {
 				state.startup = "executable_missing"
 			}
+			phase := "environment"
 			environment, err := env(ctx, s.ID)
 			if err == nil {
-				state.client, err = NewClient(ctx, s, environment, options)
+				state.client, err = newClient(ctx, s, environment, options, &phase)
 			}
 			if err == nil {
 				if len(manager.tools)+len(state.client.tools) > MaxTotalTools {
+					state.reason = startupReason(ErrLimit, "tool_count")
 					_ = state.client.Close(context.Background())
 					state.client = nil
 				} else {
@@ -74,6 +77,9 @@ func NewManager(ctx context.Context, config Config, options Options, env Environ
 						manager.tools[definition.Name] = &Tool{state.client, definition, kind}
 					}
 				}
+			}
+			if err != nil {
+				state.reason = startupReason(err, phase)
 			}
 		}
 		manager.servers = append(manager.servers, state)
