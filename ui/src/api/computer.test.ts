@@ -18,3 +18,9 @@ it('requires complete Computer typing review and rejects foreign or dangerous pr
  reply({...p,classification:'dangerous'});await expect(api.approval('session-a')).rejects.toThrow();
  reply({...p,computer_id:'other'});await expect(api.approval('session-a')).rejects.toThrow();
 });
+
+it('accepts only fixed startup reasons and rejects private values',()=>{
+ const base={id:'cua',backend:'cua-local',status:'startup_failed',busy:false,capabilities:[]};
+ for(const reason of ['environment_failed','handshake_failed','discovery_failed','discovery_too_large','tool_limit_exceeded','timeout','cancelled','protocol_error','unknown'])expect(decodeComputer({...base,reason}).reason).toBe(reason);
+ for(const reason of ['C:/private/driver','https://secret.invalid','CUA_DRIVER_TOKEN=secret','stderr-private','toString'])expect(()=>decodeComputer({...base,reason})).toThrow();
+});

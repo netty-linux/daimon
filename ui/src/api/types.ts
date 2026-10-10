@@ -1,3 +1,4 @@
+import type { StartupReason } from '../i18n/computer';
 import {copy} from '../i18n/copy';
 export interface SandboxProfile {backend:'cua-local'|'cua-cloud';placement?:'local'|'cloud';image:'linux';runtime:'gvisor';browser:boolean;resources:'small'|'standard'|'medium';network:'outbound'}
 export interface EnvironmentMetadata {placement?:'local'|'cloud';backend?:'cua-local'|'cua-cloud'|'cua-cloud';resources?:string;expires_at?:string;mode:'sandbox';state:'creating'|'ready'|'cleaning_up'|'deleted'|'failed';sandbox_id?:string;runtime:'gvisor';cleanup:'pending'|'complete'|'unresolved'}
@@ -6,7 +7,7 @@ export interface SandboxCatalog {backends?:{backend:"cua-local"|"cua-cloud";runt
 export interface ProviderSummary { id: string }
 export interface ComputerProfile {enabled:boolean;backend:"cua-local";mcp_server_id:string}
 export type ComputerClass="observe"|"navigate"|"input"|"system"|"dangerous";
-export interface ComputerInfo {id:string;backend:"cua-local"|"cua-cloud";status:"configured"|"executable_missing"|"startup_failed"|"connected"|"unavailable";capabilities:{id:string;tool:string;class:ComputerClass;available:boolean}[];busy:boolean;controller_session_id?:string}
+export interface ComputerInfo {reason?:StartupReason;id:string;backend:"cua-local"|"cua-cloud";status:"configured"|"executable_missing"|"startup_failed"|"connected"|"unavailable";capabilities:{id:string;tool:string;class:ComputerClass;available:boolean}[];busy:boolean;controller_session_id?:string}
 export interface ComputerBinding {id:string;backend:"cua-local"|"cua-cloud";capability_ids:string[]}
 export interface Bot {
  sandbox_profile?:SandboxProfile;
