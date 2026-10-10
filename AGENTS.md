@@ -13,6 +13,11 @@
   opt-in por processo e aprovação individual. Nenhuma permissão vem da agenda/Volume.
 - Memory/Volume controlado e associação Bot/Space continuam separados e pendentes;
   não antecipar importação automática, comandos, retries ou agentes externos.
+- Descarte de Sessions antigas: pendente de decisão. Hoje são retidas 128
+  Sessions por processo, sem descarte automático.
+- Rotinas perdidas com o servidor fechado: pendente de decisão. Hoje não há
+  catch-up; a rotina vencida é pulada sem registro.
+
 
 Visão: plataforma local experimental Daimon Bots, sob controle do usuário,
 com runtime nativo provider-agnostic e contratos fortes de execução local.
