@@ -1,0 +1,5 @@
+
+> daimon-ui@0.1.0 smoke:sandbox
+> node scripts/sandbox-smoke.mjs
+
+Local Sandbox browser smoke passed: live frames, two viewers, exact human input, agent exclusion, Give Back, deleted viewer unavailable, private history and joined shutdown.

@@ -4,7 +4,7 @@ export const pt = {
   dismissNotice: 'Dispensar notificação',
   bots: 'Bots', conversations: 'Conversas', chat: 'Chat', computer: 'Computador',
   files: 'Arquivos', memory: 'Memória', activity: 'Atividade', settings: 'Configurações',
-  newBot: 'Novo bot', newConversation: 'Nova conversa', editBot: 'Editar bot',
+  newBot: 'Novo bot', newConversation: 'Nova conversa', editBot: 'Editar Bot',
   editConversation: 'Editar conversa', remove: 'Excluir', cancel: 'Cancelar',
   save: 'Salvar', sending: 'Enviando…', send: 'Enviar', stop: 'Parar',
   stopping: 'Solicitando parada…', available: 'Disponível', loading: 'Carregando…',

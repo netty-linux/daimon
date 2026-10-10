@@ -1,0 +1,5 @@
+
+> daimon-ui@0.1.0 smoke:computer-view
+> node scripts/computer-view-smoke.mjs
+
+Computer view browser smoke passed: live frames, two viewers, exact human input, agent exclusion, Give Back, reload view-only, private history and joined shutdown.

@@ -6,6 +6,7 @@ import { pt } from '../i18n/pt-BR';
 import { sessionFixture } from '../test-fixtures';
 import { Markdown } from './chat/Markdown';
 import { Chat } from './chat/Chat';
+import { penCopy } from '../i18n/pen';
 import type { Bot, Thread } from '../api/types';
 
 const bot: Bot = { id: 'bot-product', name: 'Daimon', description: '', provider_id: 'fixture', model: 'offline', tools: [], permission_mode: 'ask' };
@@ -26,6 +27,33 @@ it('keeps infrastructure and raw identifiers off the primary surface',async()=>{
   await ready();expect(screen.queryByText('/private-folder')).toBeNull();expect(screen.queryByText(bot.id)).toBeNull();expect(screen.queryByText('fixture')).toBeNull();
   expect(screen.queryByText('PHASE 13')).toBeNull();expect(environmentsAPI.get).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('tab',{name:pt.files}));await waitFor(()=>expect(environmentsAPI.get).toHaveBeenCalledWith(thread.id,expect.any(AbortSignal)));
+});
+it('filters the unified navigation without changing the selected conversation or starting a run',async()=>{
+  const start=vi.spyOn(api,'start');
+  await ready();
+  fireEvent.change(screen.getByLabelText(penCopy.search),{target:{value:'does not match'}});
+  expect(screen.queryByRole('button',{name:/Meu projeto/})).toBeNull();
+  expect(location.hash).toContain('thread='+thread.id);
+  expect((screen.getByLabelText(pt.message) as HTMLTextAreaElement).disabled).toBe(false);
+  expect(start).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText(penCopy.search),{target:{value:'MEU PROJETO'}});
+  expect(screen.getByRole('button',{name:/Meu projeto/})).toBeTruthy();
+});
+it('collapses bots independently while leaving conversation actions reachable',async()=>{
+  await ready();
+  fireEvent.click(screen.getByRole('button',{name:pt.collapseBots}));
+  expect(screen.getByRole('navigation',{name:pt.conversations})).toBeTruthy();
+  expect(screen.getByRole('button',{name:/Meu projeto/})).toBeTruthy();
+  expect(screen.queryByRole('navigation',{name:pt.bots})).toBeNull();
+});
+it('closes the header menu when opening settings without changing the bookmark',async()=>{
+  await ready();
+  const menu=document.querySelector('.header-menu') as HTMLElement;
+  menu.setAttribute('open','');
+  fireEvent.click(within(menu).getByRole('button',{name:pt.settings}));
+  expect(menu.hasAttribute('open')).toBe(false);
+  expect(screen.getByRole('tab',{name:'Modelos / Provedores'})).toBeTruthy();
+  expect(location.hash).toContain('thread='+thread.id);
 });
 it('preserves conversation bookmarks and adds keyboard-accessible tab state',async()=>{
   await ready();fireEvent.keyDown(screen.getByRole('tab',{name:pt.chat}),{key:'End'});
@@ -55,6 +83,19 @@ it('reveals advanced bot sections without submitting the form',async()=>{
   const save=vi.spyOn(api,'saveBot').mockResolvedValue(bot);await ready();fireEvent.click(screen.getByRole('button',{name:pt.newBot}));
   fireEvent.change(screen.getByLabelText('Modelo'),{target:{value:'offline'}});fireEvent.click(within(screen.getByRole('dialog')).getByRole('tab',{name:'Computador'}));
   expect(save).not.toHaveBeenCalled();expect(screen.getByRole('combobox',{name:'Modo do computador'})).toBeTruthy();
+});
+it('labels the existing bot editor Editar Bot without appearance fields or saving on open',async()=>{
+  const save=vi.spyOn(api,'saveBot');
+  await ready();
+  const menu=document.querySelector('.header-menu') as HTMLElement;
+  menu.setAttribute('open','');
+  fireEvent.click(within(menu).getByRole('button',{name:pt.editBot}));
+  const dialog=screen.getByRole('dialog',{name:'Editar Bot'});
+  expect(within(dialog).getByRole('heading',{name:'Editar Bot'})).toBeTruthy();
+  expect(within(dialog).getByLabelText('Nome')).toBeTruthy();
+  expect(within(dialog).queryByText('Personalize seu DAIMON')).toBeNull();
+  expect(within(dialog).queryByText('Personagem')).toBeNull();
+  expect(save).not.toHaveBeenCalled();
 });
 it('offers an explicit empty computer surface and manual setup',async()=>{
   await ready();fireEvent.click(screen.getByRole('tab',{name:pt.computer}));expect(screen.getByText(pt.noComputer)).toBeTruthy();expect(screen.queryByRole('button',{name:'Assumir controle'})?.hasAttribute('disabled')).toBe(true);

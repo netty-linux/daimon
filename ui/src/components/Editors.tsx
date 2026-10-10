@@ -42,7 +42,7 @@ export function BotEditor({ bot, providers, onClose, onSave }: { bot?: Bot; prov
   };
   const sections=[{id:'general',label:copy["Geral"]},{id:'instructions',label:copy["Instruções"]},{id:'model',label:copy["Modelo"]},{id:'tools',label:copy["Ferramentas"]},{id:'computer',label:copy["Computador"]},{id:'memory',label:copy["Memória"]},{id:'advanced',label:copy["Avançado"]}] as const;
   const [section,setSection]=useState<string>('general');
-  return <><Modal title={bot ? copy["Edit Bot"] : copy["New Bot"]} onClose={() => { if (!busy) onClose(); }}><form noValidate className="editor-sections" onSubmit={submit}>
+  return <><Modal title={bot ? pt.editBot : copy["New Bot"]} onClose={() => { if (!busy) onClose(); }}><form noValidate className="editor-sections" onSubmit={submit}>
     <ProductTabs id="bot-editor" label="Configuração do bot" items={sections} value={section} onChange={setSection}/><div role="tabpanel" id={"bot-editor-panel-"+section} aria-labelledby={"bot-editor-tab-"+section} tabIndex={0}>
     <section hidden={section!=='general'}><label>{copy["Name"]}<input autoFocus required value={name} onChange={e => setName(e.target.value)} /></label>
     <label>{copy["Description"]}<textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} /></label>

@@ -1,3 +1,4 @@
+import { penCopy } from '../i18n/pen';
 import {label} from '../i18n/pt-BR';
 import { copy } from '../i18n/copy';
 import { useEffect, useRef, useState } from 'react';
@@ -32,7 +33,7 @@ export function ApprovalPanel({ snapshot, onAbort }: { snapshot?: SessionSnapsho
       catch { /* retain the safe error and original deliberate review */ }
     } finally { if (current === generation.current) setBusy(false); }
   };
-  return <><ErrorMessage message={error} />{snapshot?.status === 'waiting_approval' && !presentation && <button onClick={() => setRevision(r => r + 1)}>{copy["Refresh pending approval"]}</button>}{presentation && (dismissed ? <button onClick={() => setDismissed(false)}>{copy["Review pending action"]}</button> : <Modal title={copy["Human approval required"]} onClose={() => { if (!busy) setDismissed(true); }}>
+  return <><ErrorMessage message={error} />{snapshot?.status === 'waiting_approval' && !presentation && <button onClick={() => setRevision(r => r + 1)}>{copy["Refresh pending approval"]}</button>}{presentation && (dismissed ? <section className="pending-approval" aria-label={penCopy.pending}><h3>{penCopy.pending}</h3><p>{penCopy.pendingHint}</p><button onClick={() => setDismissed(false)}>{copy["Review pending action"]}</button></section> : <Modal title={copy["Human approval required"]} onClose={() => { if (!busy) setDismissed(true); }}>
     <details><summary>{copy["Detalhes da ação"]}</summary><p className="eyebrow">{label(presentation.kind)} / {presentation.tool}</p>{presentation.computer_id && <p>{presentation.backend==='cua-cloud'?copy["CLOUD Computer"]:presentation.computer_id.startsWith('sandbox-')?copy["Sandbox Computer"]:copy["Local Computer"]}: {presentation.computer_id} · {presentation.backend==='cua-cloud'?'CUA Fleet':'CUA Driver'} · {label(presentation.classification??'other')}</p>}{presentation.server_id && !presentation.computer_id && <p>{copy["External MCP server:"]} {presentation.server_id} {copy["· Classification:"]} {label(presentation.classification??'other')}</p>}</details><h3>{copy["Target"]}</h3><pre className="approval-target">{presentation.target}</pre>
     <p className="notice">{presentation.warning}</p>{presentation.preview && <><h3>{presentation.kind==='computer'?copy["Exact text to type"]:copy["Complete contract preview"]}</h3><pre className="approval-preview">{presentation.preview}</pre></>}
     <p className="hint">{copy["This decision applies once to this exact action. Closing this display keeps the Session waiting."]}</p><ErrorMessage message={error} />

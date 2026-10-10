@@ -105,7 +105,8 @@ try {
   assert.equal(await page.getByLabel("Pasta local", { exact: true }).getAttribute('readonly'), '');
   await page.getByRole('button', { name: "Salvar conversa", exact: true }).click();
   await page.getByRole('button', { name: /Reviewed workspace/ }).waitFor();
-  await page.getByLabel("Ações do bot").click(); await page.getByRole("button",{name:"Editar bot",exact:true}).click();
+  await page.getByLabel("Ações do bot").click(); await page.getByRole("button",{name:"Editar Bot",exact:true}).click();
+  await page.getByRole('dialog',{name:'Editar Bot',exact:true}).waitFor();
   assert.equal(await page.getByLabel("Instruções", { exact: true }).inputValue(), '');
   await page.getByLabel("Instruções", { exact: true }).fill('Updated instructions.');
   await page.getByLabel("Nome", { exact: true }).fill('Updated Coder');

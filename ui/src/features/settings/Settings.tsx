@@ -1,3 +1,4 @@
+import { penCopy } from '../../i18n/pen';
 import { copy } from '../../i18n/copy';
 import { useState } from 'react';
 import type { Bot, ProviderSummary } from '../../api/types';
@@ -22,7 +23,7 @@ export function Settings({ initial, providers, bot, onEdit, onClose, onRefresh }
   return <section className="settings-surface"><header><h2>{pt.settings}</h2><button onClick={onClose}>{pt.close}</button></header>
     <ProductTabs id="settings" label={pt.settings} items={sections} value={section} onChange={setSection} />
     <div role="tabpanel" id={`settings-panel-${section}`} aria-labelledby={`settings-tab-${section}`} tabIndex={0}>
-      {section === 'general' && <><h3>{copy["Seu DAIMON"]}</h3><p>{copy["Um espaço local para seus bots, conversas e tarefas."]}</p><p className="hint">{copy["Tema escuro · Português do Brasil"]}</p></>}
+      {section === 'general' && <><h3>{copy["Seu DAIMON"]}</h3><p>{penCopy.settingsHint}</p><section className="permission-summary"><h3>{penCopy.permissions}</h3><strong>{penCopy.individualApproval}</strong><p>{penCopy.permissionHint}</p></section><p>{copy["Um espaço local para seus bots, conversas e tarefas."]}</p><p className="hint">{copy["Tema escuro · Português do Brasil"]}</p></>}
       {section === 'bots' && <><h3>{bot?.name ?? pt.bots}</h3><p>{copy["Instruções, modelo e recursos de cada assistente."]}</p><button disabled={!bot} onClick={onEdit}>{pt.editBot}</button></>}
       {section === 'models' && <><h3>{copy["Modelos disponíveis no servidor"]}</h3><p>{copy["Credenciais e conexão são configuradas fora do navegador."]}</p>{!providers.length && <p role="status">{pt.noModel}</p>}
         <details><summary>{copy["Provedores configurados"]}</summary>{providers.map(provider => <p key={provider.id}>{provider.id === 'openai' ? 'OpenAI-compatible' : provider.id === 'groq' ? 'Groq' : provider.id}</p>)}<p className="hint">{copy["A lista identifica conexões; os nomes dos modelos são definidos ao criar o bot. Não há catálogo automático."]}</p></details></>}

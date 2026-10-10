@@ -1,0 +1,18 @@
+
+> daimon-ui@0.1.0 build
+> npm run typecheck && vite build
+
+
+> daimon-ui@0.1.0 typecheck
+> tsc --noEmit
+
+vite v7.3.7 building client environment for production...
+transforming...
+✓ 58 modules transformed.
+rendering chunks...
+computing gzip size...
+../internal/server/ui/index.html                   0.42 kB │ gzip:  0.30 kB
+../internal/server/ui/assets/x6AmZ-V0AtGXwv.png   10.89 kB
+../internal/server/ui/assets/index-yLEfndF4.css   26.86 kB │ gzip:  5.56 kB
+../internal/server/ui/assets/index-C7JeaBoJ.js   313.17 kB │ gzip: 96.64 kB
+✓ built in 1.92s

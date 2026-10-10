@@ -1,0 +1,1 @@
+Comando: gofmt -l . (Linux, golang:1.27.1, rede desativada). Saída: vazia. Exit: 0.

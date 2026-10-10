@@ -1,0 +1,5 @@
+
+> daimon-ui@0.1.0 smoke:computer
+> node scripts/computer-smoke.mjs
+
+Computer browser smoke passed: observe/click/type approvals, deny, abort, busy, release, second Thread, unknown action, crash, history and shutdown.

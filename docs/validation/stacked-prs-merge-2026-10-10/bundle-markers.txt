@@ -1,0 +1,4 @@
+Busca de marcadores de fixture no bundle novo:
+rg exit=1 (1 significa nenhuma correspondência)
+PNG rg exit=1
+Imports ui/scripts rg exit=1
