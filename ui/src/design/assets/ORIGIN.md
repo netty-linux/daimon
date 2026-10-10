@@ -1,6 +1,6 @@
-# Origem do wordmark arquivado
+# Registro histórico da origem do wordmark
 
-Arquivo-fonte: `x6AmZ.png`.
+Arquivo exportado anteriormente: `x6AmZ.png`, removido do repositório por não ter referências de produção.
 
 Exportado em 2026-10-09 pelo MCP `pencil`, com `Export(['x6AmZ'], 'png', ..., {scale: 2})`, do nó `x6AmZ` ("Wordmark oficial DAIMON") no quadro 09 (`qXMcY`) do documento `Daimon-Refactory.pen` fornecido pelo usuário.
 
@@ -8,4 +8,4 @@ No Pen, o nó usava um fill de imagem com URL relativa `images/daimon-wordmark-w
 
 Não há registro de licença, autor ou atribuição para essa imagem no repositório. Nenhuma licença é inferida da disponibilidade do arquivo no Pen.
 
-Em 2026-10-10, o import de produção foi removido conforme a solicitação do usuário: a imagem era referenciada apenas pelo JavaScript React, não pelo CSS nem pelo HTML estático. O cabeçalho agora usa texto DAIMON. Este PNG fica arquivado como fonte da integração anterior, sem entrar no bundle Vite de produção.
+Em 2026-10-10, o import de produção foi removido conforme a solicitação do usuário: a imagem era referenciada apenas pelo JavaScript React, não pelo CSS nem pelo HTML estático. O cabeçalho agora usa texto DAIMON. O PNG foi posteriormente removido também do repositório após confirmar que só este documento o mencionava. Este registro histórico permanece sem o arquivo binário.

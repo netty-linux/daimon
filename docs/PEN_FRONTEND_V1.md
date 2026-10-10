@@ -4,7 +4,7 @@
 
 O modal existente de edição agora usa o título **Editar Bot**, centralizado em `ui/src/i18n/pt-BR.ts` e consumido por `Editors.tsx`; os testes de interface e o seletor do smoke foram ajustados. O DTO permanece inalterado.
 
-O wordmark PNG era utilizado pelo React via JavaScript, mas não tinha referência no CSS ou HTML estático. Conforme a solicitação posterior, seu import foi removido: o cabeçalho usa texto DAIMON e o PNG não entra mais no build. A fonte exportada permanece arquivada em `ui/src/design/assets/x6AmZ.png`. A [origem registrada](../ui/src/design/assets/ORIGIN.md) identifica documento/nó/exportação, mas **não há registro de licença ou autoria**.
+O wordmark PNG era utilizado pelo React via JavaScript, mas não tinha referência no CSS ou HTML estático. Conforme a solicitação posterior, seu import foi removido: o cabeçalho usa texto DAIMON e o PNG não entra mais no build. A fonte exportada também foi removida do repositório por não haver imports; somente o registro histórico de origem permanece. A [origem registrada](../ui/src/design/assets/ORIGIN.md) identifica documento/nó/exportação, mas **não há registro de licença ou autoria**.
 
 Build limpo executado com `npm run build`: Vite usa `emptyOutDir: true`, removendo os assets antigos antes de gerar os novos. Saída:
 
