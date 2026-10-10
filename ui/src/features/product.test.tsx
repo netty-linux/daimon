@@ -84,6 +84,19 @@ it('reveals advanced bot sections without submitting the form',async()=>{
   fireEvent.change(screen.getByLabelText('Modelo'),{target:{value:'offline'}});fireEvent.click(within(screen.getByRole('dialog')).getByRole('tab',{name:'Computador'}));
   expect(save).not.toHaveBeenCalled();expect(screen.getByRole('combobox',{name:'Modo do computador'})).toBeTruthy();
 });
+it('labels the existing bot editor Editar Bot without appearance fields or saving on open',async()=>{
+  const save=vi.spyOn(api,'saveBot');
+  await ready();
+  const menu=document.querySelector('.header-menu') as HTMLElement;
+  menu.setAttribute('open','');
+  fireEvent.click(within(menu).getByRole('button',{name:pt.editBot}));
+  const dialog=screen.getByRole('dialog',{name:'Editar Bot'});
+  expect(within(dialog).getByRole('heading',{name:'Editar Bot'})).toBeTruthy();
+  expect(within(dialog).getByLabelText('Nome')).toBeTruthy();
+  expect(within(dialog).queryByText('Personalize seu DAIMON')).toBeNull();
+  expect(within(dialog).queryByText('Personagem')).toBeNull();
+  expect(save).not.toHaveBeenCalled();
+});
 it('offers an explicit empty computer surface and manual setup',async()=>{
   await ready();fireEvent.click(screen.getByRole('tab',{name:pt.computer}));expect(screen.getByText(pt.noComputer)).toBeTruthy();expect(screen.queryByRole('button',{name:'Assumir controle'})?.hasAttribute('disabled')).toBe(true);
 });

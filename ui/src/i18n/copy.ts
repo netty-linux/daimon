@@ -29,7 +29,7 @@ export const copy: Record<string, string> = {
   'Delete this saved Memory permanently? This does not remove conversation messages.': 'Excluir esta memória permanentemente? As mensagens da conversa serão preservadas.',
   'Deleting…': 'Excluindo…', 'Deny': 'Negar', 'Description': 'Descrição',
   'Disposable per Session. Guest files disappear on cleanup. Outbound networking is enabled. The host workspace is not mounted.': 'O computador isolado é liberado após a tarefa. Sem ambiente persistente, seus arquivos são descartados. A pasta local não é compartilhada; o acesso à rede é permitido.',
-  'Edit': 'Editar', 'Edit Bot': 'Editar bot', 'Edit Memory': 'Editar memória', 'Edit Thread': 'Editar conversa',
+  'Edit': 'Editar', 'Edit Bot': 'Editar Bot', 'Edit Memory': 'Editar memória', 'Edit Thread': 'Editar conversa',
   'Enable Computer': 'Ativar computador', 'Enable empty Environment': 'Ativar ambiente',
   'Enter an explicit workspace (up to 4096 bytes) and a title up to 256 bytes.': 'Informe uma pasta do servidor (até 4096 bytes) e um título de até 256 bytes.',
   'Exact model identifier': 'Nome do modelo configurado', 'Exact text to type': 'Texto exato a inserir',
