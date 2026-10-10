@@ -1,0 +1,80 @@
+ok  	github.com/netty-linux/daimon/cmd/daimon	105.001s
+ok  	github.com/netty-linux/daimon/internal/agentloop	4.202s
+ok  	github.com/netty-linux/daimon/internal/bots	0.319s
+ok  	github.com/netty-linux/daimon/internal/computer	3.832s
+?   	github.com/netty-linux/daimon/internal/computer/mediatest	[no test files]
+ok  	github.com/netty-linux/daimon/internal/computer/socket	0.010s
+ok  	github.com/netty-linux/daimon/internal/conversations	1.658s
+ok  	github.com/netty-linux/daimon/internal/createcontract	0.201s
+ok  	github.com/netty-linux/daimon/internal/diffview	0.029s
+ok  	github.com/netty-linux/daimon/internal/editcontract	0.325s
+ok  	github.com/netty-linux/daimon/internal/environments	3.243s
+ok  	github.com/netty-linux/daimon/internal/managedworkspace	144.193s
+ok  	github.com/netty-linux/daimon/internal/mcp	0.583s
+?   	github.com/netty-linux/daimon/internal/mcp/cuatest	[no test files]
+?   	github.com/netty-linux/daimon/internal/mcp/mcptest	[no test files]
+ok  	github.com/netty-linux/daimon/internal/memory	1.680s
+ok  	github.com/netty-linux/daimon/internal/model	0.005s
+ok  	github.com/netty-linux/daimon/internal/policy	0.037s
+ok  	github.com/netty-linux/daimon/internal/providers	0.011s
+ok  	github.com/netty-linux/daimon/internal/providers/groq	0.013s
+ok  	github.com/netty-linux/daimon/internal/providers/openai	0.185s
+ok  	github.com/netty-linux/daimon/internal/routines	2.517s
+ok  	github.com/netty-linux/daimon/internal/sandbox	4.986s
+ok  	github.com/netty-linux/daimon/internal/server	7.734s
+ok  	github.com/netty-linux/daimon/internal/sessions	8.767s
+ok  	github.com/netty-linux/daimon/internal/threads	0.426s
+ok  	github.com/netty-linux/daimon/internal/tools	0.023s
+ok  	github.com/netty-linux/daimon/internal/workspacefs	0.024s
+ok  	github.com/netty-linux/daimon/internal/workspacejournal	0.014s
+ok  	github.com/netty-linux/daimon/internal/workspaceplan	0.009s
+?   	github.com/netty-linux/daimon/ui/scripts/cua-fixture	[no test files]
+--- FAIL: TestManagedPreimageExecutableLifecycle (20.20s)
+    managed_preimage_cli_test.go:30: offline build: exit status 1 # github.com/netty-linux/daimon/internal/mcp
+        /src/internal/mcp/client.go:148:9: undefined: startupFailure
+        /src/internal/mcp/client.go:156:15: undefined: startupError
+        /src/internal/mcp/client.go:158:11: undefined: startupFailure
+        /src/internal/mcp/client.go:322:11: undefined: startupFailure
+        /src/internal/mcp/client.go:335:10: undefined: startupFailure
+        /src/internal/mcp/tools.go:60:17: undefined: startupFailure
+        /src/internal/mcp/tools.go:65:17: undefined: startupFailure
+        /src/internal/mcp/tools.go:111:14: undefined: startupFailure
+FAIL
+FAIL	github.com/netty-linux/daimon/cmd/daimon	112.691s
+ok  	github.com/netty-linux/daimon/internal/agentloop	5.240s
+ok  	github.com/netty-linux/daimon/internal/bots	1.839s
+ok  	github.com/netty-linux/daimon/internal/computer	4.895s
+?   	github.com/netty-linux/daimon/internal/computer/mediatest	[no test files]
+ok  	github.com/netty-linux/daimon/internal/computer/socket	1.036s
+ok  	github.com/netty-linux/daimon/internal/conversations	6.508s
+ok  	github.com/netty-linux/daimon/internal/createcontract	1.277s
+ok  	github.com/netty-linux/daimon/internal/diffview	1.074s
+ok  	github.com/netty-linux/daimon/internal/editcontract	1.377s
+ok  	github.com/netty-linux/daimon/internal/environments	3.996s
+ok  	github.com/netty-linux/daimon/internal/managedworkspace	208.998s
+--- FAIL: TestEnvironmentFailureMetadataIsPrivate (0.00s)
+    startup_test.go:57: mcp: invalid configuration
+FAIL
+FAIL	github.com/netty-linux/daimon/internal/mcp	1.263s
+?   	github.com/netty-linux/daimon/internal/mcp/cuatest	[no test files]
+?   	github.com/netty-linux/daimon/internal/mcp/mcptest	[no test files]
+ok  	github.com/netty-linux/daimon/internal/memory	4.801s
+ok  	github.com/netty-linux/daimon/internal/model	1.019s
+ok  	github.com/netty-linux/daimon/internal/policy	1.076s
+ok  	github.com/netty-linux/daimon/internal/providers	1.040s
+ok  	github.com/netty-linux/daimon/internal/providers/groq	1.031s
+ok  	github.com/netty-linux/daimon/internal/providers/openai	1.242s
+ok  	github.com/netty-linux/daimon/internal/routines	3.355s
+ok  	github.com/netty-linux/daimon/internal/sandbox	7.156s
+--- FAIL: TestComputerStartupReasonReadOnlyMetadata (0.04s)
+    computers_test.go:90: mcp: invalid configuration
+FAIL
+FAIL	github.com/netty-linux/daimon/internal/server	16.569s
+ok  	github.com/netty-linux/daimon/internal/sessions	10.694s
+ok  	github.com/netty-linux/daimon/internal/threads	1.839s
+ok  	github.com/netty-linux/daimon/internal/tools	1.068s
+ok  	github.com/netty-linux/daimon/internal/workspacefs	1.043s
+ok  	github.com/netty-linux/daimon/internal/workspacejournal	1.019s
+ok  	github.com/netty-linux/daimon/internal/workspaceplan	1.053s
+?   	github.com/netty-linux/daimon/ui/scripts/cua-fixture	[no test files]
+FAIL

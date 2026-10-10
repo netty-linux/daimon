@@ -327,3 +327,26 @@ Fontes oficiais, fixadas na versão instalada:
 - [policy.rs: variável e filtragem do catálogo](https://github.com/trycua/cua/blob/cua-driver-rs-v0.34.0/libs/cua-driver/rust/crates/cua-driver-core/src/policy.rs#L110).
 - [policy_tools_list_test.rs: teste de ferramentas ocultas e invocação negada](https://github.com/trycua/cua/blob/cua-driver-rs-v0.34.0/libs/cua-driver/rust/crates/cua-driver/tests/policy_tools_list_test.rs).
 - [cli.rs: opções de lançamento e manifesto](https://github.com/trycua/cua/blob/cua-driver-rs-v0.34.0/libs/cua-driver/rust/crates/cua-driver/src/cli.rs).
+
+
+## Causa controlada de falha de inicialização — 2026-10-10
+
+A causa agora é registrada no estado MCP e projetada pelas rotas GET existentes de metadados do Computer, com `status: startup_failed` e `reason` fixo. A UI apresenta uma frase fixa em PT-BR; não apresenta o valor bruto. `executable_missing`, conectado, desativado e indisponibilidade após conexão preservam a semântica anterior e não recebem reason de startup. Não há action API nova.
+
+A classificação usa `errors.Is` nas sentinelas existentes e a etapa local conhecida de criação. Não analisa Error(), mensagens do servidor, stderr ou valores do mcp.json. Somente a categoria é retida no Manager; o erro original não entra no status.
+
+| Categoria | Evidência e comportamento |
+| --- | --- |
+| `environment_failed` | Resolver de ambiente retorna erro que preserva `mcp.ErrConfig`. Erro livre do resolver fica unknown. |
+| `handshake_failed` | `ErrRemote` ou `ErrUnsupported` durante initialize/notificação de inicialização. |
+| `discovery_failed` | `ErrRemote` ou `ErrUnsupported` durante tools/list. |
+| `discovery_too_large` | Categoria reconhecida pelo contrato/UI, mas não emitida: não existe tipo específico para limite de descrição/frame. `ErrLimit` também cobre schema, nomes duplicados, quantidade e paginação, portanto permanece unknown na descoberta. |
+| `tool_limit_exceeded` | Comparação existente com MaxTotalTools no Manager, classificada a partir de ErrLimit e etapa local de contagem. MaxTools dentro de discover não é distinguível por tipo e fica unknown. |
+| `timeout` | `context.DeadlineExceeded`, inclusive quando envolto. |
+| `cancelled` | `context.Canceled`, inclusive quando envolto. Cancelamento antes do loop continua retornando erro ao chamador, sem novo status artificial. |
+| `protocol_error` | `mcp.ErrProtocol`. |
+| `unknown` | Erro livre, ErrUnavailable, ErrConfig fora do resolver, ErrLimit ambíguo ou qualquer erro sem evidência tipada suficiente. |
+
+Não foram criados novos tipos de erro nem modificados limites. Os testes offline aceitam descrição genérica de 1.024 bytes e rejeitam 1.025 bytes com o mesmo ErrLimit anterior; não há exceção CUA. A assinatura pública de NewClient e o fluxo de criação permanecem; um helper privado comunica somente a etapa local ao Manager.
+
+Validação e contagens: [relatório desta rodada](MCP_STARTUP_REASONS.md). Descoberta pelo DAIMON, leitura de janela, aprovação, rotinas com computador, Space, Volume, Windows com cua-driver.exe e Fleet continuam sem validação CUA real nesta rodada. Registrar a categoria não corrige nem contorna a falha de descoberta anterior.

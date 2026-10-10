@@ -1,0 +1,38 @@
+ok  	github.com/netty-linux/daimon/cmd/daimon	97.646s
+ok  	github.com/netty-linux/daimon/internal/agentloop	4.216s
+ok  	github.com/netty-linux/daimon/internal/bots	0.463s
+ok  	github.com/netty-linux/daimon/internal/computer	4.013s
+?   	github.com/netty-linux/daimon/internal/computer/mediatest	[no test files]
+ok  	github.com/netty-linux/daimon/internal/computer/socket	0.028s
+ok  	github.com/netty-linux/daimon/internal/conversations	1.442s
+ok  	github.com/netty-linux/daimon/internal/createcontract	0.199s
+ok  	github.com/netty-linux/daimon/internal/diffview	0.029s
+ok  	github.com/netty-linux/daimon/internal/editcontract	0.345s
+ok  	github.com/netty-linux/daimon/internal/environments	3.138s
+ok  	github.com/netty-linux/daimon/internal/managedworkspace	147.684s
+--- FAIL: TestEnvironmentFailureMetadataIsPrivate (0.00s)
+    startup_test.go:51: mcp: invalid configuration
+FAIL
+FAIL	github.com/netty-linux/daimon/internal/mcp	0.603s
+?   	github.com/netty-linux/daimon/internal/mcp/cuatest	[no test files]
+?   	github.com/netty-linux/daimon/internal/mcp/mcptest	[no test files]
+ok  	github.com/netty-linux/daimon/internal/memory	1.505s
+ok  	github.com/netty-linux/daimon/internal/model	0.005s
+ok  	github.com/netty-linux/daimon/internal/policy	0.040s
+ok  	github.com/netty-linux/daimon/internal/providers	0.010s
+ok  	github.com/netty-linux/daimon/internal/providers/groq	0.011s
+ok  	github.com/netty-linux/daimon/internal/providers/openai	0.169s
+ok  	github.com/netty-linux/daimon/internal/routines	2.359s
+ok  	github.com/netty-linux/daimon/internal/sandbox	4.986s
+--- FAIL: TestComputerStartupReasonReadOnlyMetadata (0.05s)
+    computers_test.go:92: mcp: invalid configuration
+FAIL
+FAIL	github.com/netty-linux/daimon/internal/server	7.230s
+ok  	github.com/netty-linux/daimon/internal/sessions	7.061s
+ok  	github.com/netty-linux/daimon/internal/threads	0.382s
+ok  	github.com/netty-linux/daimon/internal/tools	0.029s
+ok  	github.com/netty-linux/daimon/internal/workspacefs	0.020s
+ok  	github.com/netty-linux/daimon/internal/workspacejournal	0.004s
+ok  	github.com/netty-linux/daimon/internal/workspaceplan	0.008s
+?   	github.com/netty-linux/daimon/ui/scripts/cua-fixture	[no test files]
+FAIL
