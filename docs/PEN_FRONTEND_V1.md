@@ -4,7 +4,7 @@
 
 O PR #23 foi rebaseado de 809dbec sobre 169dc45 (base atual do #22). O conflito foi somente no index.html gerado; o build final substituiu os assets intermediários, incluindo o bundle herdado da base. As ocorrências perdidas de rotinas e as causas fixas de falha do Computer permanecem no frontend integrado. Nenhum contrato do runtime foi alterado pelo rebase.
 
-npm ci, typecheck, 80 testes / 15 arquivos e build passaram. O bundle atual usa index-CqpeXhAo.js e index-B7VX4gBZ.css. Não contém os três marcadores de fixtures nem x6AmZ; ui/src não importa scripts de teste. Hashes e saídas desta rodada estão em validation/stacked-prs-merge-2026-10-10. A validação completa e os smokes serão registrados nessa mesma pasta antes do merge.
+npm ci, typecheck, 80 testes / 15 arquivos e build passaram. O bundle atual usa index-CqpeXhAo.js e index-B7VX4gBZ.css. Não contém os três marcadores de fixtures nem x6AmZ; ui/src não importa scripts de teste. Hashes e saídas desta rodada estão em validation/stacked-prs-merge-2026-10-10. A validação Go completa (incluindo race e demo) e todos os smokes offline passaram; saídas e revisão visual estão no relatório STACKED_PR_MERGE_VALIDATION.md e nessa mesma pasta.
 
 A autorização do usuário nesta conversa permite atualizar, revalidar, enviar e mesclar os PRs #22 e #23. CUA real continua pendente e não foi declarado como validado. A ordem de merge será #22 em main e, após mudar a base do #23 para main, #23 em main.
 

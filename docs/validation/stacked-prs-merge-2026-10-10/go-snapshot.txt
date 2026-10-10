@@ -1,0 +1,86 @@
++ mkdir /src
++ tar -xf /source.tar -C /src
++ cd /src
++ gofmt -l .
++ go vet ./...
++ go test -count=1 ./...
+ok  	github.com/netty-linux/daimon/cmd/daimon	200.047s
+ok  	github.com/netty-linux/daimon/internal/agentloop	4.265s
+ok  	github.com/netty-linux/daimon/internal/bots	1.655s
+ok  	github.com/netty-linux/daimon/internal/computer	14.605s
+?   	github.com/netty-linux/daimon/internal/computer/mediatest	[no test files]
+ok  	github.com/netty-linux/daimon/internal/computer/socket	0.090s
+ok  	github.com/netty-linux/daimon/internal/conversations	5.305s
+ok  	github.com/netty-linux/daimon/internal/createcontract	0.910s
+ok  	github.com/netty-linux/daimon/internal/diffview	0.107s
+ok  	github.com/netty-linux/daimon/internal/editcontract	1.350s
+ok  	github.com/netty-linux/daimon/internal/environments	7.861s
+ok  	github.com/netty-linux/daimon/internal/managedworkspace	309.486s
+ok  	github.com/netty-linux/daimon/internal/mcp	1.468s
+?   	github.com/netty-linux/daimon/internal/mcp/cuatest	[no test files]
+?   	github.com/netty-linux/daimon/internal/mcp/mcptest	[no test files]
+ok  	github.com/netty-linux/daimon/internal/memory	3.844s
+ok  	github.com/netty-linux/daimon/internal/model	0.007s
+ok  	github.com/netty-linux/daimon/internal/policy	0.053s
+ok  	github.com/netty-linux/daimon/internal/providers	0.129s
+ok  	github.com/netty-linux/daimon/internal/providers/groq	0.085s
+ok  	github.com/netty-linux/daimon/internal/providers/openai	0.284s
+ok  	github.com/netty-linux/daimon/internal/routines	6.342s
+ok  	github.com/netty-linux/daimon/internal/sandbox	10.261s
+ok  	github.com/netty-linux/daimon/internal/server	27.480s
+ok  	github.com/netty-linux/daimon/internal/sessions	31.815s
+ok  	github.com/netty-linux/daimon/internal/threads	1.669s
+ok  	github.com/netty-linux/daimon/internal/tools	0.248s
+ok  	github.com/netty-linux/daimon/internal/workspacefs	0.069s
+ok  	github.com/netty-linux/daimon/internal/workspacejournal	0.151s
+ok  	github.com/netty-linux/daimon/internal/workspaceplan	0.057s
+?   	github.com/netty-linux/daimon/ui/scripts/cua-fixture	[no test files]
++ go test -race -count=1 ./...
+ok  	github.com/netty-linux/daimon/cmd/daimon	161.446s
+ok  	github.com/netty-linux/daimon/internal/agentloop	5.314s
+ok  	github.com/netty-linux/daimon/internal/bots	3.166s
+ok  	github.com/netty-linux/daimon/internal/computer	9.866s
+?   	github.com/netty-linux/daimon/internal/computer/mediatest	[no test files]
+ok  	github.com/netty-linux/daimon/internal/computer/socket	1.067s
+ok  	github.com/netty-linux/daimon/internal/conversations	19.471s
+ok  	github.com/netty-linux/daimon/internal/createcontract	1.768s
+ok  	github.com/netty-linux/daimon/internal/diffview	1.166s
+ok  	github.com/netty-linux/daimon/internal/editcontract	2.454s
+ok  	github.com/netty-linux/daimon/internal/environments	13.031s
+ok  	github.com/netty-linux/daimon/internal/managedworkspace	241.747s
+ok  	github.com/netty-linux/daimon/internal/mcp	3.815s
+?   	github.com/netty-linux/daimon/internal/mcp/cuatest	[no test files]
+?   	github.com/netty-linux/daimon/internal/mcp/mcptest	[no test files]
+ok  	github.com/netty-linux/daimon/internal/memory	14.000s
+ok  	github.com/netty-linux/daimon/internal/model	1.145s
+ok  	github.com/netty-linux/daimon/internal/policy	1.099s
+ok  	github.com/netty-linux/daimon/internal/providers	1.045s
+ok  	github.com/netty-linux/daimon/internal/providers/groq	1.096s
+ok  	github.com/netty-linux/daimon/internal/providers/openai	1.665s
+ok  	github.com/netty-linux/daimon/internal/routines	11.138s
+ok  	github.com/netty-linux/daimon/internal/sandbox	15.579s
+ok  	github.com/netty-linux/daimon/internal/server	35.902s
+ok  	github.com/netty-linux/daimon/internal/sessions	26.471s
+ok  	github.com/netty-linux/daimon/internal/threads	5.786s
+ok  	github.com/netty-linux/daimon/internal/tools	1.645s
+ok  	github.com/netty-linux/daimon/internal/workspacefs	1.255s
+ok  	github.com/netty-linux/daimon/internal/workspacejournal	1.265s
+ok  	github.com/netty-linux/daimon/internal/workspaceplan	1.402s
+?   	github.com/netty-linux/daimon/ui/scripts/cua-fixture	[no test files]
++ go run ./cmd/daimon demo
+Resposta final: DAIMON
+Passos do modelo: 2
+Chamadas de ferramenta: 1
+Resultados truncados: 0
+Motivo de parada: completed
+Eventos:
+  loop_started (step=0, tool=0, stop_reason=)
+  model_requested (step=1, tool=0, stop_reason=)
+  model_responded (step=1, tool=0, stop_reason=)
+  tool_allowed (step=1, tool=1, stop_reason=)
+  tool_requested (step=1, tool=1, stop_reason=)
+  tool_completed (step=1, tool=1, stop_reason=)
+  model_requested (step=2, tool=0, stop_reason=)
+  model_responded (step=2, tool=0, stop_reason=)
+  final_answer (step=2, tool=0, stop_reason=)
+  loop_stopped (step=2, tool=0, stop_reason=completed)
