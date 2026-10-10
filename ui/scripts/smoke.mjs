@@ -2,7 +2,7 @@
 // no credentials. Install a Playwright browser first or set DAIMON_SMOKE_CHANNEL.
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -128,6 +128,25 @@ try {
   await page.getByText('Native routine',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Pausar rotina',exact:true}).click();
   await page.getByRole('button',{name:'Ativar rotina',exact:true}).waitFor();
+  // Disposable fixture store only, while the server is stopped. No clock wait or CUA.
+  const selectedThread=new URLSearchParams(new URL(page.url()).hash.slice(1)).get('thread');
+  const selected=(await(await page.request.get(base+'api/v1/threads/'+selectedThread)).json());
+  assert.equal((await page.request.post(base+'api/v1/routines',{data:{id:'missed-fixture',bot_id:selected.bot_id,thread_id:selectedThread,title:'Missed fixture',prompt:'Must not execute offline',daily_at:'00:00',timezone:'UTC',enabled:true},headers:{Origin:new URL(base).origin}})).status(),201);
+  await stop(child);
+  const routinePath=join(state,'routines.json'),persisted=JSON.parse(await readFile(routinePath,'utf8'));
+  for(const item of persisted.routines)item.next_at='2026-01-01T00:00:00Z';
+  await writeFile(routinePath,JSON.stringify(persisted));
+  const callsBeforeRestart=calls;
+  child=startServer(serverPort);await ready(child);
+  await page.reload();await select('Updated Coder','Reviewed workspace');
+  await page.getByRole('tab',{name:'Atividade',exact:true}).click();await page.getByText('Perdida',{exact:true}).waitFor();
+  await page.getByText(/^Horário previsto \(UTC\):/).waitFor();await page.getByText(/^Detectada em \(UTC\):/).waitFor();
+  const occurrences=(await(await page.request.get(base+'api/v1/routines')).json()).routines;
+  const missed=occurrences.find(r=>r.id==='missed-fixture');assert.equal(missed.missed.state,'missed');assert.equal(missed.session_id,undefined);
+  assert.equal(occurrences.find(r=>r.title==='Native routine').missed,undefined);assert.equal(calls,callsBeforeRestart);
+  await stop(child);child=startServer(serverPort);await ready(child);
+  const twice=(await(await page.request.get(base+'api/v1/routines')).json()).routines.find(r=>r.id==='missed-fixture');assert.deepEqual(twice.missed,missed.missed);assert.equal(calls,callsBeforeRestart);
+  assert.equal((await page.request.delete(base+'api/v1/routines/missed-fixture',{headers:{Origin:new URL(base).origin}})).status(),204);
   await page.reload(); await select('Updated Coder','Reviewed workspace');
   await page.getByRole('tab',{name:'Atividade',exact:true}).click();
   await page.getByRole('button',{name:'Ativar rotina',exact:true}).waitFor();
