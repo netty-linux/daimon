@@ -1,5 +1,32 @@
 # Pen frontend v1 — integração e limites
 
+## Atualização em 2026-10-10
+
+O modal existente de edição agora usa o título **Editar Bot**, centralizado em `ui/src/i18n/pt-BR.ts` e consumido por `Editors.tsx`; os testes de interface e o seletor do smoke foram ajustados. O DTO permanece inalterado.
+
+O wordmark PNG era utilizado pelo React via JavaScript, mas não tinha referência no CSS ou HTML estático. Conforme a solicitação posterior, seu import foi removido: o cabeçalho usa texto DAIMON e o PNG não entra mais no build. A fonte exportada permanece arquivada em `ui/src/design/assets/x6AmZ.png`. A [origem registrada](../ui/src/design/assets/ORIGIN.md) identifica documento/nó/exportação, mas **não há registro de licença ou autoria**.
+
+Build limpo executado com `npm run build`: Vite usa `emptyOutDir: true`, removendo os assets antigos antes de gerar os novos. Saída:
+
+```text
+✓ 57 modules transformed.
+../internal/server/ui/index.html                 0.42 kB
+../internal/server/ui/assets/index-B7VX4gBZ.css  26.84 kB
+../internal/server/ui/assets/index-CfJl7WzH.js  313.13 kB
+✓ built in 3.57s
+```
+
+Verificação do novo bundle, executada na raiz:
+
+```powershell
+rg -n -F -e 'READ-MARKER' -e 'Computer sequence completed' -e 'Offline controlled computer fixture.' internal/server/ui/assets --glob '*.js'
+# Nenhuma correspondência; exit 1 (sem matches).
+rg -n -F 'x6AmZ' internal/server/ui
+# Nenhuma correspondência; exit 1 (sem matches).
+```
+
+`npm test`: **76 testes, 15 arquivos, todos passando**. As seções abaixo preservam a entrega e os hashes históricos de 2026-10-09; a imagem e os nomes dos bundles citados nelas não representam o build atual.
+
 Fonte: `Daimon-Refactory.pen`, lido exclusivamente pelo MCP `pencil`, em 2026-10-09.
 Base local: `feature/cua-persistent-bots`, commit `809dbec902ac65d531fb237541da5cffb848d599`.
 A branch solicitada `feature/pen-frontend-v1` já existia no mesmo commit; foi reutilizada sem reset.
