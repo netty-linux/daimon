@@ -13,11 +13,15 @@
   opt-in por processo e aprovação individual. Nenhuma permissão vem da agenda/Volume.
 - Memory/Volume controlado e associação Bot/Space continuam separados e pendentes;
   não antecipar importação automática, comandos, retries ou agentes externos.
-- Descarte de Sessions antigas: pendente de decisão. Hoje são retidas 128
-  Sessions por processo, sem descarte automático.
-- Rotinas perdidas com o servidor fechado: pendente de decisão. Hoje não há
-  catch-up; a rotina vencida é pulada sem registro.
-
+- Retenção de Sessions: no máximo 128 por processo. Novo Start no limite descarta
+  somente a Session terminal mais antiga (completed, failed ou aborted), após
+  cleanup; startup, running e aprovação permanecem retidas. Sem terminal elegível,
+  rejeitar Start com erro tipado explícito sem alterar Sessions existentes.
+- Inicialização do agendador: para cada rotina ativa com horário diário vencido
+  sem disparo, persistir uma única ocorrência perdida por horário previsto, com
+  horário previsto e detecção. Sem Session, execução, catch-up de vários dias,
+  consumo/concessão de permissão ou bloqueio do próximo disparo. Rotinas pausadas
+  não geram perda; reinícios sucessivos não duplicam a ocorrência.
 
 Visão: plataforma local experimental Daimon Bots, sob controle do usuário,
 com runtime nativo provider-agnostic e contratos fortes de execução local.
