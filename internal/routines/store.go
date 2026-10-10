@@ -40,8 +40,10 @@ type Input struct {
 }
 type Routine struct {
 	Input
-	NextAt        time.Time `json:"next_at"`
-	LastAttemptAt time.Time `json:"last_attempt_at"`
+	NextAt           time.Time `json:"next_at"`
+	LastAttemptAt    time.Time `json:"last_attempt_at"`
+	MissedAt         time.Time `json:"missed_at"`
+	MissedDetectedAt time.Time `json:"missed_detected_at"`
 }
 type envelope struct {
 	Version  int       `json:"version"`
@@ -114,6 +116,16 @@ func strict(data []byte) bool {
 	if !validEscapes(data) {
 		return false
 	}
+	var header struct {
+		Version int `json:"version"`
+	}
+	if json.Unmarshal(data, &header) != nil || (header.Version != 1 && header.Version != 2) {
+		return false
+	}
+	expected := 10
+	if header.Version == 2 {
+		expected = 12
+	}
 	d := json.NewDecoder(bytes.NewReader(data))
 	var walk func(int) bool
 	walk = func(depth int) bool {
@@ -155,6 +167,10 @@ func strict(data []byte) bool {
 			} else {
 				switch key {
 				case "id", "bot_id", "thread_id", "title", "prompt", "daily_at", "timezone", "enabled", "next_at", "last_attempt_at":
+				case "missed_at", "missed_detected_at":
+					if header.Version != 2 {
+						return false
+					}
 				default:
 					return false
 				}
@@ -170,7 +186,7 @@ func strict(data []byte) bool {
 		if depth == 0 {
 			return len(seen) == 2
 		}
-		return len(seen) == 10
+		return len(seen) == expected
 	}
 	if !utf8.Valid(data) || !walk(0) {
 		return false
@@ -237,6 +253,10 @@ func check(items []Routine) error {
 		if Validate(r.Input) != nil || r.NextAt.IsZero() || r.NextAt.Location() != time.UTC || r.LastAttemptAt.Location() != time.UTC || seen[r.ID] {
 			return ErrStore
 		}
+		if r.MissedAt.IsZero() != r.MissedDetectedAt.IsZero() || r.MissedAt.Location() != time.UTC || r.MissedDetectedAt.Location() != time.UTC ||
+			(!r.MissedAt.IsZero() && (r.MissedDetectedAt.Before(r.MissedAt) || !r.MissedAt.Before(r.NextAt))) {
+			return ErrStore
+		}
 		seen[r.ID] = true
 		if r.Enabled {
 			active[r.BotID]++
@@ -264,7 +284,7 @@ func (s *Store) load() ([]Routine, error) {
 		return nil, ErrStore
 	}
 	var v envelope
-	if json.Unmarshal(data, &v) != nil || v.Version != 1 || v.Routines == nil {
+	if json.Unmarshal(data, &v) != nil || (v.Version != 1 && v.Version != 2) || v.Routines == nil {
 		return nil, ErrStore
 	}
 	if e := check(v.Routines); e != nil {
@@ -277,7 +297,7 @@ func (s *Store) save(ctx context.Context, items []Routine) (err error) {
 	if e := check(items); e != nil {
 		return e
 	}
-	data, e := json.Marshal(envelope{1, items})
+	data, e := json.Marshal(envelope{2, items})
 	if e != nil || len(data) > MaxBytes {
 		return ErrLimit
 	}
@@ -385,7 +405,16 @@ func (s *Store) consume(ctx context.Context, r Routine, now time.Time) error {
 	}
 	return ErrNotFound
 }
+
+// reset records only the most recent missed daily slot per enabled routine.
+// One retained occurrence per routine bounds metadata to MaxRoutines records.
 func (s *Store) reset(ctx context.Context, now time.Time) error {
+	if ctx == nil || now.IsZero() {
+		return ErrInvalid
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	items, e := s.load()
@@ -394,8 +423,20 @@ func (s *Store) reset(ctx context.Context, now time.Time) error {
 	}
 	changed := false
 	for i := range items {
-		if !items[i].NextAt.After(now) {
+		if items[i].NextAt.Before(now) {
+			if items[i].Enabled {
+				at := latestSlot(items[i].Input, now)
+				if !at.Before(items[i].NextAt) && at.After(items[i].LastAttemptAt) && at.After(items[i].MissedAt) {
+					items[i].MissedAt = at
+					items[i].MissedDetectedAt = now.UTC()
+				}
+			}
 			items[i].NextAt = next(items[i].Input, now)
+			// If startup is exactly on today's slot, preserve that normal firing
+			// while recording only earlier missed intent.
+			if due := next(items[i].Input, now.Add(-time.Nanosecond)); due.Equal(now) {
+				items[i].NextAt = due
+			}
 			changed = true
 		}
 	}
@@ -403,4 +444,16 @@ func (s *Store) reset(ctx context.Context, now time.Time) error {
 		return s.save(ctx, items)
 	}
 	return nil
+}
+
+// latestSlot uses calendar days in the declared timezone, including DST.
+func latestSlot(in Input, now time.Time) time.Time {
+	loc, _ := time.LoadLocation(in.Timezone)
+	local := now.In(loc)
+	clock, _ := time.Parse("15:04", in.DailyAt)
+	at := time.Date(local.Year(), local.Month(), local.Day(), clock.Hour(), clock.Minute(), 0, 0, loc)
+	if !at.Before(now) {
+		at = time.Date(local.Year(), local.Month(), local.Day()-1, clock.Hour(), clock.Minute(), 0, 0, loc)
+	}
+	return at.UTC()
 }

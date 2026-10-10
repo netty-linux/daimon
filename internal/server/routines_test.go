@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRoutineHTTPStrictnessPrivacyAndReferences(t *testing.T) {
@@ -25,6 +26,12 @@ func TestRoutineHTTPStrictnessPrivacyAndReferences(t *testing.T) {
 	}
 	if r := request(f.server, "GET", "/api/v1/routines", nil); r.Code != 200 || strings.Contains(r.Body.String(), in.Prompt) || !strings.Contains(r.Body.String(), `"server_only":true`) {
 		t.Fatal("leak", r.Code, r.Body)
+	}
+	if err := scheduler.Initialize(context.Background(), time.Now().UTC().Add(48*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if r := request(f.server, "GET", "/api/v1/routines", nil); r.Code != 200 || !strings.Contains(r.Body.String(), `"state":"missed"`) || !strings.Contains(r.Body.String(), `"scheduled_at"`) || !strings.Contains(r.Body.String(), `"detected_at"`) || strings.Contains(r.Body.String(), in.Prompt) {
+		t.Fatal("missed metadata missing/private", r.Body)
 	}
 	for _, path := range []string{"/api/v1/bots/bot", "/api/v1/threads/thread"} {
 		if r := request(f.server, "DELETE", path, nil); r.Code != 409 || !strings.Contains(r.Body.String(), "resource_has_routines") {

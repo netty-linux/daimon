@@ -25,17 +25,24 @@ type References interface {
 type BotReader interface {
 	Get(bots.ID) (bots.Bot, error)
 }
+type MissedOccurrence struct {
+	State       string    `json:"state"`
+	ScheduledAt time.Time `json:"scheduled_at"`
+	DetectedAt  time.Time `json:"detected_at"`
+}
+
 type View struct {
-	ID        string    `json:"id"`
-	BotID     string    `json:"bot_id"`
-	ThreadID  string    `json:"thread_id"`
-	Title     string    `json:"title"`
-	DailyAt   string    `json:"daily_at"`
-	Timezone  string    `json:"timezone"`
-	Enabled   bool      `json:"enabled"`
-	NextAt    time.Time `json:"next_at"`
-	State     string    `json:"state"`
-	SessionID string    `json:"session_id,omitempty"`
+	ID        string            `json:"id"`
+	BotID     string            `json:"bot_id"`
+	ThreadID  string            `json:"thread_id"`
+	Title     string            `json:"title"`
+	DailyAt   string            `json:"daily_at"`
+	Timezone  string            `json:"timezone"`
+	Enabled   bool              `json:"enabled"`
+	NextAt    time.Time         `json:"next_at"`
+	State     string            `json:"state"`
+	SessionID string            `json:"session_id,omitempty"`
+	Missed    *MissedOccurrence `json:"missed,omitempty"`
 }
 type Scheduler struct {
 	mu              sync.Mutex
@@ -145,7 +152,11 @@ func (s *Scheduler) List() ([]View, error) {
 				state = "failed"
 			}
 		}
-		views = append(views, View{r.ID, r.BotID, r.ThreadID, r.Title, r.DailyAt, r.Timezone, r.Enabled, r.NextAt, state, s.sessionIDs[r.ID]})
+		var missed *MissedOccurrence
+		if !r.MissedAt.IsZero() {
+			missed = &MissedOccurrence{State: "missed", ScheduledAt: r.MissedAt, DetectedAt: r.MissedDetectedAt}
+		}
+		views = append(views, View{r.ID, r.BotID, r.ThreadID, r.Title, r.DailyAt, r.Timezone, r.Enabled, r.NextAt, state, s.sessionIDs[r.ID], missed})
 	}
 	return views, nil
 }
@@ -217,9 +228,9 @@ func (s *Scheduler) Tick(ctx context.Context, now time.Time) (err error) {
 }
 
 // Run is application-owned. No worker/session survives the supplied context.
-// Expired slots at process start are skipped; no offline catch-up.
+// Expired slots at process start are recorded without executing offline catch-up.
 func (s *Scheduler) Run(ctx context.Context) error {
-	if e := s.store.reset(ctx, time.Now().UTC()); e != nil {
+	if e := s.Initialize(ctx, time.Now().UTC()); e != nil {
 		return e
 	}
 	ticker := time.NewTicker(time.Second * 15)
@@ -237,4 +248,11 @@ func (s *Scheduler) Run(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+// Initialize detects missed intent only; it never consults or starts the runtime.
+func (s *Scheduler) Initialize(ctx context.Context, now time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.store.reset(ctx, now)
 }

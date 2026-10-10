@@ -207,7 +207,7 @@ func TestCorruptionAndScheduleValidation(t *testing.T) {
 			t.Fatal("invalid accepted")
 		}
 	}
-	for _, data := range []string{`{"version":1,"version":1,"routines":[]}`, `{"version":2,"routines":[]}`, `{"version":1,"routines":null}`, `{"version":1,"routines":[],"secret":"x"}`} {
+	for _, data := range []string{`{"version":1,"version":1,"routines":[]}`, `{"version":3,"routines":[]}`, `{"version":1,"routines":null}`, `{"version":1,"routines":[],"secret":"x"}`} {
 		os.WriteFile(store.path, []byte(data), 0600)
 		if _, e := Open(store.path); e == nil {
 			t.Fatal("corrupt accepted")
