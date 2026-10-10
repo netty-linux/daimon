@@ -2,6 +2,10 @@
 
 ## Atualização em 2026-10-10
 
+Após remover o PNG fonte sem uso, `npm run build` foi reexecutado e produziu exatamente os mesmos assets já versionados (`index-B7VX4gBZ.css`, `index-CfJl7WzH.js` e `index.html`). A remoção do arquivo não importado não altera o bundle. `assets-after.sha256` foi atualizado porque ainda registrava o build anterior à mudança do título e à remoção do import/PNG do build; essa divergência era do registro desatualizado, não deste rebuild. `npm test` passou com 76 testes / 15 arquivos; `npm run typecheck` passou sem diagnósticos.
+
+Nesta revalidação, após iniciar o Docker Desktop que estava desligado, `gofmt -l .` e `go vet ./...` passaram sem saída, e `go test -count=1 ./...` passou em Linux offline, incluindo os testes de symlink. [Saída Go desta rodada](validation/pen-frontend-v1/go-validation-2026-10-10.txt). Nenhum código ou asset de produção foi alterado nesta rodada.
+
 O modal existente de edição agora usa o título **Editar Bot**, centralizado em `ui/src/i18n/pt-BR.ts` e consumido por `Editors.tsx`; os testes de interface e o seletor do smoke foram ajustados. O DTO permanece inalterado.
 
 O wordmark PNG era utilizado pelo React via JavaScript, mas não tinha referência no CSS ou HTML estático. Conforme a solicitação posterior, seu import foi removido: o cabeçalho usa texto DAIMON e o PNG não entra mais no build. A fonte exportada também foi removida do repositório por não haver imports; somente o registro histórico de origem permanece. A [origem registrada](../ui/src/design/assets/ORIGIN.md) identifica documento/nó/exportação, mas **não há registro de licença ou autoria**.
