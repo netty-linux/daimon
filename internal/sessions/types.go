@@ -196,5 +196,5 @@ type Options struct {
 	EventCapacity         int // 1..16384; no implicit default.
 	MaxMemoryContextBytes int // Required when Memory is configured; 1..32KiB.
 	MaxMemoryRecords      int // Required when Memory is configured; 1..64.
-	MaxSessions           int // 1..1024, includes retained terminal sessions.
+	MaxSessions           int // 1..128; finalized terminals are evicted oldest-first at capacity.
 }

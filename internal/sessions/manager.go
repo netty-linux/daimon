@@ -29,7 +29,10 @@ type state struct {
 	approvalIDs    map[ApprovalID]bool // true = resolved, false = invalidated; bounded.
 }
 
-// Manager owns every worker and retains bounded metadata until Close/process exit.
+// MaxRetainedSessions bounds retained Sessions in the application-owned Manager.
+const MaxRetainedSessions = 128
+
+// Manager owns every worker and retains bounded metadata, evicting finalized terminals.
 // Short locks protect state only; external calls never run under these locks.
 type Manager struct {
 	mu        sync.Mutex
@@ -37,6 +40,7 @@ type Manager struct {
 	options   Options
 	factories map[providers.ID]providers.Factory
 	sessions  map[ID]*state
+	usedIDs   map[ID]struct{} // Identity tombstones only: never reuse an admitted ID after eviction.
 	active    map[string]ID
 	closed    bool
 }
@@ -46,10 +50,10 @@ func NewManager(deps Dependencies, options Options) (*Manager, error) {
 		return nil, &Error{Kind: Invalid, Cause: err}
 	}
 	if deps.Bots == nil || deps.Threads == nil || deps.Providers == nil || deps.Config == nil ||
-		(deps.Memory != nil && (options.MaxMemoryContextBytes < 1 || options.MaxMemoryContextBytes > 32*1024 || options.MaxMemoryRecords < 1 || options.MaxMemoryRecords > 64)) || options.EventCapacity < 1 || options.EventCapacity > 16384 || options.MaxSessions < 1 || options.MaxSessions > 1024 {
+		(deps.Memory != nil && (options.MaxMemoryContextBytes < 1 || options.MaxMemoryContextBytes > 32*1024 || options.MaxMemoryRecords < 1 || options.MaxMemoryRecords > 64)) || options.EventCapacity < 1 || options.EventCapacity > 16384 || options.MaxSessions < 1 || options.MaxSessions > MaxRetainedSessions {
 		return nil, &Error{Kind: Invalid}
 	}
-	m := &Manager{deps: deps, options: options, factories: map[providers.ID]providers.Factory{}, sessions: map[ID]*state{}, active: map[string]ID{}}
+	m := &Manager{deps: deps, options: options, factories: map[providers.ID]providers.Factory{}, sessions: map[ID]*state{}, usedIDs: map[ID]struct{}{}, active: map[string]ID{}}
 	for _, id := range deps.Providers.IDs() {
 		factory, err := deps.Providers.Get(id)
 		if err != nil {
@@ -107,7 +111,7 @@ func (m *Manager) Start(ctx context.Context, req StartRequest) (Snapshot, error)
 		m.mu.Unlock()
 		return Snapshot{}, &Error{Kind: Closed}
 	}
-	if _, exists := m.sessions[req.SessionID]; exists {
+	if _, exists := m.usedIDs[req.SessionID]; exists {
 		m.mu.Unlock()
 		return Snapshot{}, &Error{Kind: Duplicate}
 	}
@@ -131,14 +135,33 @@ func (m *Manager) Start(ctx context.Context, req StartRequest) (Snapshot, error)
 		}
 	}
 	if len(m.sessions) >= m.options.MaxSessions {
-		m.mu.Unlock()
-		return Snapshot{}, &Error{Kind: Capacity}
+		var oldest ID
+		for id, candidate := range m.sessions {
+			if !terminal(candidate.snapshot.Status) {
+				continue
+			}
+			select {
+			case <-candidate.done:
+			default:
+				continue
+			}
+			if oldest == "" || candidate.snapshot.StartedAt.Before(m.sessions[oldest].snapshot.StartedAt) ||
+				(candidate.snapshot.StartedAt.Equal(m.sessions[oldest].snapshot.StartedAt) && id < oldest) {
+				oldest = id
+			}
+		}
+		if oldest == "" {
+			m.mu.Unlock()
+			return Snapshot{}, &Error{Kind: Capacity}
+		}
+		delete(m.sessions, oldest)
 	}
 	runCtx, cancel := context.WithCancelCause(ctx)
 	s := &state{snapshot: Snapshot{ID: req.SessionID, ThreadID: req.ThreadID, Status: Created, StartedAt: nowUTC()},
 		events: eventBuffer{items: make([]Event, m.options.EventCapacity)}, cancel: cancel, done: make(chan struct{}), changed: make(chan struct{})}
 	s.admissionBot, s.scheduled = admissionBot, req.ScheduledBotID != ""
 	m.sessions[req.SessionID] = s
+	m.usedIDs[req.SessionID] = struct{}{}
 	m.active[string(req.ThreadID)] = req.SessionID
 	initial := s.snapshot
 	m.mu.Unlock()
