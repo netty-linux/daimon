@@ -84,7 +84,7 @@ Navigation collapses at narrower widths; content remains usable without body ove
 
 ## Non-goals
 
-No runtime/backend redesign, authentication, subscriptions, Honcho, Intelligent
+(histórico) No runtime/backend redesign, authentication, subscriptions, Honcho, Intelligent
 Memory, background runs, subagents, file manager, mobile/desktop app or Phase 17.
 
 ## Validation
@@ -127,7 +127,7 @@ Web UI documentation updated. Backend source and API contracts were not redesign
 - No file manager, automatic memory, token streaming or guarantee against browser
   resource limits. Real paid cloud behavior was not exercised by these fixtures.
 
-Next recommended phase: **Phase 17 — Background Tasks + Long-Running Agent Runs**.
+Phase 17 — Background Tasks: parte Native Routines Foundation implementada (escopo restrito); próximo passo é a validação com CUA real.
 Deferred: background agents, Honcho, Intelligent Memory, subagents, billing, accounts
 and standalone mobile/desktop apps. None implemented in this phase.
 
@@ -172,4 +172,4 @@ missing/crashed drivers, live view/human input/exclusion/release, cloud cleanup 
 persistent environment revisions across local/cloud and restart. Menus close after
 action; memory deletion uses a modal; notification dismissal has a distinct label.
 A screenshot contains only fixture chat content, never captured computer media.
-No commit, push, paid execution or implementation of Phase 17 was performed.
+(histórico) No commit, push, paid execution or implementation of Phase 17 was performed.

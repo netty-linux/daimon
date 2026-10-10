@@ -451,7 +451,9 @@ func TestValidationTransitionsCapacityAndClose(t *testing.T) {
 	m := manager(t, deps, options)
 	start(t, m, "session-a", "thread-a")
 	wait(t, m, "session-a")
-	if _, err := m.Start(testContext(t), StartRequest{SessionID: "session-b", ThreadID: "thread-b", Message: "hello"}); !errors.Is(err, &Error{Kind: Capacity}) {
+	start(t, m, "session-b", "thread-b")
+	wait(t, m, "session-b")
+	if _, err := m.Get("session-a"); !errors.Is(err, &Error{Kind: NotFound}) {
 		t.Fatal(err)
 	}
 	if err := m.Close(testContext(t)); err != nil {

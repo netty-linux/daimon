@@ -47,3 +47,8 @@ it('identifies cloud approvals with the exact guest',async()=>{
  await screen.findByText('Computador na nuvem: '+id+' · CUA Fleet · Navegação');
  expect(screen.queryByText(/Computador local:/)).toBeNull();
 });
+
+it('shows a fixed Portuguese startup cause without action controls',async()=>{
+ vi.mocked(api.computers).mockResolvedValue([{...computer,status:'startup_failed',reason:'discovery_too_large',capabilities:[]}]);render(<ComputerPanel/>);
+ await screen.findByText('A descrição ou o frame de descoberta excedeu o limite permitido.');expect(screen.queryByText('discovery_too_large')).toBeNull();
+});

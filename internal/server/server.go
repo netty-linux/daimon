@@ -11,6 +11,7 @@ import (
 	"github.com/netty-linux/daimon/internal/mcp"
 	"github.com/netty-linux/daimon/internal/memory"
 	"github.com/netty-linux/daimon/internal/providers"
+	"github.com/netty-linux/daimon/internal/routines"
 	"github.com/netty-linux/daimon/internal/sandbox"
 	"github.com/netty-linux/daimon/internal/sessions"
 	"github.com/netty-linux/daimon/internal/threads"
@@ -36,6 +37,7 @@ type SessionManager interface {
 	EventsSince(sessions.ID, uint64) (sessions.Replay, error)
 }
 type Dependencies struct {
+	Routines     *routines.Scheduler
 	Environments *environments.Store
 	Bots         *BotStore
 	Threads      *ThreadStore

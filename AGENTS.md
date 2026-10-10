@@ -1,5 +1,28 @@
 # DAIMON
 
+## Native Routines Foundation — escopo autorizado em 2026-10-09
+
+- Rotinas só agendam SessionManager.Start; nunca Space.agentStart, routineAdd ou
+  agentes persistentes/harnesses CUA. ToolPolicy, budget e aprovação por call intactos.
+- Agendador possui lifetime da aplicação e só funciona com servidor aberto, sem
+  catch-up de slots vencidos. Uma Session agendada reserva seu Bot; approval/startup/
+  cleanup bloqueiam novo disparo. Pausar rotina não decide aprovação nem aborta Session.
+- Store explícito/versionado limitado a 32 rotinas, 4 ativas/Bot, intervalo mínimo
+  de 15 minutos entre tentativas por Bot; horário diário e timezone IANA explícitos.
+- Cloud paga permanece bloqueada em rotina; escrita nativa permanece Linux-only
+  opt-in por processo e aprovação individual. Nenhuma permissão vem da agenda/Volume.
+- Memory/Volume controlado e associação Bot/Space continuam separados e pendentes;
+  não antecipar importação automática, comandos, retries ou agentes externos.
+- Retenção de Sessions: no máximo 128 por processo. Novo Start no limite descarta
+  somente a Session terminal mais antiga (completed, failed ou aborted), após
+  cleanup; startup, running e aprovação permanecem retidas. Sem terminal elegível,
+  rejeitar Start com erro tipado explícito sem alterar Sessions existentes.
+- Inicialização do agendador: para cada rotina ativa com horário diário vencido
+  sem disparo, persistir uma única ocorrência perdida por horário previsto, com
+  horário previsto e detecção. Sem Session, execução, catch-up de vários dias,
+  consumo/concessão de permissão ou bloqueio do próximo disparo. Rotinas pausadas
+  não geram perda; reinícios sucessivos não duplicam a ocorrência.
+
 Visão: plataforma local experimental Daimon Bots, sob controle do usuário,
 com runtime nativo provider-agnostic e contratos fortes de execução local.
 Escopo atual: Reliable Agent Loop + Execution Budget + OpenAI-compatible
@@ -24,7 +47,7 @@ registry/configuração de providers; 2 Bots; 3 Threads; 4 Sessions; 5 servidor 
 11 Memory Foundation manual; 12 Computer Use Foundation + CUA Driver local;
 13 Live Computer View + Human Takeover explícito e efêmero.
 Phases 0–13 estão estabelecidas, com transcript persistente separado
-e controle de input humano exclusivo no ComputerManager. Phases 14/15 adicionam sandbox local/cloud; Phase 16 adds durable workspace revisions; próxima: Phase 17 Background Tasks.
+e controle de input humano exclusivo no ComputerManager. Phases 14/15 adicionam sandbox local/cloud; Phase 16 adds durable workspace revisions; Phase 17 — Background Tasks: parte Native Routines Foundation implementada (escopo restrito, ver seção própria); execução autônoma longa, runs em background fora do servidor e demais partes da Phase 17 continuam adiadas. Próximo passo: validação com CUA real.
 As fases futuras exigem escopo explícito próprio; não criam autorização para efeitos.
 Não criar adapters vazios, abstrações especulativas ou dependências sem necessidade.
 
@@ -401,7 +424,7 @@ a cada push e pull request. Não substitua execução real por comandos simulado
 - Discovery não executa tools. Protocol 2025-11-25, frames/pending/queues/results bounded, IDs correlacionados; timeout/cancel/protocol violation aposentam conexão, sem restart ou retry.
 - Exec direto, ambiente operacional injetado sem DAIMON_*; stderr descartado; subprocessos encerram após Sessions e são aguardados. Sem promessa de sandbox ou limite de memória externo.
 - Eventos/snapshots/erros públicos sem argumentos/resultados/protocolo/segredos. Aprovação e catálogo são displays deliberados mínimos.
-- Testes offline com subprocesso real, incluindo Linux cleanup, autorização, persistência, falhas e navegador opt-in. Memory é extensão separada da Phase 11; Computer possui contrato próprio na Phase 12. Phase 13 é implementada pelo contrato Computer View; Phases 14/15 seguem os contratos de sandbox/cloud abaixo; não antecipar Phase 17.
+- Testes offline com subprocesso real, incluindo Linux cleanup, autorização, persistência, falhas e navegador opt-in. Memory é extensão separada da Phase 11; Computer possui contrato próprio na Phase 12. Phase 13 é implementada pelo contrato Computer View; Phases 14/15 seguem os contratos de sandbox/cloud abaixo; Phase 17 — Background Tasks: parte Native Routines Foundation implementada (escopo restrito, ver seção própria); execução autônoma longa, runs em background fora do servidor e demais partes da Phase 17 continuam adiadas.
 
 ## Memory Foundation — Phase 11
 
@@ -515,8 +538,7 @@ a cada push e pull request. Não substitua execução real por comandos simulado
 - Existing action approval/media/takeover gates; TLS official gateway only, no redirects.
 - Cost visible before Send. Managed pool billing may continue until Fleet GC.
 - Offline tests/smokes only by default; real paid smoke needs operator opt-in.
-- See docs/CLOUD_COMPUTERS_V1.md. Phase 16 is implemented below; Phase 17 Background Tasks
-  is the next recommended phase, not implemented in this cut.
+- See docs/CLOUD_COMPUTERS_V1.md. Phase 16 is implemented below; Phase 17 — Background Tasks: parte Native Routines Foundation implementada (escopo restrito, ver seção própria); execução autônoma longa, runs em background fora do servidor e demais partes da Phase 17 continuam adiadas.
 
 
 ## Persistent Environments — Phase 16
@@ -535,8 +557,8 @@ API (inode/device/hard-link count). Fixed executable/code/arguments; no user/mod
 command strings, shell, arbitrary command tool, stdin or content transfer. Structured
 bounded output, timeout and cancellation/kill-on-disconnect are required. Unsupported
 or unproven metadata fails closed. All content transfer uses FilesystemService.
-No paid CUA smoke, installation or login is automatic. Phase 17 Background Tasks +
-Long-Running Agent Runs, Intelligent Memory, Subagents and External Agents stay deferred.
+No paid CUA smoke, installation or login is automatic. Phase 17 — Background Tasks: parte Native Routines Foundation implementada (escopo restrito, ver seção própria); execução autônoma longa, runs em background fora do servidor e demais partes da Phase 17 continuam adiadas.
+Intelligent Memory, Subagents and External Agents stay deferred.
 
 
 ## Product UI V2 — Phase 16.5

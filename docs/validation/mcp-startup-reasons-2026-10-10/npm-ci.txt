@@ -1,0 +1,26 @@
+npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+npm error code EPERM
+npm error syscall spawn
+npm error errno -4048
+npm error Error: spawn EPERM
+npm error     at ChildProcess.spawn (node:internal/child_process:421:11)
+npm error     at spawn (node:child_process:796:9)
+npm error     at promiseSpawn (C:\Users\01 Bigode\AppData\Roaming\npm\node_modules\npm\node_modules\@npmcli\promise-spawn\lib\index.js:39:16)
+npm error     at spawnWithShell (C:\Users\01 Bigode\AppData\Roaming\npm\node_modules\npm\node_modules\@npmcli\promise-spawn\lib\index.js:124:10)
+npm error     at promiseSpawn (C:\Users\01 Bigode\AppData\Roaming\npm\node_modules\npm\node_modules\@npmcli\promise-spawn\lib\index.js:12:12)
+npm error     at runScriptPkg (C:\Users\01 Bigode\AppData\Roaming\npm\node_modules\npm\node_modules\@npmcli\run-script\lib\run-script-pkg.js:79:13)
+npm error     at runScript (C:\Users\01 Bigode\AppData\Roaming\npm\node_modules\npm\node_modules\@npmcli\run-script\lib\run-script.js:9:12)
+npm error     at C:\Users\01 Bigode\AppData\Roaming\npm\node_modules\npm\node_modules\@npmcli\arborist\lib\arborist\rebuild.js:328:17
+npm error     at run (C:\Users\01 Bigode\AppData\Roaming\npm\node_modules\npm\node_modules\promise-call-limit\dist\commonjs\index.js:67:22)
+npm error     at C:\Users\01 Bigode\AppData\Roaming\npm\node_modules\npm\node_modules\promise-call-limit\dist\commonjs\index.js:84:9 {
+npm error   errno: -4048,
+npm error   code: 'EPERM',
+npm error   syscall: 'spawn'
+npm error }
+npm error
+npm error The operation was rejected by your operating system.
+npm error It's possible that the file was already in use (by a text editor or antivirus), or that you lack permissions to access it.
+npm error
+npm error If you believe this might be a permissions issue, please double-check the permissions of the file and its containing directories, or try running the command again as root/Administrator.
+npm error Log files were not written due to an error writing to the directory: C:\Users\01 Bigode\AppData\Local\npm-cache\_logs
+npm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal

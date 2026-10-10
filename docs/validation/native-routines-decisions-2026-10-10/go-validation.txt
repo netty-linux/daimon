@@ -1,0 +1,35 @@
+ok  	github.com/netty-linux/daimon/cmd/daimon	147.863s
+ok  	github.com/netty-linux/daimon/internal/agentloop	4.198s
+ok  	github.com/netty-linux/daimon/internal/bots	0.346s
+ok  	github.com/netty-linux/daimon/internal/computer	3.588s
+?   	github.com/netty-linux/daimon/internal/computer/mediatest	[no test files]
+ok  	github.com/netty-linux/daimon/internal/computer/socket	0.011s
+ok  	github.com/netty-linux/daimon/internal/conversations	1.341s
+ok  	github.com/netty-linux/daimon/internal/createcontract	0.175s
+ok  	github.com/netty-linux/daimon/internal/diffview	0.017s
+ok  	github.com/netty-linux/daimon/internal/editcontract	0.307s
+ok  	github.com/netty-linux/daimon/internal/environments	2.984s
+ok  	github.com/netty-linux/daimon/internal/managedworkspace	232.180s
+ok  	github.com/netty-linux/daimon/internal/mcp	0.575s
+?   	github.com/netty-linux/daimon/internal/mcp/cuatest	[no test files]
+?   	github.com/netty-linux/daimon/internal/mcp/mcptest	[no test files]
+ok  	github.com/netty-linux/daimon/internal/memory	1.437s
+ok  	github.com/netty-linux/daimon/internal/model	0.004s
+ok  	github.com/netty-linux/daimon/internal/policy	0.038s
+ok  	github.com/netty-linux/daimon/internal/providers	0.010s
+ok  	github.com/netty-linux/daimon/internal/providers/groq	0.011s
+ok  	github.com/netty-linux/daimon/internal/providers/openai	0.158s
+ok  	github.com/netty-linux/daimon/internal/routines	2.191s
+ok  	github.com/netty-linux/daimon/internal/sandbox	4.979s
+--- FAIL: TestRoutineHTTPStrictnessPrivacyAndReferences (0.07s)
+    routines_test.go:42: 409
+FAIL
+FAIL	github.com/netty-linux/daimon/internal/server	6.882s
+ok  	github.com/netty-linux/daimon/internal/sessions	7.426s
+ok  	github.com/netty-linux/daimon/internal/threads	0.442s
+ok  	github.com/netty-linux/daimon/internal/tools	0.021s
+ok  	github.com/netty-linux/daimon/internal/workspacefs	0.009s
+ok  	github.com/netty-linux/daimon/internal/workspacejournal	0.004s
+ok  	github.com/netty-linux/daimon/internal/workspaceplan	0.008s
+?   	github.com/netty-linux/daimon/ui/scripts/cua-fixture	[no test files]
+FAIL

@@ -74,6 +74,13 @@ func validateEnv(env []string) error {
 	return nil
 }
 func NewClient(ctx context.Context, config ServerConfig, env []string, options Options) (*Client, error) {
+	return newClient(ctx, config, env, options, nil)
+}
+
+func newClient(ctx context.Context, config ServerConfig, env []string, options Options, phase *string) (*Client, error) {
+	if phase != nil {
+		*phase = "unknown"
+	}
 	if ctx == nil || !options.valid() || Validate(Config{Version: 1, Servers: []ServerConfig{config}}) != nil || validateEnv(env) != nil {
 		return nil, ErrConfig
 	}
@@ -126,6 +133,9 @@ func NewClient(ctx context.Context, config ServerConfig, env []string, options O
 	}
 	initCtx, end := context.WithTimeout(ctx, options.InitializeTimeout)
 	defer end()
+	if phase != nil {
+		*phase = "handshake"
+	}
 	result, err := c.request(initCtx, "initialize", map[string]any{"protocolVersion": c.protocol, "capabilities": map[string]any{}, "clientInfo": map[string]string{"name": "daimon", "version": "0.10"}})
 	if err == nil {
 		err = c.initialize(result)
@@ -134,6 +144,9 @@ func NewClient(ctx context.Context, config ServerConfig, env []string, options O
 		err = c.notify(initCtx, "notifications/initialized", map[string]any{})
 	}
 	if err == nil {
+		if phase != nil {
+			*phase = "discovery"
+		}
 		c.tools, err = c.discover(initCtx, config.ID)
 	}
 	if err != nil {

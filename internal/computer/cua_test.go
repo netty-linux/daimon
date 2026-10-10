@@ -45,6 +45,18 @@ func TestCUARealStdioDiscoveryGatingAndSafeResults(t *testing.T) {
 				if info.Status != "startup_failed" {
 					t.Fatal(info.Status)
 				}
+				want := "unknown"
+				if mode == "invalid-discovery" {
+					want = "discovery_failed"
+				}
+				if info.Reason != want {
+					t.Fatalf("reason = %q, want %q", info.Reason, want)
+				}
+				manager, _ := NewManager(backend)
+				infos, e := manager.Infos(ctx)
+				if e != nil || len(infos) != 1 || infos[0].Reason != want {
+					t.Fatal("metadata reason lost", e)
+				}
 				return
 			}
 			if info.Status != "connected" {

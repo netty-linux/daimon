@@ -80,6 +80,11 @@ func (m *Manager) resolve(ctx context.Context, req StartRequest, sink agentloop.
 	if err := threads.Validate(thread); err != nil || thread.ID != req.ThreadID {
 		return &Error{Kind: ThreadResolution, Cause: err}
 	}
+	m.mu.Lock()
+	if s := m.sessions[req.SessionID]; s != nil {
+		s.admissionBot = thread.BotID
+	}
+	m.mu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -90,6 +95,9 @@ func (m *Manager) resolve(ctx context.Context, req StartRequest, sink agentloop.
 	bot = bots.Clone(bot)
 	if err := bots.Validate(bot); err != nil || bot.ID != thread.BotID {
 		return &Error{Kind: BotResolution, Cause: err}
+	}
+	if req.ScheduledBotID != "" && bot.SandboxProfile != nil && bot.SandboxProfile.EffectivePlacement() == "cloud" {
+		return &Error{Kind: SandboxResolution}
 	}
 	r.binding = Binding{BotID: bot.ID, ProviderID: bot.ProviderID, Model: bot.Model, Instructions: bot.Instructions, Tools: append([]string{}, bot.Tools...), PermissionMode: bot.PermissionMode}
 	needsApproval := false

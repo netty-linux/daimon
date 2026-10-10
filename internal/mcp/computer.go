@@ -23,7 +23,10 @@ func (t ComputerTransport) Call(ctx context.Context, args json.RawMessage, accep
 	return t.tool.client.callWithTextFilter(ctx, t.tool.definition.RemoteName, args, acceptText)
 }
 
-type ComputerSource struct{ ID, Backend, Status string }
+type ComputerSource struct {
+	ID, Backend, Status string
+	Reason              string
+}
 
 func (m *Manager) isComputerServer(id string) bool {
 	for _, s := range m.servers {
@@ -55,7 +58,14 @@ func (m *Manager) ComputerSources() []ComputerSource {
 				status = "connected"
 			}
 		}
-		result = append(result, ComputerSource{s.id, s.backend, status})
+		reason := ""
+		if status == "startup_failed" {
+			reason = s.reason
+			if reason == "" {
+				reason = "unknown"
+			}
+		}
+		result = append(result, ComputerSource{ID: s.id, Backend: s.backend, Status: status, Reason: reason})
 	}
 	return result
 }

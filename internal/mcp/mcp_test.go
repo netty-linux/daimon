@@ -282,3 +282,21 @@ func TestFloodBoundedAndOtherServerSurvivesCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGenericDescriptionLimitUnchanged(t *testing.T) {
+	for _, mode := range []string{"description-boundary", "description-limit"} {
+		t.Run(mode, func(t *testing.T) {
+			c, err := mcp.NewClient(t.Context(), config(t, "fixture"), []string{"MCP_FIXTURE=" + mode, "GORACE=atexit_sleep_ms=0"}, options())
+			if mode == "description-limit" {
+				if !errors.Is(err, mcp.ErrLimit) {
+					t.Fatalf("expected existing limit, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer c.Close(context.Background())
+		})
+	}
+}

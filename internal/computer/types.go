@@ -48,6 +48,7 @@ type Info struct {
 	ID                  string       `json:"id"`
 	Backend             BackendID    `json:"backend"`
 	Status              string       `json:"status"`
+	Reason              string       `json:"reason,omitempty"`
 	Capabilities        []Capability `json:"capabilities"`
 	Busy                bool         `json:"busy"`
 	ControllerSessionID string       `json:"controller_session_id,omitempty"`

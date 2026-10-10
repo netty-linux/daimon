@@ -1,3 +1,4 @@
+import { startupReasons, type StartupReason } from '../i18n/computer';
 import {errorMessages} from '../i18n/errors';
 import type {SandboxProfile, EnvironmentMetadata, SandboxCatalog, SandboxInfo} from './types';
 import { eventLabels, statuses, mcpName, type Bot, type BotInput, type Thread, type ProviderSummary, type SessionSnapshot, type SessionEvent } from './types';
@@ -74,8 +75,9 @@ function decodeComputerBinding(value:unknown):ComputerBinding {
 }
 export function decodeComputer(value:unknown):ComputerInfo {
  const v=object(value);if(!validComputerID(v.id)||!(v.backend==='cua-local'||v.backend==='cua-cloud'&&String(v.id).startsWith('sandbox-'))||!['configured','executable_missing','startup_failed','connected','unavailable'].includes(String(v.status))||typeof v.busy!=='boolean'||!Array.isArray(v.capabilities)||v.capabilities.length>64||(v.controller_session_id!==undefined&&(typeof v.controller_session_id!=='string'||!/^[a-z][a-z0-9-]{0,63}$/.test(v.controller_session_id))))throw new APIError('invalid_response');
+ if(v.reason!==undefined&&(v.status!=='startup_failed'||typeof v.reason!=='string'||!Object.hasOwn(startupReasons,v.reason)))throw new APIError('invalid_response');
  const capabilities=v.capabilities.map(value=>{const c=object(value);if(typeof c.id!=='string'||!mcpName(String(c.tool))||c.tool!==`mcp__${v.id}__${c.id}`||!['observe','navigate','input','system','dangerous'].includes(String(c.class))||typeof c.available!=='boolean')throw new APIError('invalid_response');return {id:c.id,tool:c.tool as string,class:c.class as ComputerClass,available:c.available};});
- return {id:v.id as string,backend:v.backend as 'cua-local'|'cua-cloud',status:v.status as ComputerInfo['status'],capabilities,busy:v.busy,...(v.controller_session_id?{controller_session_id:v.controller_session_id as string}:{})};
+ return {...(v.reason?{reason:v.reason as StartupReason}:{}),id:v.id as string,backend:v.backend as 'cua-local'|'cua-cloud',status:v.status as ComputerInfo['status'],capabilities,busy:v.busy,...(v.controller_session_id?{controller_session_id:v.controller_session_id as string}:{})};
 }
 export const api = {
  computers:(signal?:AbortSignal)=>list('/computers','computers',decodeComputer,signal),

@@ -1,0 +1,5 @@
+
+> daimon-ui@0.1.0 smoke:approval
+> node scripts/approval-smoke.mjs
+
+Approval browser smoke passed: read/write allow/deny, exact preview, reload, two tabs, replay, abort and shutdown.
