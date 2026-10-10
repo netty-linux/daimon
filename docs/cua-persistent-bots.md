@@ -242,9 +242,18 @@ consumidos em falha, cancelamento, JSON corrupto/versionado, symlinks reais Linu
 e modo 0600. Teste AST impede imports de execução CUA/processo e os identificadores
 agentStart/routineAdd/persistentAgentCreate/Send no código do agendador.
 
-Riscos para revisão: Manager mantém o limite existente de 128 Sessions retidas
-por processo no serve. Ao alcançar capacidade, disparo falha explicitamente;
-não há eviction, retries, retomada durável, catch-up offline ou exactly-once.
+Retenção: o Manager mantém no máximo 128 Sessions no serve e descarta somente
+terminais finalizadas, da mais antiga à mais recente, ao admitir um novo Start
+no limite. Sem terminal elegível, retorna erro tipado de capacidade sem alterar
+as Sessions existentes. IDs admitidos não são reutilizados; somente tombstones
+de identidade sobrevivem ao descarte, sem dados/eventos/recursos da execução.
+Não há retries, retomada durável, catch-up offline ou garantia exactly-once.
+Na inicialização, uma rotina ativa vencida registra a última ocorrência perdida
+com horário previsto e detecção, sem Session ou alteração de LastAttemptAt.
+Retém-se somente a perda mais recente de cada rotina (até 32 registros), sem
+contador de execução ou consumo de autorização; pausadas não geram perda.
+O store grava versão 2; versão 1 continua legível e é convertida na próxima
+gravação válida. Versões desconhecidas e metadados incompletos falham fechado.
 Criar/pausar/excluir agenda não autoriza effects nem decide approvals. Horários
 dependem do relógio/timezone do servidor. CUA real, cua-driver Windows real,
 Space/Volume e Fleet permanecem não validados; nenhum smoke pago foi executado.
