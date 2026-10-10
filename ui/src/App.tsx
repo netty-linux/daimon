@@ -1,5 +1,4 @@
 import {Icon} from './design/Icon';
-import wordmark from './design/assets/x6AmZ.png';
 import { copy } from './i18n/copy';
 
 import {EnvironmentPanel} from './components/EnvironmentPanel';
@@ -128,7 +127,7 @@ export function App() {
   const computerID=bot?.sandbox_profile ? (active?snapshot?.computer?.id:undefined) : active?snapshot?.computer?.id:bot?.computer_profile?.enabled?bot.computer_profile.mcp_server_id:undefined;
   const failure=snapshot?.error_category ? resolutionMessages[snapshot.error_category]??pt.failed : '';
   return <div className={'app-shell'+(botsCollapsed?' bots-collapsed':'')+(conversationsCollapsed?' conversations-collapsed':'')}>
-    <header className="topbar"><div className="brand"><img className="brand-wordmark" src={wordmark} alt={copy["DAIMON"]}/></div>
+    <header className="topbar"><div className="brand"><strong className="brand-wordmark">{copy["DAIMON"]}</strong></div>
       <div className="navigation-toggles"><button className="icon-button" aria-label={botsCollapsed?pt.expandBots:pt.collapseBots} aria-expanded={!botsCollapsed} onClick={()=>setBotsCollapsed(v=>!v)}><Icon name="menu"/></button>
         <button className="icon-button" aria-label={conversationsCollapsed?pt.expandConversations:pt.collapseConversations} aria-expanded={!conversationsCollapsed} onClick={()=>setConversationsCollapsed(v=>!v)}><Icon name="conversations"/></button></div>
       <span className="server-state">{copy["● Execução local"]}</span><button className="icon-button" aria-label={pt.settings} onClick={()=>openSettings()}><Icon name="settings"/></button>
