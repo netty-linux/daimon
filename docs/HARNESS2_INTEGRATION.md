@@ -12,9 +12,11 @@ branch inicial `work`. `origin/main` local e GET remoto
 `repos/netty-linux/daimon/branches/main` confirmaram o mesmo SHA.
 Trabalho em `feature/harness2-contracts`; main não é alterada.
 
-O shell não alcança o proxy HTTP (`Failed to connect to proxy port 8080`).
-As leituras remotas foram feitas pelo conector GitHub, sem contornar a política
-de rede. Não houve instalação, login ou inferência paga.
+No sandbox inicial, o shell não alcançou o proxy HTTP (`Failed to connect to
+proxy port 8080`). As primeiras leituras remotas foram feitas pelo conector
+GitHub. Após autorização automática de execução fora do sandbox de comandos,
+`git ls-remote origin HEAD refs/heads/main` também confirmou o SHA acima usando
+o proxy configurado. Não houve instalação, login ou inferência paga.
 
 Fontes locais: AGENTS.md, README.md, DAIMON_ARCHITECTURE_V2, SESSION_RUNTIME,
 WEB_APPROVAL_V1, MEMORY_V1, MCP_V1, SANDBOX_COMPUTERS_V1,
@@ -121,6 +123,88 @@ nem autenticação. Testes usarão apenas fixtures e nenhum modelo remoto.
 
 ## Validação e continuidade
 
-Resultados executados, inventário e instruções serão registrados ao finalizar
-este corte. O critério final solicitado (Bot em ciclo real Harness²) permanece
-pendente; esta entrega não declara as fases seguintes concluídas.
+O critério final solicitado (Bot em ciclo real Harness²) permanece pendente;
+esta entrega não declara as fases seguintes concluídas.
+
+### Uso interno e limites do manifesto
+
+O pacote não abre arquivos, lê ambiente, cria subprocessos ou chama providers.
+Uso em código interno que já possui um `bots.Bot` válido:
+
+```go
+manifest, err := harness2.Baseline(bot)
+if err != nil { return err }
+manifest.Components.SystemPrompt = "Instruções candidatas"
+snapshot, err := harness2.Freeze(manifest, bot)
+if err != nil { return err }
+candidate, err := snapshot.Candidate(bot)
+if err != nil { return err }
+// candidate é um valor privado. Não salvar no Bot Store nem executar antes
+// dos gates de isolamento/lifecycle. bot continua com suas instruções originais.
+```
+
+`Decode` aceita um único documento UTF-8 até 64 KiB, versão 1, campos exatos
+obrigatórios (incluindo as oito superfícies), sem null/duplicatas/case aliases,
+surrogates inválidos ou valores concatenados. Quatro textos têm limite individual
+de 8192 bytes; cada coleção aceita 16 referências com ID restrito e SHA-256
+hexadecimal lowercase. Referências não são caminhos, comandos ou download URLs;
+não são dereferenciadas. O limite codificado inclui escapes JSON.
+
+`BotID` e `base_bot_sha256` fixam a associação e todos os campos do Bot base,
+incluindo provider/modelo/permissões/tools/Computer/Sandbox. A existência do Bot
+é verificada pelo valor explícito fornecido, sem lookup implícito. A mudança de
+qualquer campo da base exige novo candidato e nova revisão. A serialização de
+Bot pertence ao schema atual; uma mudança futura exige revisão do contrato de hash.
+
+`revision` é positivo. Revisão 1 não tem parent; posteriores exigem parent hash.
+Isso valida somente a forma da linhagem: não há store que prove que o pai existe,
+compare monotonicidade ou autorize promoção. Hash é integridade determinística,
+não assinatura, autorização ou garantia de melhoria. Não publicar hashes de
+conteúdo privado indiscriminadamente (podem permitir ataques de dicionário).
+
+Snapshot guarda bytes canônicos privados por valor; `Manifest()` retorna cópia
+profunda, `Candidate()` clona o Bot. Nenhum estado global ou pointer de autoridade
+é entregue ao candidato. Zero value falha fechado. Chamador possui os inputs e
+não pode modificá-los concorrentemente durante Freeze/Candidate; snapshots prontos
+suportam leitores concorrentes. Textos podem conter segredos: não há secret scanner,
+criptografia nem promessa de imunidade de modelos a prompt injection.
+
+| Superfície | Contrato atual | Materialização |
+| --- | --- | --- |
+| System prompt | Texto privado obrigatório | Somente cópia de Bot em memória |
+| Guardrails | Texto privado | Não vazio retorna ErrUnsupported; nunca altera policy |
+| Memory | Contexto experimental separado da Memory manual | Não vazio retorna ErrUnsupported |
+| Tool guidance | Texto privado | Não vazio retorna ErrUnsupported |
+| Subagents | Referências ID/hash | Coleção não vazia retorna ErrUnsupported |
+| Skills | Referências ID/hash | Coleção não vazia retorna ErrUnsupported |
+| Scripts | Referências ID/hash | Coleção não vazia retorna ErrUnsupported |
+| Plugins | Referências ID/hash | Coleção não vazia retorna ErrUnsupported |
+
+### Inventário
+
+Criados: `docs/HARNESS2_INTEGRATION.md`, `internal/harness2/manifest.go`,
+`internal/harness2/json.go`, `internal/harness2/manifest_test.go`.
+Modificado: `README.md` (link e status experimental).
+Nenhum algoritmo upstream foi copiado, reescrito ou executado: nesta etapa os
+contratos reais orientaram o desenho; reuso executável fica para B–D.
+
+### Cobertura de segurança e pendências
+
+Unitários exercitam mudança de provider/modelo/tools/permissão/Computer/Sandbox,
+prompt com instruções maliciosas sem alteração de autoridade, isolamento de
+valores/slices, snapshot concorrente, Unicode, limites antes da aceitação,
+hashes/revisões e rejeição das sete superfícies não materializáveis. Fuzz target
+exercita decoder/roundtrip. Não há processo/modelo na fixture.
+
+Não comprovados nesta etapa: contenção real de processo, cross-workspace de um
+executor, bloqueio de escrita/rede/exfiltração, cancelamento de engine, limites
+efetivos de CPU/RAM/disco, limpeza após crash, promoção/rollback e comparação de
+evidências científicas. Recusar campos de credenciais/rede/workspace no manifesto
+não é um teste de isolamento do sistema operacional.
+
+Pendentes: dependência Python instalada e fixada, DaimonSubstrate e
+DaimonBenchmarkAdapter reais, protocolo Go/Python, health checks, execução
+isolada por Sessions, engine recursiva original, biblioteca de experiências
+privada com retenção, budgets globais, lifecycle persistente, revisão humana,
+rollback, HTTP/UI de Otimização e testes de integração/segurança correspondentes.
+Nenhum botão ou endpoint fictício foi adicionado.
