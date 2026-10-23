@@ -12,6 +12,7 @@ export DAIMON_HARNESS2_TEST_SITE=/opt/bridge/.venv/lib/python3.12/site-packages
 python --version
 go version
 /opt/bridge/.venv/bin/python -I -S -B python/harness2_bridge/test_worker.py
+/opt/bridge/.venv/bin/python -I -S -B python/harness2_native_substrate/test_substrate.py
 /opt/bridge/.venv/bin/python -I -S -B python/harness2_bridge/test_linux_limits.py
 go vet ./...
 go test -count=1 ./...
