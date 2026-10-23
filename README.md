@@ -3,6 +3,11 @@
 **Native Routines Foundation:** agendador diário DAIMON implementado; Space/Volume pendentes.
 Veja [auditoria e proposta](docs/cua-persistent-bots.md).
 
+**Harness² — contratos experimentais:** manifesto versionado, snapshot privado
+imutável e materialização de candidatos em memória estão em `internal/harness2`.
+Não há engine Python ou otimização executável habilitada. Veja a
+[auditoria, limites e fases pendentes](docs/HARNESS2_INTEGRATION.md).
+
 DAIMON é a fundação experimental de um **Sovereign Personal Agent** em Go:
 execução sob controle do usuário e contratos independentes de provedor.
 **Ainda não é um agente pessoal pronto.**
