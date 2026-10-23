@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "BLOCKED_ACQUISITION_INCOMPLETE",
+  "purpose": "pre-provisioning proposal; not executable admission policy",
+  "architecture": "amd64",
+  "vm": {"generation": 2, "vcpus": 2, "memory_gib": 4, "vhdx_max_gib": 48, "initial_network": "disconnected"},
+  "ubuntu": {
+    "iso": "ubuntu-24.04.5-live-server-amd64.iso",
+    "source": "https://releases.ubuntu.com/24.04/",
+    "candidate_sha256": "97f3d7ffb032c3eb3b23d2c8be9cc76e60c2c1f2c0146ba5ba9fe01cafae0fd8",
+    "signing_fingerprint": "843938DF228D22F7B3742BC0D94AA3F0EFE21092",
+    "fingerprint_source": "https://documentation.ubuntu.com/security/software-integrity/image-verification/",
+    "signature_verification": "NOT_RUN",
+    "iso_hash_verification": "NOT_RUN"
+  },
+  "gvisor": {
+    "candidate_release": "release-20261019.0",
+    "candidate_commit": "760b80785dc53311d4c87bd2de167525a99709c1",
+    "candidate_asset": "gvisor-x86_64.tar.bz2",
+    "candidate_sha256": "1298e8ed9c3fee900f00d2ea96ec2d79d80ed93f2175812f29b7e7da718041a3",
+    "platform": "systrap",
+    "producer_authentication": "UNRESOLVED",
+    "complete_layout_inventory": null
+  },
+  "kernel_packages": null,
+  "systemd_packages": null,
+  "dependency_closure": null,
+  "rootfs_inventory": null,
+  "revocation_snapshot": null,
+  "security_gates": "all-18-unverified"
+}

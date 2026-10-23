@@ -1,5 +1,8 @@
 # C2 — plano operacional de infraestrutura
 
+Pré-provisionamento atualizado: [inventário, scripts e decisão pendente](HARNESS2_C2_PREFLIGHT.md),
+com [manifesto v1 incompleto e bloqueado](harness2-c2-deployment.v1.json).
+
 Registro de 2026-10-23. Base auditada: PR #28,
 `55fd556991baa6654e5e7e788fa997887f8c219d`. **Plano para execução posterior
 autorizada, não provisionamento concluído nem implementação de isolamento.**
@@ -88,11 +91,10 @@ Procedimento de confiança a concluir **antes de instalar/executar runsc**:
    assumir que esse pacote corresponde ao tarball candidato acima. Selecionar
    **uma** origem autenticada e registrar todos os bytes obtidos. A documentação
    não promete pin de point release por APT; canal por data pode mudar.
-3. Se usar o tarball candidato, checksum e tag unsigned não fornecem autenticação
-   independente do produtor. Exigir decisão de confiança explícita, revisão da
-   proveniência e assinatura externa do bundle aprovado pelo operador. Essa
-   assinatura identifica a aprovação do operador, não inventa assinatura upstream.
-   Se a política exigir assinatura upstream indisponível, interromper aquisição.
+3. Checksum e tag unsigned não fornecem autenticação independente do produtor.
+   Uma assinatura local ou aprovação do operador não substitui essa autenticação.
+   Sem cadeia de origem verificável, interromper aquisição e instalação, mesmo
+   que o operador assine o bundle. Assinatura de aprovação é apenas adicional.
 4. Incluir runsc **e todo gvisor-bin/sidecars** da mesma release. O layout atual
    deixou de ser um único executável. Não permitir downloads implícitos em startup.
    O pacote APT pode configurar Docker automaticamente; não o instalar às cegas.
