@@ -42,7 +42,7 @@ não uma dependência instalada ou certificada.
 
 Arquivos lidos: README, pyproject.toml, config.py, substrate/base.py,
 substrate/codex.py, substrate/opencode.py, core/spec.py, tree.py, recursion.py,
-proposer.py, selection.py, library.py e judge.py.
+proposer.py, selection.py, library.py, judge.py, demo.py e tests/test_workflow.py.
 
 - `Substrate` exige `surface`, `materialise(tree_dir, spec, ctx) -> Install`,
   `execute(task_ref, install, run_ids, timeout)`, `read_trajectory` e `preflight`.
@@ -185,8 +185,12 @@ criptografia nem promessa de imunidade de modelos a prompt injection.
 Criados: `docs/HARNESS2_INTEGRATION.md`, `internal/harness2/manifest.go`,
 `internal/harness2/json.go`, `internal/harness2/manifest_test.go`.
 Modificado: `README.md` (link e status experimental).
-Nenhum algoritmo upstream foi copiado, reescrito ou executado: nesta etapa os
-contratos reais orientaram o desenho; reuso executável fica para B–D.
+Nenhum algoritmo upstream foi incorporado ou reescrito no DAIMON. Nesta etapa os
+contratos reais orientaram o desenho; reuso executável no produto fica para B–D.
+Separadamente, uma cópia temporária de 43 arquivos de fonte/licença/configuração
+upstream foi obtida pelo conector GitHub e verificada contra os Git blob hashes
+da revisão auditada. Seus testes determinísticos originais foram executados
+fora da árvore DAIMON. Isso não é um DaimonSubstrate nem certifica integração.
 
 ### Cobertura de segurança e pendências
 
@@ -208,3 +212,59 @@ isolada por Sessions, engine recursiva original, biblioteca de experiências
 privada com retenção, budgets globais, lifecycle persistente, revisão humana,
 rollback, HTTP/UI de Otimização e testes de integração/segurança correspondentes.
 Nenhum botão ou endpoint fictício foi adicionado.
+
+### Resultados executados
+
+Linux amd64, Go 1.27.1 (`/workspace/.tools/go/bin`), Python 3.13.5 para upstream,
+Node 24.19.0 e dependências de frontend já presentes. Nenhuma suíte foi alterada
+ou pulada para obter aprovação.
+
+| Verificação | Resultado |
+| --- | --- |
+| gofmt nos arquivos novos; gofmt -l . | PASS; nenhuma saída pendente |
+| go vet ./... | PASS |
+| go test -count=1 ./... | PASS, suíte completa |
+| go test -race -count=1 ./... | PASS, suíte completa |
+| go test -count=1 -cover ./internal/harness2 | PASS; 91,7% statements |
+| go test ./internal/harness2 -run '^$' -fuzz FuzzDecode -fuzztime=5s -parallel=2 | PASS; 172 execuções |
+| go run ./cmd/daimon demo | PASS; completed, 2 passos/1 ferramenta |
+| npm run typecheck | PASS |
+| npm test | PASS; 80 testes em 15 arquivos |
+| npm run build | PASS; assets embutidos sem alteração de conteúdo |
+| unittest discover do upstream tests/test_workflow.py | PASS; 5 testes, sem modelos |
+| git diff --check | PASS |
+
+As primeiras tentativas da suíte completa falharam: sandbox de comandos recusava
+sockets loopback; fora dele, `/tmp` é mount separado e a umask herdada 077 impede
+o modo 0640 esperado pelas fixtures de managedworkspace. Reproduzido no HEAD
+inicial em worktree separado. A fixture original passou com temporários no
+filesystem do projeto e umask 022; **as suítes completas passaram com a mesma
+configuração**, sem mudar guardas, código ou testes anteriores:
+
+```sh
+export PATH=/workspace/.tools/go/bin:$PATH
+export GOCACHE=/tmp/daimon-go-cache
+mkdir -p /workspace/daimon-test-tmp
+umask 0022
+TMPDIR=/workspace/daimon-test-tmp go test -count=1 ./...
+TMPDIR=/workspace/daimon-test-tmp go test -race -count=1 ./...
+```
+
+Estes comandos exigiram autorização automática para sair apenas do sandbox de
+comandos do ambiente de desenvolvimento. Isso não altera o sandbox do produto
+nem constitui prova de contenção da engine. Artefatos locais da execução:
+`/tmp/daimon-go-test-final.log`, `/tmp/daimon-go-race-final.log` e
+`/tmp/daimon-harness2-python-final.log`.
+
+Os testes Python usaram `env -i`, Python `-I`, caminho explícito da cópia auditada,
+proposer determinístico e chamadas externas mockadas. Eles executam o método
+upstream com DemoAdapter; não executam um Bot DAIMON ou chamam APIs cobradas.
+Não executados: browsers Playwright, CUA/Fleet reais, testes de bridge Go/Python
+ou ciclo Harness²–DAIMON (a bridge ainda não existe).
+
+Commits incrementais: auditoria antes do código; contratos/testes; documentação
+final de resultados. A descrição do PR foi preparada localmente. A revisão
+automática rejeitou o push da branch por considerar não suficientemente explícita
+a autorização de exportar o código e criar uma ref remota. Nenhum PR remoto foi
+criado, nenhum merge foi feito e nenhuma outra ferramenta foi usada para contornar
+essa rejeição. Publicação exige autorização explícita do usuário.
