@@ -1,5 +1,7 @@
 # Harness² — Native Substrate Foundation C1
 
+Revisão posterior do PR #27: [achados, regressões e critérios C2](HARNESS2_C1_FINAL_REVIEW.md).
+
 Base: main `bedb0866988b0e72dae4f533a630c856de88efb5`, com #26, #24 e #25
 integrados nessa ordem. Checkout e HEAD remoto foram conferidos antes da nova
 branch `feature/harness2-native-substrate-c1`. Upstream permanece na revisão
