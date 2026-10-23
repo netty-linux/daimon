@@ -1,5 +1,39 @@
 # C2 — aquisição executada e preparação operacional
 
+## Continuação independente da pendência ESU
+
+O proprietário confirmou que ainda não verificou manualmente ESU; manter
+**UNVERIFIED**, sem ativar/instalar/alterar Windows. Auditoria do HEAD e534bb4:
+os quatro checks Go/Linux e UI, eventos push/PR, concluíram SUCCESS. Nova leitura
+SHA256 integral da ISO e do .deb reproduziu exatamente os hashes do manifesto.
+Não houve novo download grande nem execução de conteúdo.
+
+Leitura ISO via libarchive (`tar -tf` e `tar -xOf`, somente stdout) confirmou
+identidade de mídia Ubuntu-Server 24.04.5 amd64, datada 20260909. Foram calculados
+hashes de três manifests internos, agora no manifesto de deployment. Declarações
+da mídia: systemd 255.4-1ubuntu8.17; libc6 2.39-0ubuntu8.8; Python 3.12.3-1ubuntu0.16;
+ubuntu-keyring 2023.11.28.1; camada GA 6.8.0-139.139; HWE 7.0.0-31.31~24.04.1.
+Os arquivos usam registros de camadas com prefixos de alteração; não tratá-los
+como inventário consolidado completo de um guest instalado. Autenticidade deriva
+dos bytes da ISO assinada já conferida, não de assinatura independente desses
+arquivos internos. Isso reduz incerteza sobre a mídia; não preenche kernel_packages,
+systemd_packages ou rootfs_inventory de deployment nem comprova patches atuais.
+
+Consulta oficial de attestation GitHub para o digest do .deb retornou HTTP 404;
+não fornece prova de inexistência global de atestações, mas nenhuma evidência
+utilizável foi obtida nessa rota. Advisories públicos: zero na consulta, sem
+garantia de ausência de vulnerabilidades. Chave gVisor segue UNVERIFIED quanto
+à autenticação independente: falta confirmação de identidade/rotação/revogação
+ancorada em canal previamente confiável, ou attestation verificável do produtor.
+Nenhuma solicitação externa foi enviada em nome do usuário.
+
+PASS: reconferência de hashes, inventário interno autenticado e cinco testes
+Python existentes do planejador. FAIL/indisponível de evidência: endpoint de
+attestation retornou 404. NOT RUN: instalação, boot, gVisor executável, montagem,
+fixtures e novas suítes de runtime inalterado. A pendência ESU bloqueia somente
+operações que dependem da confiança do host; aquisição/inspeção autorizadas
+continuaram. Os 18 gates permanecem unverified e nenhum recurso Hyper-V foi criado.
+
 Checkpoint 2026-10-23, base ba583bbf399536abed792ff1ef2bfd83b2cc5c85.
 Branch preservada e checkout inicialmente limpo; fetch sem sobrescrever arquivos.
 **Windows 10 Pro será mantido. Não migrar, reinstalar ou substituir o OS.**

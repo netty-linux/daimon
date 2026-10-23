@@ -38,7 +38,36 @@
     ],
     "actual_size": 4080486400,
     "actual_sha256": "97f3d7ffb032c3eb3b23d2c8be9cc76e60c2c1f2c0146ba5ba9fe01cafae0fd8",
-    "verified_on": "2026-10-23"
+    "verified_on": "2026-10-23",
+    "media_manifest_inventory": [
+      {
+        "path": "casper/ubuntu-server-minimal.manifest",
+        "sha256": "c034ebbbfa00c6ef322ce8686925ff95b71cf3b19753af484308157d8560cd2a",
+        "size": 12651,
+        "status": "VERIFIED_ISO_CONTENT_NOT_INSTALLED"
+      },
+      {
+        "path": "casper/ubuntu-server-minimal.ubuntu-server.installer.generic.manifest",
+        "sha256": "66ec9175d31bc874c382c56c991d8aaac51ceec033ea9a57021f86fb854e6106",
+        "size": 2606,
+        "status": "VERIFIED_ISO_CONTENT_NOT_INSTALLED"
+      },
+      {
+        "path": "casper/ubuntu-server-minimal.ubuntu-server.installer.generic-hwe.manifest",
+        "sha256": "65d7084f4c2b3394102054d7c25086af75215eb1047f2931be7deba96e499f07",
+        "size": 2735,
+        "status": "VERIFIED_ISO_CONTENT_NOT_INSTALLED"
+      }
+    ],
+    "media_declared_components": {
+      "systemd": "255.4-1ubuntu8.17",
+      "libc6:amd64": "2.39-0ubuntu8.8",
+      "python3.12": "3.12.3-1ubuntu0.16",
+      "ubuntu-keyring": "2023.11.28.1",
+      "ga_kernel": "6.8.0-139.139",
+      "hwe_kernel": "7.0.0-31.31~24.04.1",
+      "status": "MEDIA_DECLARATIONS_ONLY_NOT_DEPLOYMENT_LOCK"
+    }
   },
   "gvisor": {
     "candidate_release": "release-20261019.0",
@@ -152,7 +181,8 @@
       "key_history_commit_signature": "UNSIGNED",
       "package_byte_verification": "PASS",
       "metadata_valid_until": null,
-      "actual_package_sha256": "24e9740411c15f229151155e9b890388a18cfb4c9fce5c8d7ea6ed9f926e7a52"
+      "actual_package_sha256": "24e9740411c15f229151155e9b890388a18cfb4c9fce5c8d7ea6ed9f926e7a52",
+      "github_package_attestation_query": "HTTP_404_NO_EVIDENCE"
     },
     "dependencies": [
       "Linux 5.6+ upstream minimum; supported patched kernel still pending",
