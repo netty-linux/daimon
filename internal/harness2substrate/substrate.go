@@ -33,6 +33,7 @@ var (
 type Plan struct{ snapshot harness2.Snapshot }
 
 func (Plan) String() string                                  { return "harness2substrate: private plan" }
+func (p Plan) GoString() string                              { return p.String() }
 func (p Plan) SHA256() string                                { return p.snapshot.SHA256() }
 func (p Plan) Manifest() (harness2.Manifest, error)          { return p.snapshot.Manifest() }
 func (p Plan) Candidate(baseline bots.Bot) (bots.Bot, error) { return p.snapshot.Candidate(baseline) }
@@ -89,8 +90,9 @@ type Record struct {
 
 type Evidence struct{ encoded string }
 
-func (Evidence) String() string { return "harness2substrate: private structural evidence" }
-func (e Evidence) JSON() []byte { return []byte(e.encoded) }
+func (Evidence) String() string     { return "harness2substrate: private structural evidence" }
+func (e Evidence) GoString() string { return e.String() }
+func (e Evidence) JSON() []byte     { return []byte(e.encoded) }
 
 // Probe runs only the two closed fixtures. Candidate instructions are inert bytes.
 // Deadline covers the entire call; cancellation is checked during bounded hashing

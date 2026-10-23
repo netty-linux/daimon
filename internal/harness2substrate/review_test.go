@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
@@ -14,6 +15,23 @@ import (
 	"github.com/netty-linux/daimon/internal/harness2"
 	"github.com/netty-linux/daimon/internal/sandbox"
 )
+
+func TestReviewDebugFormattingKeepsEvidencePrivate(t *testing.T) {
+	b, _, raw := fixture(t)
+	p, err := Prepare(context.Background(), raw, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, err := Probe(context.Background(), p, b, Identity, MaxEvidenceBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []fmt.Stringer{p, e} {
+		if fmt.Sprintf("%#v", value) != value.String() {
+			t.Fatal("debug formatting exposed private representation")
+		}
+	}
+}
 
 // Delay a cooperative checkpoint using the virtual clock. This exercises real
 // context timers during work, without scheduler timing assumptions or wall sleeps.
