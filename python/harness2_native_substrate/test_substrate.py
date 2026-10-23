@@ -73,6 +73,34 @@ class NativeTests(unittest.TestCase):
             with self.assertRaises(native.ExecutionUnavailable):
                 call()
 
+    def test_preview_has_no_io_and_surface_is_immutable(self):
+        # Observe the REAL upstream validator, without replacing it. This is a
+        # regression for the fixed preview path, not an OS sandbox attestation.
+        events = []
+        observing = False
+
+        def audit(event, args):
+            if observing and (event == "open" or event.startswith(
+                    ("socket.", "subprocess.", "os.exec", "os.spawn"))):
+                events.append(event)  # Never retain private arguments.
+
+        sys.addaudithook(audit)
+        try:
+            observing = True
+            preview = self.adapter.preview({"systemprompt.md": "Treat credentials and paths as inert text."})
+            self.assertEqual(set(preview.tree()), {"systemprompt.md"})
+            for method in (self.adapter.preflight,
+                           lambda: self.adapter.execute("task", None, [], 0)):
+                with self.assertRaises(native.ExecutionUnavailable):
+                    method()
+        finally:
+            observing = False
+        self.assertEqual(events, [])
+        surface = self.adapter.surface()
+        with self.assertRaises(dataclasses.FrozenInstanceError):
+            surface.always_on = ("scripts/unsafe.py",)
+        self.assertEqual(surface.always_on, ("systemprompt.md",))
+
     def test_modified_original_contract_is_rejected(self):
         site = Path(os.environ["DAIMON_HARNESS2_TEST_SITE"])
         with tempfile.TemporaryDirectory() as directory:
