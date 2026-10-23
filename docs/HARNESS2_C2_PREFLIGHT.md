@@ -1,5 +1,9 @@
 # C2 — decisão de pré-provisionamento Hyper-V
 
+Plano operacional atualizado: [remediação Windows, aquisição e autorizações](HARNESS2_C2_REMEDIATION.md).
+Estado BLOCKED preservado; ISO exige aprovação específica de download, chave
+gVisor apenas corroborada em canais oficiais, ESU/patches ainda não comprovados.
+
 ## Windows e supply chain — verificação de 2026-10-23
 
 **Provisionamento: BLOCKED.** Base inspecionada `5352e830744948de0d986fd4cd5e229260a1ce24`,
