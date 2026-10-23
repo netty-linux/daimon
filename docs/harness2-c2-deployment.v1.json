@@ -10,8 +10,14 @@
     "candidate_sha256": "97f3d7ffb032c3eb3b23d2c8be9cc76e60c2c1f2c0146ba5ba9fe01cafae0fd8",
     "signing_fingerprint": "843938DF228D22F7B3742BC0D94AA3F0EFE21092",
     "fingerprint_source": "https://documentation.ubuntu.com/security/software-integrity/image-verification/",
-    "signature_verification": "NOT_RUN",
-    "iso_hash_verification": "NOT_RUN"
+    "verification_status": "CANDIDATE",
+    "signature_verification": "VERIFIED_CHECKSUM_LIST_ONLY",
+    "checksum_list_sha256": "728064ecf411f4ab702d9c3ca0a938ce672771424c028a1b52b2449f7eb5a068",
+    "signature_date": "2026-09-15",
+    "key_expiry_in_downloaded_keyring": null,
+    "revocation_freshness": "UNVERIFIED",
+    "iso_hash_verification": "NOT_RUN",
+    "pending": ["approved ISO download and byte verification", "fresh revocation review"]
   },
   "gvisor": {
     "candidate_release": "release-20261019.0",
@@ -20,7 +26,28 @@
     "candidate_sha256": "1298e8ed9c3fee900f00d2ea96ec2d79d80ed93f2175812f29b7e7da718041a3",
     "platform": "systrap",
     "producer_authentication": "UNRESOLVED",
-    "complete_layout_inventory": null
+    "verification_status": "UNVERIFIED",
+    "complete_layout_inventory": null,
+    "source_declared_layout": ["runsc", "containerd-shim-runsc-v1", "gvisor-bin/gvisor_sentry", "gvisor-bin/checkpointgofer", "gvisor-bin/runsc-metric-server", "gvisor-bin/runsc-fd-parking", "gvisor-bin/gvisor-sentry-prewarmer", "gvisor-bin/gvisor-proc-umounter"],
+    "layout_source": "https://github.com/google/gvisor/blob/760b80785dc53311d4c87bd2de167525a99709c1/tools/release.bzl",
+    "apt": {
+      "origin": "https://storage.googleapis.com/gvisor/releases/",
+      "version": "20261019.0",
+      "architecture": "amd64",
+      "package": "pool/20261019.0/binary-amd64/runsc.deb",
+      "package_size": 76131500,
+      "published_package_sha256": "24e9740411c15f229151155e9b890388a18cfb4c9fce5c8d7ea6ed9f926e7a52",
+      "release_sha256": "ea5e20f4714c99bf7bc1e2ab43dc3b56d311555dd4456087a5fdd90c391b5b40",
+      "packages_sha256": "9eee2a2c0c09542751dfd12741597d42206c5d0b21ba9e20519b734f71eadc64",
+      "observed_signing_fingerprint": "6F1DF85E3A71C24918E727D56FC6D554E32BD943",
+      "signature_math": "PASS",
+      "packages_digest_matches_release": true,
+      "independent_key_authentication": "UNVERIFIED",
+      "package_byte_verification": "NOT_RUN",
+      "metadata_valid_until": null
+    },
+    "dependencies": ["Linux 5.6+ upstream minimum; supported patched kernel still pending", "complete same-version sidecars", "deployment-controlled OCI rootfs and cgroup v2 supervisor"],
+    "pending": ["independent signing-key provenance", "package byte and layout inventory", "dependency closure", "anti-replay and revocation policy"]
   },
   "kernel_packages": null,
   "systemd_packages": null,

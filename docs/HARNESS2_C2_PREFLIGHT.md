@@ -1,5 +1,113 @@
 # C2 — decisão de pré-provisionamento Hyper-V
 
+## Windows e supply chain — verificação de 2026-10-23
+
+**Provisionamento: BLOCKED.** Base inspecionada `5352e830744948de0d986fd4cd5e229260a1ce24`,
+checkout inicialmente limpo. Só documentação/manifesto alterados. Memória e calibração
+3–4 GiB continuam pendências independentes; os 18 gates permanecem unverified.
+
+### Windows: atualização do OS insuficiente e ESU UNVERIFIED
+
+Windows 10 Pro x64, 19045.6466. Histórico local completo disponível (546 entradas,
+QueryHistory, sem scan online) registra último cumulativo de OS identificado:
+KB5071959, sucesso em 2026-02-26; KB5066791 em 2026-02-21. A build atual corresponde
+ao [OOB de novembro de 2025](https://support.microsoft.com/en-us/servicing/os/windows-10/2025/11/november-11-2025-kb5071959-windows-10-version-22h2-os-build-19045-6466-out-of-band).
+Datas de instalação não são datas de publicação. Get-HotFix isoladamente não
+apresentou todos os mesmos KBs; histórico e build foram confrontados, sem inventar
+reparo ou reset do catálogo.
+
+Referência oficial atual: [KB5126657, 2026-10-13, build 19045.7807](https://support.microsoft.com/en-gb/servicing/os/windows-10/2026/10/kb5126657-windows-10-21h2-22h2-security-update).
+Não aplicada conforme build/histórico consultados; atualizar requer revisão de
+elegibilidade, pré-requisitos/SSU e autorização administrativa. Não foi executada
+busca de aplicabilidade online, portanto não se lista cada pacote faltante como
+diagnóstico individual. KB5126256 é preparação ESU, não cumulativo de segurança;
+Defender/.NET não foram contados como patch do OS.
+
+Suporte regular encerrado; [ESU exige inscrição/ativação aplicável](https://learn.microsoft.com/windows/whats-new/enable-extended-security-updates),
+Windows 22H2 e pré-requisitos atualizados. SoftwareLicensingProduct consultado só
+por classificação: 24 entradas ESU, zero LicenseStatus=1. Cobertura **UNVERIFIED**,
+sem inferir modalidade consumer nem publicar IDs/chaves. Serviços wuauserv/UsoSvc
+Running, BITS Stopped (manual); isso não comprova integridade de componentes nem
+exige reparo. Indicadores CBS e WindowsUpdate de reinício pendente: false. Nenhuma
+ativação, instalação, reparo ou reinício realizado.
+
+### Ubuntu: assinatura da lista PASS; bytes ISO NOT RUN
+
+Metadados pequenos baixados de releases.ubuntu.com/24.04 e keyring de
+archive.ubuntu.com/ubuntu/project/ubuntu-archive-keyring.gpg para staging local
+não versionado sob .git. Nenhuma imagem grande baixada. GnuPG 2.4.9 já existente
+na instalação Git foi localizado fora do PATH; isso supera a limitação anterior
+de verificador não localizado, sem instalar software ou alterar keyring global.
+
+Fingerprint `843938DF228D22F7B3742BC0D94AA3F0EFE21092` conferida separadamente na
+[documentação Canonical](https://documentation.ubuntu.com/security/software-integrity/image-verification/).
+`gpg --batch --no-options --homedir <staging> --no-default-keyring --keyring
+<keyring-baixado> --status-fd 1 --verify SHA256SUMS.gpg SHA256SUMS` retornou exit 0,
+GOODSIG e VALIDSIG dessa fingerprint, assinatura em 2026-09-15. Chave sem expiração
+no keyring obtido; nenhuma revogação indicada nele, sem prova independente de
+freshness de revogação. TRUST_UNDEFINED é esperado sem trustdb global: autenticação
+usou comparação explícita de fingerprint, não confiança automática do GPG.
+A primeira tentativa falhou por sintaxe de caminho Windows no GPG MSYS; corrigir
+para caminho MSYS permitiu validação, sem aceitar a falha como sucesso.
+
+SHA256 dos bytes obtidos de SHA256SUMS:
+`728064ecf411f4ab702d9c3ca0a938ce672771424c028a1b52b2449f7eb5a068`.
+Entrada autenticada para ubuntu-24.04.5-live-server-amd64.iso:
+`97f3d7ffb032c3eb3b23d2c8be9cc76e60c2c1f2c0146ba5ba9fe01cafae0fd8`.
+**ISO CANDIDATE, integridade dos bytes NOT RUN**. Não houve busca em arquivos
+pessoais nem aprovação para download grande. Após download explicitamente aprovado,
+revalidar assinatura/fingerprint/revogação e calcular hash da ISO inteira.
+
+### gVisor: cadeia APT parcialmente demonstrada; origem ainda UNVERIFIED
+
+GitHub API oficial confirmou release-20261019.0 publicada em 2026-10-22, commit
+760b80785dc53311d4c87bd2de167525a99709c1; mais recente na consulta de releases.
+Tag unsigned. Consulta de advisories públicos retornou lista vazia; isso **não**
+é prova de ausência de vulnerabilidades ou correções sob embargo. Notas da release
+e [política de backports](https://gvisor.dev/release/) revisadas; pin exato não
+recebe futuras correções automaticamente. Nenhuma versão foi trocada silenciosamente.
+
+Canal recomendado [APT oficial](https://gvisor.dev/docs/user_guide/install/):
+Release/Release.gpg e Packages amd64 baixados, sem instalar APT/runsc. Assinatura
+matematicamente válida (exit 0, VALIDSIG) pela chave obtida em gvisor.dev/archive.key,
+fingerprint `6F1DF85E3A71C24918E727D56FC6D554E32BD943`. Falta corroborar essa chave
+por fonte independente aprovada; HTTPS e assinatura com a própria chave baixada
+não fecham confiança de produtor. Estado geral **UNVERIFIED**.
+
+Release de 2026-10-22 autentica digest/tamanho do Packages baixado: SHA256
+`9eee2a2c0c09542751dfd12741597d42206c5d0b21ba9e20519b734f71eadc64`, 597 bytes.
+Packages anuncia runsc amd64 20261019.0, pacote 76.131.500 bytes e digest no manifesto.
+Pacote NÃO baixado/verificado/executado. Versão futura deve ser exata (`runsc=20261019.0`),
+com captura dos metadados autenticados e revisão de maintainer scripts; canal por
+data pode receber backports e não basta para reprodução. Release sem Valid-Until
+observado: exigir política externa de freshness/anti-replay antes de implantação.
+
+Layout declarado pelo código pinado tools/release.bzl e BUILD: runsc, shim
+containerd-shim-runsc-v1 e seis sidecars listados no manifesto. Não equivale ao
+inventário byte-a-byte do pacote. Preservar diretório gvisor-bin junto a runsc,
+inclusive auxiliares condicionais, sem downloads implícitos. Systrap evita exigir
+KVM aninhado; mínimo upstream Linux 5.6+ não substitui kernel suportado corrigido.
+Kernel/systemd/libs/rootfs, modos/links e dependências reais continuam sem closure
+autenticada. Nenhum binário baixado foi executado; nenhuma instalação feita.
+
+### Próximas ações e validação
+
+1. Comprovar inscrição ESU vigente ou planejar OS suportado; aprovar atualização
+   cumulativa/SSU apropriada e eventual reboot separadamente. Até lá, host bloqueado.
+2. Aprovar download ISO grande e verificar seus bytes contra a lista autenticada.
+3. Corroborar chave APT gVisor externamente, revisar revogação/freshness, verificar
+   pacote e todos os arquivos/dependências sem executar conteúdo adquirido.
+4. Congelar kernel/systemd/rootfs e políticas autenticados, revisar provisionador
+   e cleanup; somente depois decidir provisionamento. RAM continua independente.
+
+Manifesto diferencia VERIFIED da assinatura de metadados, CANDIDATE da ISO e
+UNVERIFIED do runtime; status global BLOCKED. JSON parseado, invariantes de schema
+version 1 verificadas e git diff --check; não existe schema formal de deployment
+no projeto identificado nesta revisão. Suites Go/Python/UI não repetidas por mudança
+somente documental; CI novo consultado separadamente. Checks verdes não autenticam
+artefatos. Evidências pequenas ficam no staging local; nenhum caminho privado,
+produto/licença/token ou arquivo adquirido foi incluído no commit.
+
 Dimensionamento reavaliado: [alternativa dinâmica 3/3/4 GiB e plano de consumo](HARNESS2_C2_INFRASTRUCTURE_PLAN.md#alternativa-de-dimensionamento-sob-demanda--revisão-de-2026-10-23).
 O usuário informou inventário administrativo sem VMs e com um switch interno;
 não repetido nesta sessão. A proposta não altera scripts/manifesto nem configurações.
