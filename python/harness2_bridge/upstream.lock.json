@@ -1,0 +1,164 @@
+{
+  "repository": "https://github.com/google-research/harness2",
+  "revision": "1cfe254e8d25b15f37048c3730134686abe60335",
+  "license": "Apache-2.0",
+  "license_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+  "files": {
+    "harness2/__init__.py": {
+      "lf": "de20a79ef3cf3974bf32cb6afdbb32608655676e749a466ffd6c7c173bb7e26a",
+      "crlf": "79c584bb7891c7d027783eb21bb0fe0be47df88735b18ea2877a52cc6f314ce3"
+    },
+    "harness2/benchmarks/__init__.py": {
+      "lf": "6c0fb1a1a69906258c5a0a7765aa7d0e862c71ac955707d938933f9c26f73fa8",
+      "crlf": "ede74b8dbe67e44c41d792444e3948f84f5980ba104ab32c252a063525004eb8"
+    },
+    "harness2/benchmarks/jb_opencode_runner.py": {
+      "lf": "aadfb0d1307b41da84900d353505c72d322937aef8f5400e2b95c7701ae9b768",
+      "crlf": "79c6e12e48913d6e370ee2989a9e3ca4b66df36440516c7770796959f531913c"
+    },
+    "harness2/benchmarks/jobbench.py": {
+      "lf": "446738c854a5fc1639c7a8a312aa90367d1f73bc7f1df1f00ccd2d243b2aeafb",
+      "crlf": "3bdb6bc6974153619aa125f2127cc109c7f0cb88d0453650ae3ab55566714c0a"
+    },
+    "harness2/benchmarks/lab.py": {
+      "lf": "95bfa213048e870f6c4e45f9040d881ef60f2282d25175b0f8fefe6ce9eb4e71",
+      "crlf": "17fe0334e9373cc14b6f165b0b0f3ab29aeef3e44132abcadb8c4f12af564f48"
+    },
+    "harness2/benchmarks/tasks.py": {
+      "lf": "368fa8d5f7596522a9e54c6c0cb9cd8feb12a3de110d29af05cdd7e6f74dabc7",
+      "crlf": "136ffec470255db355be2f323660a5a43089fbf374e560626569e35956555da5"
+    },
+    "harness2/benchmarks/wb_render.py": {
+      "lf": "df516796e3f29842b2ee9efa0f9f7274fe062b6e1232be75fb83cf76a93c32b5",
+      "crlf": "948422632aed24bde6185b6dc7c2843b12b8709314a0ee5f5fcb7c38290d1de5"
+    },
+    "harness2/benchmarks/workbuddy.py": {
+      "lf": "1e08d17a9ad0b23a3b6dabc6da2d2e65a8110cba17d7882d5f113940f7dfeb91",
+      "crlf": "edc149d7088564e5e1590e72ce71635ea5e0dbe6e852c4606e4b29257fc4ff30"
+    },
+    "harness2/cli/__init__.py": {
+      "lf": "8fd4345e5586666df552582be8e8d69adbb4daffae69088b08a773400c844b78",
+      "crlf": "8807b45caf2de7c85c5c7802cf0c0adbbef5285e8c1f8900137077275756d6b1"
+    },
+    "harness2/cli/_common.py": {
+      "lf": "aba8393739a6ae343ce95ef005c7037b737466f444064aba63735f2ac5a22037",
+      "crlf": "053c59da437c87b0f85783cfbfa2fb13e8f48bae4fcc5fed7651629f9b558838"
+    },
+    "harness2/cli/bridge.py": {
+      "lf": "6092475dd656eccbd454067fd20166d2ca44948d91d3c574b4da2e3b28e2af7e",
+      "crlf": "55530bf72a8d0b373e1eb83c1fc19721a028744897957ea36f0835258af38ad7"
+    },
+    "harness2/cli/check.py": {
+      "lf": "0c42509009b292613d46c7a87287036b5080116c14b0da4ead984896d108c2e0",
+      "crlf": "08d11ce8eb3f4e8c2debbf246e75e30c6f37457716a41bcd1add77284cb175af"
+    },
+    "harness2/cli/demo.py": {
+      "lf": "f8ba578ff547d1f78666ee222d0ace3fea34d468405c9766d103b856c6272d25",
+      "crlf": "8d793272001342babbaef0f47c3aa8cfb1ec412de5a9ed17050a5e833a2c2dff"
+    },
+    "harness2/cli/judge.py": {
+      "lf": "7dfb882266dd541100e5a1d4f7ac6cf728441e26c6850e420651bae8a4c7fb26",
+      "crlf": "cbb3191194129bc0e1e2ef748b2bb3ef639cf5349c85643f60efb79f90941c73"
+    },
+    "harness2/cli/report.py": {
+      "lf": "2cb4460658d982d9ef9921b4393b1adbb95d1909b07a967759167b97f78cf5d4",
+      "crlf": "4215f180f80a4d72f933d26c2fbbfd76fb3663625ca0e27f151a44ee24f7ea27"
+    },
+    "harness2/cli/run_sweep.py": {
+      "lf": "83998848662cdf3e101250ae13afbfbf82d9b88db4d9181ab973ae9fe32f8b0a",
+      "crlf": "7af2c0395acf1a2927b20413a664a65d30770871728c869020ab476ed08b4f1a"
+    },
+    "harness2/cli/setup.py": {
+      "lf": "c0a5438fcbea074e61b749554198638777f393c48d0a686161699e298ee18d0b",
+      "crlf": "9de95f0d2511da6bd91266ad0aa9e9a1f322772dc205a22fe3dab1d97cd655b3"
+    },
+    "harness2/config.py": {
+      "lf": "0db5ba0c42b87f5b14cbff2d11aaecddda1cd45500903c1d61741232bd1e0a88",
+      "crlf": "4e1bc8dd74eec9c3f5eaa791293205f747505d7510c8f574e30e196c0fe8283f"
+    },
+    "harness2/core/__init__.py": {
+      "lf": "ce487673e00fd8921139e3afb688c566fc43d9b07acba048d2102663a81f7151",
+      "crlf": "3e59e8c3c2878e10d83c576a7b899c9488aed022fd14cdba42fa1d1cda0fea3c"
+    },
+    "harness2/core/context.py": {
+      "lf": "63dd482e5d9467d7e659d186a11289fc7861d08c8aed603244ff0cee92de91f3",
+      "crlf": "131a778850f72b76a29e08b0977639abbef99c87e8be2f5f85571390e55c6da3"
+    },
+    "harness2/core/judge.py": {
+      "lf": "0f8cd6f4ec659f5d5976bdad4ccdc432651f51486c3fbbee36be53a6d619fbba",
+      "crlf": "1631335e96bc61f6f7351bececbe7b4365f1173cd2b81b5bae5bdea0a9a1c3cc"
+    },
+    "harness2/core/ledger.py": {
+      "lf": "7059de5d90fc9fb8d4b3b799ff075f09d34f182ba0fdb56eb9d8b8383d0bbf55",
+      "crlf": "fc34c75a7ec67ab0c541bd97faca6c2313e54f5f4182b2c9bdbfedd3bf7856f7"
+    },
+    "harness2/core/library.py": {
+      "lf": "00219fda201a030f43b35b49c4e73ccf336aedc81164144c435b4b06a1256dd3",
+      "crlf": "2413c5b884b9971c40398c5c0b618c17e59f993b16fe80fc7f4a0aaf19663361"
+    },
+    "harness2/core/prompts.py": {
+      "lf": "d1f4f8db4ab4cb4addcbca175b548db2270375499fda727ac95d271c63cc2504",
+      "crlf": "9eaee30af64f33161acc521f34c614afe84ba4c61c5b6e1499ba1def134dc62d"
+    },
+    "harness2/core/proposer.py": {
+      "lf": "475ef49d72228e249d7172d793f8362913774412402dfd259ae6e01c6586e175",
+      "crlf": "98fb50b083d054a12e2889bf7ea3ab989525af677ddd63664e0cc659b38fb70b"
+    },
+    "harness2/core/recursion.py": {
+      "lf": "b299813b5334f2c0f89024a7f14162f0fdd5418ebd4413be93920b5334a204c1",
+      "crlf": "897af986107f5e36e30079d812ed27fa97028da83871bf3de8cd26000125cb3a"
+    },
+    "harness2/core/report.py": {
+      "lf": "9d5b119ec93dc6b2c6341095130103ab4ba2f2dc6867c4b7ea759fca5de3cac9",
+      "crlf": "1d7fb9b96c376cf333f00f5d185864f00ab71112fb8c65ec2910eb10c52f6159"
+    },
+    "harness2/core/runmark.py": {
+      "lf": "99a7c3f0b023623224c3376bc0390e985b8e6608f0928d34b821ffe6c36f9175",
+      "crlf": "e2226e86909eee4320ccce869354161f8af028f03d1fba8e5b9fa4e43fb905b3"
+    },
+    "harness2/core/schedule.py": {
+      "lf": "6e46c5ab1e4ac111818ff3acd6b636e39d650898189ac0c21802a8233ad4cd38",
+      "crlf": "31b02f9bb9b97643b64561b98f88e88a146926273ab971cef49703d071bdf648"
+    },
+    "harness2/core/selection.py": {
+      "lf": "2cb3353b2fd4ec72e6322f2c1f35db1ff2cdab88b0b50c8809d1841d235cb92f",
+      "crlf": "403a456e81d84b4d023f722b628f75cb06b261fd43da72cb272fa2e5c528360c"
+    },
+    "harness2/core/spec.py": {
+      "lf": "f245ec9e314778e2a1a51594b906584255b9eed8340c073b864a8a6f2c8dc400",
+      "crlf": "50d235853e4c65238bb52246e50bf6539ba8e8dd71b4f6f46f1aba324e77d9bd"
+    },
+    "harness2/core/tree.py": {
+      "lf": "c2a15690b1b6b02156e922c5e0b1a215c5065d7bea5a3bae2e56b47309197552",
+      "crlf": "65b66283e43c50c0fecb15d4703072fcc815fbbfc3ecac1e66b01d7786fadfc9"
+    },
+    "harness2/demo.py": {
+      "lf": "8f338b3254922a8a48d66162f7796dde435d3ef65a7ccd441ef604c81a1d39d4",
+      "crlf": "1db252258e8d5ddb744f5f030b17a40faf072caed6de28792639622e4b07cc84"
+    },
+    "harness2/install.py": {
+      "lf": "a75eaa452d405020a268864e1f047346ec10cb64b81c4045f6bda0f72bd152c4",
+      "crlf": "52d66b97b674a32309ffeb2d5bafb8d968e9d0f83fbf582f810a310bb019ae19"
+    },
+    "harness2/preflight.py": {
+      "lf": "78b6a7bc81ced28987f6d9a47bb20e7e5c6d70ff89f2a70cc9a6d179363d6c53",
+      "crlf": "f6516e54fedbe3f3a795d664b9dd86b928767b76837dfcb22a766bdf77cc93e1"
+    },
+    "harness2/substrate/__init__.py": {
+      "lf": "57f95d86cb0d4acfd60fddd52f2d140ffadcf0c318e28093532580339dc3f37d",
+      "crlf": "d1211f31f09bd551df1faee86a1be32a47b0d3615289fa8a839e0070627fa309"
+    },
+    "harness2/substrate/base.py": {
+      "lf": "50a63f174e3772888af3882f3ffff3162cefba8d36e927b1a5de343c5806dd16",
+      "crlf": "0a414352e1746b08b811e23470b7ece548d7af0260e80d4cd4c3cc1b38932604"
+    },
+    "harness2/substrate/codex.py": {
+      "lf": "281a07271ebed72a617a671ced1b9137901aa8f5d1deffb56c706f44c295e416",
+      "crlf": "95221d9c7a99921c1ae0228bc86d0d3f6bce5a209076bf1f43bf7958f12db6a7"
+    },
+    "harness2/substrate/opencode.py": {
+      "lf": "dabc79953d164a0d38802125756379ffa6acdc7b553d2f9036475f8220166ff0",
+      "crlf": "a6d3a6bd66fa4bdb52d3c02412c5f6d9d1658a1db04e27ef8b93de081c0850e3"
+    }
+  }
+}
