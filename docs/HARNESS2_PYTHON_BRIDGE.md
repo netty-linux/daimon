@@ -353,3 +353,69 @@ registro da entrega inicial. A correção de código está no commit
 `4d89d1caa2cac61e42f6364d3b664310f68b6dba`. O relatório distingue os testes finais
 PASS da falha observada na suíte Windows completa. Nenhuma garantia de sandbox
 adversarial foi acrescentada.
+
+## Consolidação de #26 → #24 → #25 — 2026-10-23
+
+A autorização posterior do operador permite a consolidação sequencial, condicionada
+à revisão, ausência de bloqueadores e checks aprovados. Os registros anteriores
+preservam as falhas e o escopo de autorização existentes naquelas execuções.
+
+- #26 integrado por merge commit `5e5490b425f91127763d5b9b9191cc90fb0c324e`.
+  A correção é exclusivamente de testes/documentação; mantém os deadlines e o
+  runtime fail-closed. Nova repetição dos três cenários com race/count=30 passou.
+- A branch A recebeu main por merge `39e7888ad71c6c271049d650414893e8967242db`,
+  preservando os commits originais. #24 foi integrado por merge commit
+  `79582205ba077f4a7e14ed527dfb271e4c131218`, após todos os checks aprovados.
+- #25 foi retargetado para main. A branch B recebeu main por merge
+  `26976610d9ad96cd29ba822f545816034f5b245e`, preservando os seis commits
+  originais e a correção Windows. Seu diff contra main contém somente os 24
+  arquivos da Phase B, incluindo esta documentação. Contratos A e runtime
+  sandbox/computer/Sessions/policy não diferem da main já integrada.
+
+As validações abaixo executaram o código de `2697661`; o commit posterior
+somente acrescenta este registro. Os checks do HEAD final devem concluir antes
+da integração de #25. O SHA do merge final é rastreável no
+[PR #25](https://github.com/netty-linux/daimon/pull/25).
+
+| Validação desta consolidação | Resultado |
+| --- | --- |
+| Regressão após #26 e após #24, normal/race | PASS: sandbox, lifetime/cleanup e contratos A |
+| Windows, Go completo sem race | PASS; sandbox 36,917 s, ponte real 8,893 s |
+| Windows, Go completo com race | PASS; sandbox 39,189 s, ponte real 7,009 s |
+| Linux, Go completo sem race | PASS; sandbox 4,280 s, ponte real 2,892 s; managedworkspace/symlinks preservados |
+| Linux, Go completo com race | PASS; sandbox 6,390 s, ponte real 3,411 s; managedworkspace/symlinks preservados |
+| Python real Windows/Linux | PASS: 8 testes em cada plataforma; mais 1 teste hard-limit Linux |
+| E2E, cancelamento, falha de startup e cleanup | PASS nos pacotes completos da ponte, com variáveis DAIMON_HARNESS2_TEST_PYTHON/SITE explicitamente configuradas |
+| Integridade e procedência | PASS: 39 fontes e licença Apache-2.0, contra objetos Git do checkout oficial limpo na revisão fixada |
+| go vet, gofmt e git diff --check | PASS; nenhuma formatação pendente |
+| UI local | PASS: typecheck, 80 testes/15 arquivos e build; assets sem alterações; UI é idêntica à main |
+| Demo Linux offline | PASS: completed, 2 passos, 1 ferramenta |
+| Revisão do diff | Somente Phase B; nenhum ambiente/cache/temporário/dependência instalada ou formato reconhecível de credencial encontrado |
+
+Windows usa Go 1.27.1, CGO habilitado, Python 3.12.10 e uv 0.12.17. Linux usa
+o runner versionado com fonte somente leitura, cópia privada, umask 022, TMPDIR
+no mesmo filesystem e `--network none --cpus 4 --memory 4g --pids-limit 512`.
+Imagem local de teste:
+`sha256:bbbdfac62f6851c8191f46b39d3404febe84a3fa80f9426dc6bf5bd9303d619a`.
+Nenhum launcher upstream, candidato, modelo ou API paga foi executado.
+Testes específicos Linux não foram adaptados ou relaxados para Windows.
+
+Os workflows push/PR da A atualizada passaram (runs 39961843214/39961847502),
+assim como os workflows das mains após #26/#24 (39961683170/39962468355).
+Os workflows da B em `2697661` passaram (39962622968/39962629171).
+O CI continua sem matriz Windows/Python real: essas evidências são locais,
+complementares aos checks Go/Linux e UI do GitHub, não implícitas no CI verde.
+
+Logs locais não versionados:
+`D:/hyperframes-cache/temp/daimon-final-consolidation-windows-normal.log`,
+`D:/hyperframes-cache/temp/daimon-final-consolidation-windows-race.log` e
+`D:/hyperframes-cache/temp/daimon-final-consolidation-linux.log`.
+
+A falha histórica de lifetime permanece documentada; as execuções completas
+desta consolidação passaram após a estabilização do teste em #26. Não houve
+alteração de semântica de produção, supressão de cancelamento ou aumento de
+timeouts. A revisão de segurança anterior continua válida para o código fixo
+confiável. Os gates C1/C2/C3 de filesystem/rede/credenciais, integridade externa
+do runtime e supervisão/quota/reaping de árvores adversariais permanecem abertos.
+Phase C, recursão, Experience Library e conexão automática a Sessions continuam
+fora desta consolidação.
