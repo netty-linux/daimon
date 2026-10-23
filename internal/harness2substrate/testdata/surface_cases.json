@@ -1,0 +1,5 @@
+[
+  {"name":"ascii", "prompt":"Respond with care.", "upstream_valid":true},
+  {"name":"unicode", "prompt":"Olá, 世界. <&>\nKeep data private.", "upstream_valid":true},
+  {"name":"missing-script", "prompt":"Run python scripts/private-missing.py", "upstream_valid":false}
+]

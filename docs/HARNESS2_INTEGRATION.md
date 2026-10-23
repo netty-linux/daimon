@@ -1,7 +1,7 @@
 # Harness² — integração incremental
 
-Estado atual: ponte de validação da Phase B implementada em pacote opcional;
-veja [instalação, protocolo, testes e limites](HARNESS2_PYTHON_BRIDGE.md).
+Estado atual: Phases A/B integradas e [fundação offline C1](HARNESS2_NATIVE_SUBSTRATE_C1.md)
+implementada em pacote opcional. Veja também [instalação, protocolo e limites B](HARNESS2_PYTHON_BRIDGE.md).
 Execução de candidatos e otimização continuam indisponíveis.
 
 ## Estado e auditoria da Phase A — registro de 2026-10-22

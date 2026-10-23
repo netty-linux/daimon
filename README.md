@@ -7,6 +7,8 @@ Veja [auditoria e proposta](docs/cua-persistent-bots.md).
 imutável e materialização de candidatos em memória estão em `internal/harness2`.
 Há uma [ponte Python opcional de validação](docs/HARNESS2_PYTHON_BRIDGE.md), com
 upstream fixado e protocolo limitado. Não há otimização executável habilitada.
+Uma [fundação nativa C1](docs/HARNESS2_NATIVE_SUBSTRATE_C1.md) prepara candidatos
+e provas estruturais offline, mantendo a execução real indisponível.
 Veja a [auditoria, limites e fases pendentes](docs/HARNESS2_INTEGRATION.md).
 
 DAIMON é a fundação experimental de um **Sovereign Personal Agent** em Go:
