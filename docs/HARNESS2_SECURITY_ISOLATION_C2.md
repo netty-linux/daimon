@@ -1,5 +1,9 @@
 # Harness² C2 — inspeção de pré-requisitos; execução bloqueada
 
+Continuação documental: [plano operacional de infraestrutura](HARNESS2_C2_INFRASTRUCTURE_PLAN.md).
+Ele distingue container/daemon/kernel/plataforma e propõe provisionamento futuro
+autorizado; não instala runtime nem implementa um executor.
+
 ## Situação e base
 
 **Entrega parcial, C2 bloqueada. Não existe executor de fixtures nesta entrega.**
