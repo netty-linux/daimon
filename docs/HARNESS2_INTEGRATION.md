@@ -3,6 +3,8 @@
 Estado atual: Phases A/B integradas e [fundação offline C1](HARNESS2_NATIVE_SUBSTRATE_C1.md)
 implementada em pacote opcional. Veja também [instalação, protocolo e limites B](HARNESS2_PYTHON_BRIDGE.md).
 Execução de candidatos e otimização continuam indisponíveis.
+Uma [inspeção C2 de pré-requisitos](HARNESS2_SECURITY_ISOLATION_C2.md) registra
+as lacunas do ambiente; não entrega executor nem comprova isolamento adversarial.
 
 ## Estado e auditoria da Phase A — registro de 2026-10-22
 

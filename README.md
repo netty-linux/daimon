@@ -9,6 +9,8 @@ Há uma [ponte Python opcional de validação](docs/HARNESS2_PYTHON_BRIDGE.md), 
 upstream fixado e protocolo limitado. Não há otimização executável habilitada.
 Uma [fundação nativa C1](docs/HARNESS2_NATIVE_SUBSTRATE_C1.md) prepara candidatos
 e provas estruturais offline, mantendo a execução real indisponível.
+Há uma [inspeção de pré-requisitos C2](docs/HARNESS2_SECURITY_ISOLATION_C2.md);
+o isolamento de fixtures permanece bloqueado, sem executor disponível.
 Veja a [auditoria, limites e fases pendentes](docs/HARNESS2_INTEGRATION.md).
 
 DAIMON é a fundação experimental de um **Sovereign Personal Agent** em Go:
