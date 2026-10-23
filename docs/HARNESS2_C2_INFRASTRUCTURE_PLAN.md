@@ -61,6 +61,146 @@ compatibilidade. [Plataformas](https://gvisor.dev/docs/architecture_guide/platfo
 Manter GA e HWE distintos ao fixar o kernel da distro; não inferir a ABI apenas
 do nome 24.04.5. [Ciclo dos kernels Ubuntu](https://ubuntu.com/kernel/lifecycle).
 
+### Alternativa de dimensionamento sob demanda — revisão de 2026-10-23
+
+**Proposta documental, não configuração aplicada. Estado PENDENTE.** O operador
+informou inventário administrativo sem VMs registradas e com um switch interno;
+essa evidência é fornecida pelo usuário, não repetida por esta sessão sem elevação.
+Não conectar a VM ao switch por conveniência: um switch interno permite comunicação
+host/guest e não constitui barreira de rede. Permanecem ausência de NIC nos ensaios
+e revisão separada da rede de manutenção.
+
+Ubuntu 24.04 amd64 possui LIS integrado e suporte documentado a hot-add e ballooning.
+O perfil exato host/kernel ainda precisa de validação; memória dinâmica pode falhar
+quando o guest já está sob pressão. Não instalar LIS externo. Consultar driver
+hv_balloon e hotplug na imagem autenticada futura; rever compatibilidade GA/HWE sem
+trocar kernel implicitamente. [Suporte Microsoft](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/supported-ubuntu-virtual-machines-on-hyper-v).
+
+Startup RAM é a memória disponível durante instalação/upgrade; máximo não garante
+disponibilidade física. Ballooning depende do guest e não assegura devolução imediata.
+Smart Paging tem uso restrito em reinício, não é reserva operacional nem solução
+para sobrescrição. [Semântica Hyper-V](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/dynamic-memory).
+Canonical informa mínimo ISO de 1,5 GB e mínimo sugerido de 3 GB para Ubuntu 24.04
+amd64. Esses valores não incluem a carga C2 nem homologam 2 GiB para este laboratório.
+[Requisitos Ubuntu](https://ubuntu.com/server/docs/system-requirements/).
+
+| Perfil, sempre 2 vCPUs | Mínimo / inicial / máximo | Benefício | Limite |
+| --- | --- | --- | --- |
+| Conservador original | 4 / 4 / 4 GiB fixos | Capacidade previsível; melhor referência de quotas/latência | Mantém toda a RAM enquanto ligado; plano exigia 8 GiB livres antes do boot |
+| Dinâmico econômico, experimental | 2 / 2 / 4 GiB | Menor alocação inicial | Menos margem para instalação, serviços e hot-add; não recomendado como perfil inicial; só avaliar depois de referência estável |
+| Dinâmico inicial recomendado | 3 / 3 / 4 GiB | Economiza até 1 GiB frente ao fixo; margem superior à opção de 2 GiB | Pode crescer para 4 GiB, não é garantia de estabilidade nem economia constante |
+
+Escolha inicial proposta: **3 GiB mínimo e inicial, 4 GiB máximo, buffer alvo 20%,
+prioridade padrão**, sem overcommit planejado; todos os tamanhos múltiplos de
+128 MiB. Não diminuir mínimo abaixo de 3 GiB antes de medir. Teto de 4 GiB não
+inclui todo overhead do host. VHDX permanece até 48 GiB e reserva de disco 120 GiB.
+VM desligada fora de sessões deliberadas de laboratório; sem auto-start ou agente
+em background. Perfil fixo de 4 GiB continua referência para comparação reproduzível.
+
+#### Estimativa de memória, sem medições gVisor nesta máquina
+
+Valores seguintes são **reservas de engenharia a validar**, não benchmarks ou
+garantias do upstream. Evitar build Go/race, instalação de pacotes e ensaio de
+isolamento concorrentes dentro da VM pequena; validar esses custos separadamente.
+
+| Componente dentro do guest | Reserva inicial de planejamento |
+| --- | --- |
+| Kernel, systemd e serviços mínimos, contabilidade cgroups incluída | 768–1.280 MiB |
+| Supervisor/watchdog fora do cgroup limitado da fixture | 128–256 MiB |
+| Sentry, gofers, stubs, auxiliares e fixture juntos | Até 512 MiB, teto agregado proposto já existente; overhead runtime também consome esse teto |
+| Cache recuperável e margem de boot/hotplug | 512–768 MiB |
+
+Soma de planejamento: aproximadamente 1,88–2,75 GiB; há incerteza e picos de boot.
+Não somar workspace tmpfs de 64 MiB novamente se já contabilizado nos 512 MiB;
+garantir que sua cobrança realmente pertença ao subtree correto. O supervisor não
+compete pelo mesmo teto da fixture. Cgroups não têm custo fixo universal: metadados,
+page tables e kernel memory precisam entrar na medição agregada. Nenhuma faixa
+autoriza aumentar memory.max para caber runsc.
+
+O modelo gVisor contabiliza memória de aplicação via memfd/shmem; medir
+memory.current/peak e memory.stat completos, não apenas anon/RSS nem relato interno
+da fixture. Não há valor universal de overhead Sentry/gofer aplicável ao pin ainda
+não instalado. [Modelo de recursos gVisor](https://gvisor.dev/docs/architecture_guide/resources/).
+
+Quotas propostas de segurança permanecem intactas: uma fixture por vez, 512 MiB
+agregados, swap negado no subtree, 0,5 CPU, processos/disco/tempo do perfil-base.
+2 vCPUs são capacidade do guest, não limite da fixture. Se runtime confiável não
+couber no teto, registrar falha e revisar desenho antes de executar fixtures;
+não aumentar quotas nem reduzir garantias silenciosamente.
+
+#### Reserva do Windows e critérios de admissão/interrupção
+
+Amostra somente leitura desta revisão: 15,85 GiB visíveis e **6,69 GiB disponíveis**.
+Pagefile: 18.432 MiB alocados, 2.044 MiB em uso, pico 2.049 MiB. Isso não mede taxa
+de paginação nem prova thrashing. Consulta Win32_PerfFormattedData_PerfOS_Memory
+falhou com classe inválida; métricas de commit/paginação não obtidas. Não reparar
+contadores como efeito colateral. Chrome, Discord, ChatGPT e Codex ficam abertos.
+
+Reservar pelo menos 4 GiB disponíveis para o Windows e crescimento normal dos apps,
+mais margem **provisória** de 0,5 GiB de overhead host Hyper-V, a medir. Para boot e
+smoke inerte de 3 GiB, exigir inicialmente 7,5 GiB disponíveis; para autorizar ensaio
+que possa chegar a 4 GiB, exigir **8,5 GiB**, ou margem maior se a calibração indicar.
+Isso explicita overhead ausente no cálculo conservador de 8 GiB, não reduz a reserva
+anterior. Não usar 7,5 GiB para admitir ensaios de quota a 4 GiB. Scripts e manifesto
+anteriores não foram alterados e continuam bloqueados; esses números ainda exigem
+revisão antes de codificar admissão.
+
+Com 6,69 GiB livres, contas aproximadas após boot: 4 GiB fixos deixariam 2,19 GiB;
+dinâmico inicial 3 GiB deixaria 3,19 GiB; inicial 2 GiB deixaria 4,19 GiB, mas no
+pico de 4 GiB também cairia para 2,19 GiB. São subtrações estáticas com overhead
+estimado, sem prever cache/ballooning ou crescimento dos aplicativos. Portanto
+**nenhuma opção está comprovada apta hoje**, e não se promete uso normal sem impacto.
+
+Política futura de monitoramento, ainda não implementada: amostrar host/guest a
+cada segundo por observador fora do subtree da fixture. Não iniciar nova execução
+se host cair abaixo de 4 GiB disponíveis. Se permanecer abaixo por 5 s, cancelar
+ensaio cooperativamente e iniciar cleanup; abaixo de 2 GiB em qualquer amostra,
+cancelar imediatamente. Esses limiares não são garantia contra esgotamento entre
+amostras; manter reserva e autoridade externa são essenciais. Nunca encerrar apps.
+
+Também interromper a campanha se houver OOM global no guest, falha de hot-add,
+supervisor/watchdog sem resposta, memória guest disponível abaixo de 512 MiB por
+5 s, ou pressão PSI full contínua por 5 s. OOM **esperado dentro** do cgroup da
+fixture é resultado do teste, desde que supervisor e guest sobrevivam e façam cleanup.
+Se commit host ultrapassar 85% por 10 s ou paginação de entrada exceder duas vezes
+o p95 do baseline por 10 s junto de disco >80% ativo, suspender novos ensaios e
+revisar. São critérios provisórios de operação; com métricas ausentes, não admitir
+testes de pressão. Degradação perceptível pelo usuário interrompe a campanha.
+Não alterar pagefile/swap global como compensação automática.
+
+#### Plano posterior de medição — tudo NOT RUN
+
+1. Depois de sanar ESU/patches, autenticação e autorização administrativa, medir
+   baseline por 10 minutos com os quatro apps no uso habitual: RAM disponível,
+   commit/limite, paginação e disco do host. Selecionar contadores realmente
+   disponíveis ou Task Manager/PerfMon manualmente; não inventar números ausentes.
+2. Em janela autorizada, iniciar somente a VM do laboratório com 3/3/4 GiB;
+   medir boot e 10 minutos ociosa: MemoryAssigned/MemoryDemand/MemoryStatus no host,
+   hv_balloon/hotplug, MemAvailable, PSI, swap e OOM no guest. Não assumir que
+   páginas hot-added serão devolvidas; medir alocação real e margem para os apps.
+3. Smoke confiável inerte, depois runtime/supervisor sem fixture; registrar pico
+   de cada cgroup, guest total e overhead host. Só depois de revisão própria executar
+   fixtures controladas C2, sequenciais. Sem candidatos, inferência ou Sessions.
+4. Após autorização das provas, exercitar crescimento bounded e OOM no subtree,
+   cancelamento/cleanup, sem pressão global intencional. Comparar com 4 GiB fixos
+   em execuções separadas, com mesmo kernel/runtime/limites; no mínimo três ciclos
+   por perfil. Separar mudanças de alocação de evidência de desempenho/isolamento.
+5. Encerrar novas execuções, cancelar/aguardar run próprio, verificar cgroups vazios,
+   mounts e journal reconciliados; solicitar shutdown limpo do guest e confirmar
+   estado Off e recuperação da RAM no host. Não usar Saved como substituto de
+   shutdown limpo. Timeout de shutdown é falha de lifecycle, sem force-off automático;
+   diagnosticar e solicitar intervenção. Nada disso foi executado nesta tarefa.
+
+A instalação pode precisar de janela distinta de RAM; se 3 GiB não bastar, parar
+e planejar instalação com recursos suficientes, nunca confiar em hot-add durante
+instalação. Não incluir patching/build pesado no orçamento das fixtures.
+
+Pendências independentes da economia de RAM: **Windows/ESU e patches comprovados**;
+**ISO, runtime completo, rootfs e dependências autenticados**; scripts efetivos de
+provisionamento/descarte revisados e aprovação explícita. Inventário informado
+remove uma incerteza administrativa anterior, não essas condições. Todos os 18
+gates continuam unverified; RequireRealExecution segue ErrUnavailable.
+
 ## 3. Deployment reproduzível e autenticação
 
 Valores abaixo são **candidatos de aquisição**, não artefatos baixados ou autenticados:

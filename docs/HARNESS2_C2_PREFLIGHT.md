@@ -1,5 +1,11 @@
 # C2 — decisão de pré-provisionamento Hyper-V
 
+Dimensionamento reavaliado: [alternativa dinâmica 3/3/4 GiB e plano de consumo](HARNESS2_C2_INFRASTRUCTURE_PLAN.md#alternativa-de-dimensionamento-sob-demanda--revisão-de-2026-10-23).
+O usuário informou inventário administrativo sem VMs e com um switch interno;
+não repetido nesta sessão. A proposta não altera scripts/manifesto nem configurações.
+Memória atual 6,69 GiB disponível: PENDENTE mesmo com alocação inicial menor.
+ESU/patches e autenticação de artefatos continuam pendências obrigatórias separadas.
+
 ## Diagnóstico administrativo complementar — 2026-10-23
 
 **Resultado: PENDENTE**, não APTO PARA PROVISIONAMENTO. HEAD inspecionado
