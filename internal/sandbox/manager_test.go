@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -286,30 +287,110 @@ func TestConcurrentCreationAndClose(t *testing.T) {
 		}
 	}
 }
+
+// Real journal I/O must not consume the lease's test clock. The production
+// lifetime still includes provisioning; test that separate failure path below.
 func TestLifetimeExpiresAndRevokes(t *testing.T) {
-	m, _, catalog := setup(t)
-	m.options.Lifetime = time.Second
-	l, e := m.Create(context.Background(), "session-one", profile())
-	if e != nil {
-		t.Fatal(e)
-	}
-	select {
-	case <-l.Context.Done():
-	case <-time.After(2 * time.Second):
-		t.Fatal("lifetime not bounded")
-	}
-	deadline := time.Now().Add(time.Second)
-	for {
-		i, _ := m.Get(l.ID())
-		if i.Cleanup == "complete" {
-			break
+	synctest.Test(t, func(t *testing.T) {
+		m, f, catalog := setup(t)
+		m.options.Lifetime = time.Second
+		started := time.Now()
+		l, e := m.Create(context.Background(), "session-one", profile())
+		if e != nil {
+			t.Fatal(e)
 		}
-		if time.Now().After(deadline) {
-			t.Fatal(i)
+		expires, ok := l.Context.Deadline()
+		if !ok || !expires.Equal(started.Add(time.Second)) {
+			t.Fatal("lifetime must include provisioning")
 		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	if _, e = catalog.ForComputer(context.Background(), computerID(l.ID())); e == nil {
-		t.Fatal("expired computer live")
+		time.Sleep(time.Second - time.Nanosecond)
+		synctest.Wait()
+		if l.Context.Err() != nil {
+			t.Fatal("lease expired before deadline")
+		}
+		if _, e := catalog.ForComputer(context.Background(), computerID(l.ID())); e != nil {
+			t.Fatal("computer revoked before deadline", e)
+		}
+		time.Sleep(time.Nanosecond)
+		synctest.Wait() // Join the expiry callback, including real persistence/cleanup.
+		if l.Context.Err() == nil {
+			t.Fatal("lifetime not bounded", l.Context.Err())
+		}
+		i, e := m.Get(l.ID())
+		if e != nil || i.Status != Deleted || i.Cleanup != "complete" {
+			t.Fatal("expiry cleanup incomplete", i, e)
+		}
+		if _, e = catalog.ForComputer(context.Background(), computerID(l.ID())); e == nil {
+			t.Fatal("expired computer live")
+		}
+		f.mu.Lock()
+		remaining := len(f.remotes)
+		f.mu.Unlock()
+		if remaining != 0 {
+			t.Fatal("expired guest remains")
+		}
+		records, e := loadJournal(m.path)
+		if e != nil || records[l.ID()].Info.Cleanup != "complete" {
+			t.Fatal("expiry cleanup not persisted", e)
+		}
+	})
+}
+
+func TestCreateDeadlineCleansPartialResource(t *testing.T) {
+	for _, tc := range []struct {
+		name                    string
+		lifetime, createTimeout time.Duration
+	}{
+		{"lifetime", time.Second, 120 * time.Second},
+		{"create-timeout", time.Minute, time.Second},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				m, f, catalog := setup(t)
+				m.options.Lifetime, m.options.CreateTimeout = tc.lifetime, tc.createTimeout
+				f.started, f.gate = make(chan struct{}), make(chan struct{})
+				type result struct {
+					lease *Lease
+					err   error
+				}
+				done := make(chan result, 1)
+				started := time.Now()
+				go func() { l, e := m.Create(context.Background(), "session-one", profile()); done <- result{l, e} }()
+				<-f.started // A partial remote exists; backend waits on the create context.
+				time.Sleep(time.Second - time.Nanosecond)
+				synctest.Wait()
+				select {
+				case <-done:
+					t.Fatal("create completed before deadline")
+				default:
+				}
+				time.Sleep(time.Nanosecond)
+				r := <-done // Includes the deferred owned-resource cleanup with its own budget.
+				synctest.Wait()
+				if time.Since(started) != time.Second {
+					t.Fatal("create exceeded its earliest deadline", time.Since(started))
+				}
+				if r.lease != nil || !errors.Is(r.err, context.DeadlineExceeded) {
+					t.Fatal("expired create accepted or cancellation lost", r.err)
+				}
+				items := m.List()
+				if len(items) != 1 || items[0].Status != Deleted || items[0].Cleanup != "complete" {
+					t.Fatal("partial resource not cleaned", items)
+				}
+				if _, e := catalog.ForComputer(context.Background(), computerID(items[0].ID)); e == nil {
+					t.Fatal("failed create registered computer")
+				}
+				f.mu.Lock()
+				remaining := len(f.remotes)
+				f.mu.Unlock()
+				if remaining != 0 {
+					t.Fatal("partial guest remains")
+				}
+				records, e := loadJournal(m.path)
+				if e != nil || records[items[0].ID].Info.Cleanup != "complete" {
+					t.Fatal("failed-create cleanup not persisted", e)
+				}
+			})
+		})
 	}
 }
