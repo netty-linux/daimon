@@ -1,5 +1,105 @@
 # C2 — decisão de pré-provisionamento Hyper-V
 
+## Diagnóstico administrativo complementar — 2026-10-23
+
+**Resultado: PENDENTE**, não APTO PARA PROVISIONAMENTO. HEAD inspecionado
+`423f348d7df0caafed00becca1e1a965b1159482`, branch esperada e checkout inicialmente
+limpo. Não foi comprovada incompatibilidade de hardware. Permanecem bloqueios
+obrigatórios de acesso, memória e autenticação; nenhum recurso foi provisionado.
+Os registros abaixo atualizam as amostras históricas das seções seguintes.
+
+| Área | Evidência atual somente leitura | Interpretação |
+| --- | --- | --- |
+| Instalação Hyper-V | Win32_OptionalFeature: os sete componentes Microsoft-Hyper-V consultados, incluindo hypervisor, serviços, clientes e PowerShell, com InstallState=1; HypervisorPresent=true | Instalado e hipervisor ativo; criar/ligar VM ainda não validado |
+| Serviços | vmms Running/Automatic; vmcompute e hns Running/Manual | Serviços ativos, sem reinício ou mudança de configuração |
+| Autoridade | WindowsPrincipal.IsInRole(Administrator)=false; SID do grupo Hyper-V Administrators ausente do token atual | Sessão sem autoridade demonstrada para inventário/provisionamento; não se inferiu ausência de associação administrativa fora desse token |
+| Erro de inventário | Get-VM/Get-VMSwitch: VirtualizationException → ServerConnectionException → CimException; mensagens classificadas localmente como acesso negado, camadas superiores mencionam elevação/administração | Falta de acesso comprovada para essas consultas. Nenhuma tentativa de elevar ou contornar UAC |
+| Inventário | Consulta CIM de virtualização mostrou somente objeto host; inventário de VMs/switches/discos permanece incompleto | Não usar visibilidade parcial como prova de ausência de recursos/conflitos; não varrer discos pessoais |
+| CPU/RAM | 8 CPUs lógicas, 15,85 GiB físicos e 6,21 GiB disponíveis na amostra | 2 vCPUs plausíveis; faltam aproximadamente 1,79 GiB para reserva mínima de 8 GiB. Não reduzir reserva |
+| Disco | Volume NTFS de trabalho: 174,86 GiB livres | Satisfaz capacidade proposta de 120 GiB, sem garantir reserva/ACL/conflitos; nenhum VHDX foi criado |
+| Consumo | Maiores working sets agregados por tipo: navegador ~4,38 GiB; aplicação de conversa ~2,30 GiB; comunicação ~1,00 GiB; serviços ~0,83 GiB; Node ~0,47 GiB | Dados de processos, sem command lines, conteúdo ou paths. Working sets incluem páginas compartilhadas; somas não equivalem a RAM exclusiva nem recuperação garantida |
+| Docker/WSL | docker-desktop Stopped/WSL2; API Docker indisponível por named pipe ausente; só wslservice observado entre processos pesquisados | Nenhum consumo grande de vmmem identificado nessa amostra; não demonstra conflito de arquitetura nem autoriza parar serviços |
+| Windows | Windows 10 Pro 19045.6466 | Versão lida do OS/registro; não afirmar atualização completa |
+| Update | Histórico local: últimas 100 entradas com ResultCode=2; 93 classificadas como inteligência de segurança, 7 outras, nenhuma identificada como cumulativa nessa janela | Sucesso de inteligência de segurança não comprova patch do kernel/OS. QueryHistory não iniciou scan, download ou instalação |
+| Serviços Update | UsoSvc Running; BITS Stopped/Manual; wuauserv passou de Stopped para Running entre amostras, sem intervenção desta tarefa | Estado transitório não é falha por si; nenhum serviço foi iniciado/parado pelo diagnóstico |
+| Reinício | CBS RebootPending=false, WindowsUpdate RebootRequired=false, PendingFileRenameOperations ausente/vazio | Nenhum sinal nesses três indicadores; não prova ausência de toda condição possível de reinício |
+| ESU | SoftwareLicensingProduct com Name LIKE '%ESU%': 24 entradas, zero LicenseStatus=1 | Nenhuma licença ESU ativa demonstrada por essa consulta. Não basta para excluir todas as modalidades consumer; cobertura vigente permanece não comprovada |
+
+Get-HotFix segue mostrando KB5126256 (2026-09-10) como registro mais recente.
+Esse KB é **preparação de licenciamento**, não inscrição ESU nem atualização de
+segurança do Windows, conforme a [Microsoft](https://support.microsoft.com/en-us/servicing/os/windows-10/2026/09/kb5126256-windows-10-21h2-22h2-standalone-cbs).
+Conferir cobertura/validade do programa aplicável e patch cumulativo vigente
+separadamente, pela [orientação ESU oficial](https://learn.microsoft.com/windows/whats-new/enable-extended-security-updates).
+Não foram lidos product keys, IDs de ativação ou contas vinculadas.
+
+Computer Use: skill lida e runtime inicializado; inventário de interfaces e
+tentativa de abrir Configurações não produziram janela targetable. Nova consulta
+de janelas confirmou ausência da interface alvo; não se contornou a falha por
+automação alternativa. Hyper-V Manager não foi iniciado via terminal nem houve
+diálogo UAC controlado. Gerenciador de Tarefas não agregaria evidência sobre a
+consulta estruturada já obtida. Nenhuma propriedade foi alterada pela UI.
+
+### Comandos e limitações de reprodução
+
+Consultas utilizadas: git status/rev-parse; Get-CimInstance para
+Win32_OperatingSystem, Win32_ComputerSystem, Win32_OptionalFeature,
+SoftwareLicensingProduct e Msvm_ComputerSystem; Get-Process agrupado por nome
+(sem argumentos/caminhos); Get-Service; Get-Volume; Get-VM/Get-VMSwitch;
+Get-HotFix; Microsoft.Update.Session.CreateUpdateSearcher().QueryHistory;
+Test-Path/Get-ItemProperty somente nos indicadores públicos de reinício/build;
+wsl --list --verbose; docker info; gh pr view. Mensagens brutas com identificadores
+do host não foram publicadas. Não se executou script de provisionamento.
+
+A parte do inventário que exige elevação foi interrompida. Próxima intervenção
+manual solicitada: usuário abre PowerShell como administrador por conta própria,
+sem automatização do UAC, e executa somente consultas. Exemplo sanitizado:
+
+```powershell
+$vms = @(Get-VM -ErrorAction Stop)
+$vms | Group-Object State | Select-Object Name, Count
+Get-VMSwitch -ErrorAction Stop | Group-Object SwitchType | Select-Object Name, Count
+$disks = @($vms | Get-VMHardDiskDrive -ErrorAction Stop)
+$disks | Measure-Object
+$disks | Where-Object Path | ForEach-Object {
+    Get-VHD -Path $_.Path -ErrorAction Stop |
+        Select-Object VhdType, Size, FileSize, Attached
+}
+```
+
+Não enviar nomes de máquinas, diretórios, discos ou contas no relatório público.
+Essas consultas não inventariam discos órfãos/desanexados nem excluem conflitos
+no diretório futuro: revisão local do destino e nomes aprovados ainda necessária.
+Se a consulta elevada também falhar, preservar código/categoria e investigar
+provider/serviços antes de propor instalação ou reparo.
+
+### Pendências, correções recomendadas e autorização posterior
+
+1. **Acesso:** intervenção manual elevada para completar inventário somente leitura.
+   Não adicionar usuário a grupos, mudar ACL ou instalar Hyper-V como tentativa
+   automática de correção. Elevação de consulta não autoriza provisionamento.
+2. **RAM:** usuário decide se fecha cargas dispensáveis ou amplia hardware;
+   nenhuma aplicação encerrada aqui. Repetir medição e exigir pelo menos 8 GiB.
+3. **Segurança:** verificar inscrição ESU válida e histórico cumulativo adequado;
+   se ausentes, apresentar plano de atualização/OS suportado antes de executá-lo.
+   Não declarar host seguro apenas por receber definições de segurança.
+4. **Supply chain:** autenticar ISO/metadata/pacotes e completar closure de deployment;
+   manifesto atual permanece bloqueado. Provisionador e descarte efetivos pendentes.
+
+Alterações administrativas futuras que precisam de autorização específica:
+instalar patches/alterar OS ou inscrição ESU se necessário; reiniciar se indicado;
+alterar grupos/ACLs somente se uma necessidade for comprovada; criar diretório
+privado, VHDX e VM com configuração aprovada; configurar somente essa VM e eventual
+conexão a switch existente identificado; provisionar identidades/pacotes no guest;
+descarte estritamente por ownership. Nenhuma dessas ações foi executada ou está
+autorizada implicitamente pelo diagnóstico. Não há recomendação atual de reparar
+Hyper-V, criar switch ou modificar Docker/WSL.
+
+Validação desta atualização: diff somente documental, sem segredos/identificadores;
+CI do HEAD auditado 423f348: Go/Linux e UI PASS em push e PR. Novos checks devem
+ser avaliados pelo novo HEAD documental. Não houve mudança de código que exigisse
+repetir suites locais. Os 18 gates continuam unverified, sem prova gVisor, C3,
+execução adversarial ou alteração de Sessions.
+
 Auditoria somente leitura em 2026-10-23; base do PR #28 antes desta atualização:
 `e6fe3962b3f09d3d4698d0094f862f334a9ea67e`. **Provisionamento BLOQUEADO.**
 Não há homologação de isolamento, executor ou mudança dos 18 gates unverified.
