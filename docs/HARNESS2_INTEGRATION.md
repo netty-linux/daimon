@@ -1,8 +1,12 @@
 # Harness² — integração incremental
 
-## Estado e auditoria de 2026-10-22
+Estado atual: ponte de validação da Phase B implementada em pacote opcional;
+veja [instalação, protocolo, testes e limites](HARNESS2_PYTHON_BRIDGE.md).
+Execução de candidatos e otimização continuam indisponíveis.
 
-Entrega atual: contratos nativos da Phase A. **Não há ciclo de otimização,
+## Estado e auditoria da Phase A — registro de 2026-10-22
+
+Entrega da Phase A (registro histórico): contratos nativos. **Não há ciclo de otimização,
 processo Python, promoção de Bot, endpoint ou interface de Otimização executável.**
 As fases B–G dependem dos gates descritos abaixo. Não confundir candidato validado
 com execução isolada, melhoria científica ou configuração aprovada.
@@ -268,3 +272,15 @@ automática rejeitou o push da branch por considerar não suficientemente explí
 a autorização de exportar o código e criar uma ref remota. Nenhum PR remoto foi
 criado, nenhum merge foi feito e nenhuma outra ferramenta foi usada para contornar
 essa rejeição. Publicação exige autorização explícita do usuário.
+
+## Phase B — ponte Python de validação (2026-10-22)
+
+A branch `feature/harness2-python-bridge`, iniciada em
+`7bb5053fab3e4fed6aff10f7ad06ff3320e8cf87`, acrescenta um worker opcional com
+health/capabilities/validate_manifest e protocolo real Go/Python. A dependência
+original é fixada/verificada na revisão auditada, em venv isolada.
+Veja [protocolo, instalação, resultados e limites](HARNESS2_PYTHON_BRIDGE.md).
+Não há integração com Sessions, execução de candidatos, engine recursiva,
+DaimonSubstrate/BenchmarkAdapter, endpoints ou UI de otimização. O gate de
+isolamento para código adversarial permanece aberto; o worker fixo confiável
+não constitui sandbox de filesystem/rede. Phase C não foi iniciada.
