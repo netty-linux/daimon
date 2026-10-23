@@ -1,5 +1,9 @@
 # C2 — decisão de pré-provisionamento Hyper-V
 
+Checkpoint atual: [ISO adquirida/verificada, pacote inspecionado e dry-run](HARNESS2_C2_OPERATIONAL_CHECKPOINT.md).
+Os registros anteriores de ISO não baixada são históricos. Integridade ISO agora
+comprovada; gVisor ainda sem confiança independente completa, Windows/ESU e RAM pendentes.
+
 Plano operacional atualizado: [remediação Windows, aquisição e autorizações](HARNESS2_C2_REMEDIATION.md).
 Estado BLOCKED preservado; ISO exige aprovação específica de download, chave
 gVisor apenas corroborada em canais oficiais, ESU/patches ainda não comprovados.
