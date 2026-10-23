@@ -210,6 +210,9 @@ func (c *Client) call(parent context.Context, op string, payload any) (result Re
 	prepareProcess(cmd)
 	cmd.Cancel = func() error { return killProcess(cmd) }
 	if cmd.Start() != nil {
+		if ctx.Err() != nil {
+			return Result{}, ctx.Err()
+		}
 		return Result{}, ErrWorker
 	}
 	release, containmentErr := containProcess(cmd)
@@ -217,7 +220,13 @@ func (c *Client) call(parent context.Context, op string, payload any) (result Re
 		_ = cmd.Process.Kill()
 		close(ready)
 		_ = cmd.Wait()
-		return Result{}, ErrWorker
+		if ctx.Err() != nil {
+			if errors.Is(containmentErr, ErrCleanup) {
+				return Result{}, errors.Join(ctx.Err(), ErrCleanup)
+			}
+			return Result{}, ctx.Err()
+		}
+		return Result{}, containmentErr
 	}
 	input.allowed = true
 	close(ready) // No request bytes enter Python until process ownership is established.

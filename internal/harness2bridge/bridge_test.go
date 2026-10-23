@@ -282,3 +282,43 @@ func TestActiveWorkerCancellationAndClose(t *testing.T) {
 		})
 	}
 }
+
+func TestStartupDeadlinePreservesContext(t *testing.T) {
+	cfg := integrationConfig(t)
+	cfg.Timeout = 2 * time.Millisecond
+	c, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	for range 10 {
+		_, err := c.Health(context.Background())
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("startup lost deadline: %v", err)
+		}
+	}
+	entries, err := os.ReadDir(cfg.ScratchRoot)
+	if err != nil || len(entries) != 0 {
+		t.Fatal("startup scratch leak", err)
+	}
+}
+
+func TestExecutableStartFailureCleansScratch(t *testing.T) {
+	cfg := integrationConfig(t)
+	cfg.Python = filepath.Join(t.TempDir(), "invalid-python.exe")
+	if err := os.WriteFile(cfg.Python, []byte("not an executable"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if _, err = c.Health(context.Background()); !errors.Is(err, ErrWorker) {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(cfg.ScratchRoot)
+	if err != nil || len(entries) != 0 {
+		t.Fatal("failed start leaked scratch", err)
+	}
+}
