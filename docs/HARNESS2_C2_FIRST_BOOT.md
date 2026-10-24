@@ -3,6 +3,18 @@
 No boot or installation is authorized by this document, an acknowledgement string,
 or a passing offline test. All 18 isolation gates remain `unverified`.
 
+## Latest status
+
+The second real normal trial passed at **70.6801584 s** with verified original
+3/3/4 and protected journal recovery. [Sanitized evidence](evidence/HARNESS2_C2_SECOND_BOOT_2026-10-24.json).
+The first **91.1312018 s FAIL is permanent**. Emergency watchdog poweroff is still
+unproved. New self-thread-stall preparation is **BLOCKED**: both the Work helper
+and a separate elevated test helper are inside a Windows Job, so independence
+from the enclosing session fault domain has not been proved. No live VM trial
+was run in this preparation. [Current emergency proposal and block](HARNESS2_C2_EMERGENCY_PROOF.md).
+Historical V2 instructions below are superseded for future launches by schema V3
+and mandatory helper-isolation checks; existing receipts remain historical facts.
+
 ## Current revision: deadline correction after the first real probe
 
 One real probe on `6450e38` verified boot, controller poweroff, restored 3/3/4 GiB

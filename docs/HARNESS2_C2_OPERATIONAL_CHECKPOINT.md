@@ -1,5 +1,42 @@
 # C2 — aquisição executada e preparação operacional
 
+## Estado atual: PASS normal registrado; prova emergencial BLOCKED por isolamento do helper
+
+O segundo boot real em `0ce479d` passou: pedido em **70,0426436 s**, envio em
+**70,1701778 s**, confirmação Off em **70,6801584 s**, limite absoluto de 90 s.
+Boot/SO/desligamento confirmados pelos eventos 18500/18601/18502; memória 3/3/4,
+journal `configured` e ACLs privadas validados; zero NICs. [Evidência permanente](evidence/HARNESS2_C2_SECOND_BOOT_2026-10-24.json).
+O watchdog apenas encontrou Off e não enviou parada: emergência continua não comprovada.
+O primeiro ensaio de **91,1312018 s continua FAIL temporal**, sem reclassificação.
+
+Preparação nova, sem acesso à VM: injeção opt-in `HeartbeatStall30`, limitada a
+pausar o próprio thread de um helper pwsh dedicado por 30 s, após Running e guard
+pronto. Não mata processos nem toca serviços. Guard/schema V3, autorização distinta,
+isolation/PID/start-time binding, prova de comando do watchdog partindo de Running,
+pedido em até 14 s do último heartbeat e Off em até 30 s desse heartbeat e 90 s
+absolutos. Controlador retoma e continua como único escritor do journal; supervisor
+somente valida os registros protegidos e o estado final, sem fallback de mutação.
+
+**BLOCKED concreto:** consulta nativa encontrou Job Object no executor Work. Um
+helper separado elevado via UAC também retornou `job_query_ok=true`, `in_job=true`,
+console isolado, `verified=false` em **2026-10-24T22:22:43Z**. A própria suíte recusou
+a injeção; `vm_access=false`. Não foi comprovado que seja o mesmo Job nem seu
+comportamento ao fechar Work, mas a independência exigida permanece não demonstrada.
+Não foram usados breakaway, alterações de Job, serviços ou lançamentos repetidos.
+
+Os dois cenários positivos de independência real ficam **NOT RUN** neste ambiente;
+a recusa segura sob UAC está comprovada. Testes de contrato e a suíte anterior de
+processos não substituem essa prova. [Método, critérios, recuperação e bloqueio](HARNESS2_C2_EMERGENCY_PROOF.md).
+Para desbloquear, primeiro executar apenas a suíte offline de helpers em contexto
+administrativo iniciado pelo usuário fora do Work, exigindo resultado real sem Job,
+console isolado e os dois cenários positivos. Isso não autoriza boot e pode reprovar.
+Só após essa prova, CI e preflight fresco será cabível solicitar um ensaio real.
+
+Não houve novo boot, instalação, alteração de Windows/aplicativos ou VM nesta tarefa.
+PR permanece draft e todos os 18 gates `unverified`.
+
+Os checkpoints abaixo preservam a sequência histórica.
+
 ## Estado atual: primeiro boot real, falha temporal preservada e correção offline
 
 A única tentativa real autorizada no código `6450e38` iniciou a VM e o sistema

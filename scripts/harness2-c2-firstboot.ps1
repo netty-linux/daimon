@@ -10,19 +10,23 @@ param(
     [ValidateScript({$_ -in @(2,2.5,3,4)})][double]$MaximumGiB=2,
     [string]$Authorization,
     [Parameter(Mandatory)][string]$ReceiptPath,
-    [string]$GuardDirectory
+    [string]$GuardDirectory,
+    [ValidateSet('None','HeartbeatStall30')][string]$FaultInjection='None'
 )
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
 $profileText=$MaximumGiB.ToString([cultureinfo]::InvariantCulture)
-$ack='FIRSTBOOT-DEADLINE-V2:'+ $OperationId.ToString()+':'+$VMId.ToString()+':MAX'+$profileText
+$ack=$(if($FaultInjection -eq 'None'){'FIRSTBOOT-DEADLINE-V3:'}else{'C2-WATCHDOG-STALL30-V1:'})+ $OperationId.ToString()+':'+$VMId.ToString()+':MAX'+$profileText
 if($Authorization -cne $ack){throw 'Specific boot/cap/poweroff authorization required; no action performed.'}
+if($FaultInjection -ne 'None' -and $MaximumGiB -ne 2){throw 'Emergency proof is limited to the existing 2 GiB candidate.'}
 Import-Module (Join-Path $PSScriptRoot 'harness2-c2-boot.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'harness2-c2-deadline.psm1')
+Import-Module (Join-Path $PSScriptRoot 'harness2-c2-helper.psm1')
 $base=Import-Module (Join-Path $PSScriptRoot 'harness2-c2-lab.psm1') -Force -PassThru
 $policy=Get-C2BootBudget $MaximumGiB
 $parameters=@{Root=$Root;IsoPath=$IsoPath;OperationId=$OperationId}
 $script:ref=$null;$script:attempt=$null;$script:transitionPath=$null;$script:stopPath=$null
 $script:deadline=$null;$script:timing=@{};$script:stopJob=$null;$script:timingPath=$null;$script:stopVm=$null
+$script:isolation=$null;$script:faultRecord=$null
 function Save-Timing {
     if($script:timingPath){Write-Private $script:timingPath @{actor=$Mode;timing=$script:timing;deadline=$script:deadline;utc=[datetime]::UtcNow.ToString('o')}}
 }
@@ -125,6 +129,7 @@ function Reconcile-Off {
 $report=@{};$lock=$null;$watcher=$null;$started=$false;$baselineCaptured=$false;$receiptAllowed=$false
 try {
     $c=& $base {param($p) Get-C2Contract $p.Root $p.IsoPath $p.OperationId} $parameters
+    $script:isolation=if($FaultInjection -eq 'None'){Assert-C2HelperIsolation}else{Assert-C2DedicatedHelper $PSCommandPath}
     if($Mode -eq 'Watchdog'){
         $canonical=& $base {param($g,$root)
             $p=Get-C2Path $g
@@ -134,7 +139,7 @@ try {
         if([IO.Path]::GetFullPath($ReceiptPath) -ine (Join-Path $canonical 'watchdog-receipt.json')){throw 'Unexpected watchdog receipt path.'}
         $receiptAllowed=$true
         $script:attempt=Read-Private (Join-Path $canonical 'policy.json')
-        if($script:attempt.version -ne 2 -or $script:attempt.operation_id -cne $OperationId.ToString() -or $script:attempt.vm_id -cne $VMId.ToString() -or
+        if($script:attempt.version -ne 3 -or $script:attempt.fault_injection -cne $FaultInjection -or $script:attempt.operation_id -cne $OperationId.ToString() -or $script:attempt.vm_id -cne $VMId.ToString() -or
           $script:attempt.maximum_gib -ne $MaximumGiB -or $script:attempt.original_maximum_gib -ne 4){throw 'Guard binding mismatch.'}
         $script:ref=$script:attempt.reference
         $j=& $base {param($c) Read-C2Journal $c} $c
@@ -146,7 +151,7 @@ try {
         Assert-C2AsyncStopCapability (Get-Command Stop-VM -ErrorAction Stop)
         # Compile/warm the native sensor before declaring readiness; do not overlap this peak with guest startup.
         $null=Get-C2NativeSample;[GC]::Collect()
-        Write-Private (Join-Path $canonical 'ready.json') @{vm_id=$VMId.ToString();operation_id=$OperationId.ToString();process_id=$PID}
+        Write-Private (Join-Path $canonical 'ready.json') @{vm_id=$VMId.ToString();operation_id=$OperationId.ToString();process_id=$PID;isolation=$script:isolation}
         $reason=Wait-C2WatchdogLease -ReadHeartbeat {Read-Private (Join-Path $canonical 'heartbeat.json')} -Sample {Get-C2NativeSample} -Policy $policy -Stop {
             $null=Invoke-C2ProbeRollback @{Stop={Stop-OwnedVM};State={(Get-OwnedVM).State.ToString()};Restore={Restore-OwnedMaximum}}
         } -ReadDeadline {
@@ -163,8 +168,8 @@ try {
             $script:timing.confirmed_off=$true;Save-Timing;$true
         }
         $temporal=if($script:deadline){Get-C2TemporalVerdict $script:deadline $script:timing}else{'NO_BOOT_CLOCK'}
-        if($reason -ne 'controller-finished'){Write-Private (Join-Path $canonical 'watchdog-result.json') @{status='OFF_VERIFIED';reason=$reason;timing=$script:timing;temporal_verdict=$temporal;poweroff_command_issued=$script:timing.ContainsKey('stop_command_invoked_ticks')}}
-        $report=@{status=if($temporal -in 'OFF_BY_DEADLINE','NO_BOOT_CLOCK'){'WATCHDOG_FINISHED'}else{'WATCHDOG_FAILED_OFF_VERIFIED'};reason=$reason;timing=$script:timing;temporal_verdict=$temporal;ownership_authority=$false}
+        if($reason -ne 'controller-finished'){Write-Private (Join-Path $canonical 'watchdog-result.json') @{status='OFF_VERIFIED';reason=$reason;timing=$script:timing;temporal_verdict=$temporal;poweroff_command_issued=$script:timing.ContainsKey('stop_command_invoked_ticks');vm_id=$VMId.ToString();operation_id=$OperationId.ToString();isolation=$script:isolation}}
+        $report=@{status=if($temporal -in 'OFF_BY_DEADLINE','NO_BOOT_CLOCK'){'WATCHDOG_FINISHED'}else{'WATCHDOG_FAILED_OFF_VERIFIED'};reason=$reason;timing=$script:timing;temporal_verdict=$temporal;ownership_authority=$false;isolation=$script:isolation}
     }else{
         # Receipt must be an explicit new operator file, outside the protected root.
         $receipt=& $base {param($p) $r=Get-C2Path $p;Assert-C2NoLinks $r;$r} $ReceiptPath
@@ -194,17 +199,17 @@ try {
         $script:timingPath=Join-Path $guard 'controller-timing.json'
         $script:transitionPath=Join-Path $guard 'transition.lock';$script:stopPath=Join-Path $guard 'stop-requested.json'
         & $base {param($p) $f=New-C2File $p;$f.Dispose();Assert-C2Acl $p} $script:transitionPath
-        $script:attempt=@{version=2;operation_id=$OperationId.ToString();vm_id=$VMId.ToString();maximum_gib=$MaximumGiB;original_maximum_gib=4;reference=$script:ref;policy=$policy
+        $script:attempt=@{version=3;fault_injection=$FaultInjection;isolation=$script:isolation;operation_id=$OperationId.ToString();vm_id=$VMId.ToString();maximum_gib=$MaximumGiB;original_maximum_gib=4;reference=$script:ref;policy=$policy
           controller_pid=$PID;controller_started_utc=(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o')}
         Write-Private (Join-Path $guard 'policy.json') $script:attempt
         Write-Heartbeat 'arming'
-        $childArgs=@('-NoProfile','-NonInteractive','-File',('"'+$PSCommandPath+'"'),'-Mode','Watchdog','-Root',('"'+$Root+'"'),'-IsoPath',('"'+$IsoPath+'"'),'-OperationId',$OperationId.ToString(),'-VMId',$VMId.ToString(),'-MaximumGiB',$profileText,'-Authorization',('"'+$ack+'"'),'-ReceiptPath',('"'+(Join-Path $guard 'watchdog-receipt.json')+'"'),'-GuardDirectory',('"'+$guard+'"')) -join ' '
+        $childArgs=@('-NoProfile','-NonInteractive','-File',('"'+$PSCommandPath+'"'),'-Mode','Watchdog','-Root',('"'+$Root+'"'),'-IsoPath',('"'+$IsoPath+'"'),'-OperationId',$OperationId.ToString(),'-VMId',$VMId.ToString(),'-MaximumGiB',$profileText,'-FaultInjection',$FaultInjection,'-Authorization',('"'+$ack+'"'),'-ReceiptPath',('"'+(Join-Path $guard 'watchdog-receipt.json')+'"'),'-GuardDirectory',('"'+$guard+'"')) -join ' '
         $watcher=Start-Process -FilePath (Get-Command pwsh.exe).Source -ArgumentList $childArgs -WindowStyle Hidden -PassThru
         $ready=[Diagnostics.Stopwatch]::StartNew()
         while(-not (Test-Path -LiteralPath (Join-Path $guard 'ready.json'))){
             if($ready.Elapsed.TotalSeconds -gt 8 -or $watcher.HasExited){throw 'Independent watchdog not ready; no boot.'};Start-Sleep -Milliseconds 200
         }
-        $proof=Read-Private (Join-Path $guard 'ready.json');if($proof.vm_id -cne $VMId.ToString() -or $proof.operation_id -cne $OperationId.ToString() -or $proof.process_id -ne $watcher.Id){throw 'Wrong watchdog binding.'}
+        $proof=Read-Private (Join-Path $guard 'ready.json');if($proof.vm_id -cne $VMId.ToString() -or $proof.operation_id -cne $OperationId.ToString() -or $proof.process_id -ne $watcher.Id -or -not $proof.isolation.verified -or $proof.isolation.pid -ne $watcher.Id -or ([datetime]$proof.isolation.started_utc).ToUniversalTime().Ticks -ne $watcher.StartTime.ToUniversalTime().Ticks){throw 'Wrong watchdog binding/isolation.'}
         # Recheck live headroom after arming the extra host process, before any VM setting change.
         $pre=Host-Sample $null
         if($pre.available_gib -lt $policy.required_available_gib -or $pre.balancer_available_gib -lt $policy.required_balancer_gib -or $pre.commit_limit_gib-$pre.commit_gib -lt $policy.required_commit_headroom_gib -or $pre.commit_limit_gib -le 0 -or $pre.commit_gib/$pre.commit_limit_gib -gt $policy.max_commit_ratio){throw 'Live budget changed while arming; no boot.'}
@@ -228,6 +233,32 @@ try {
         }
         $started=$true
         $j.state='running';& $base {param($j) Write-C2Journal $j} $j
+        if($FaultInjection -eq 'HeartbeatStall30'){
+            $v=Get-OwnedVM;$d=Get-C2DeadlineState $script:deadline ([Diagnostics.Stopwatch]::GetTimestamp())
+            if($v.State -ne 'Running' -or $d.elapsed_seconds -gt 10){throw 'Running not confirmed in the bounded injection window; no fault.'}
+            Assert-C2StartLease $watcher $script:stopPath
+            Invoke-C2HeartbeatStall -EntryFile $PSCommandPath -Before {
+                param($identity)
+                $stamp=Get-C2MonotonicStamp
+                $script:faultRecord=@{method='HeartbeatStall30';vm_id=$VMId.ToString();operation_id=$OperationId.ToString();controller_isolation=$identity
+                  last_heartbeat_ticks=$stamp.ticks;observed_vm_state='Running';stall_seconds=30;watchdog_pid=$proof.process_id;watchdog_started_utc=$proof.isolation.started_utc}
+                Write-Private (Join-Path $guard 'fault-intent.json') $script:faultRecord
+                Write-Private (Join-Path $guard 'heartbeat.json') @{utc=$stamp.utc;monotonic_ticks=$stamp.ticks;phase='running'}
+            } -After {
+                $script:faultRecord.stall_returned_ticks=[Diagnostics.Stopwatch]::GetTimestamp()
+                Write-Private (Join-Path $guard 'fault-returned.json') $script:faultRecord
+            }
+            $resultPath=Join-Path $guard 'watchdog-result.json';$wait=[Diagnostics.Stopwatch]::StartNew()
+            while(-not (Test-Path -LiteralPath $resultPath) -and $wait.Elapsed.TotalSeconds -lt 5){Start-Sleep -Milliseconds 100}
+            if(-not (Test-Path -LiteralPath $resultPath)){throw 'Independent watchdog produced no proof; emergency trial FAIL.'}
+            $watchProof=Read-Private $resultPath
+            $emergencyVerdict=Get-C2EmergencyProofVerdict $script:faultRecord $watchProof $script:deadline
+            if($emergencyVerdict -ne 'WATCHDOG_POWEROFF_PROVEN'){throw ('Emergency trial failed: '+$emergencyVerdict)}
+            Reconcile-Off
+            Write-Heartbeat 'done'
+            $report=@{status='EMERGENCY_WATCHDOG_PROOF_PASS';fault=$script:faultRecord;watchdog_proof=$watchProof;emergency_verdict=$emergencyVerdict
+              journal_reconciled=$true;maximum_restored_gib=4;guard_directory=$guard;deadline=$script:deadline;timing=$script:timing;guest_installation=$false;ownership_authority=$false;events=@(Get-EventSummary $since)}
+        }else{
         $previous=$null;$last=0.0;$low=0.0;$high=0.0;$run=[Collections.Generic.List[object]]::new();$why=''
         do{
             $deadlineState=Get-C2DeadlineState $script:deadline ([Diagnostics.Stopwatch]::GetTimestamp())
@@ -262,6 +293,7 @@ try {
         $report=@{status=if($temporal -eq 'OFF_BY_DEADLINE' -and $why -eq 'shutdown-lead-reached'){'PROBE_FINISHED_OFF_WITHIN_DEADLINE'}else{'PROBE_FAILED_OFF_VERIFIED'}
             temporal_verdict=$temporal;deadline=$script:deadline;timing=$script:timing;stop_reason=$why;samples=$run.ToArray();baseline=$assessment;events=@(Get-EventSummary $since)
             journal_reconciled=$true;maximum_restored_gib=4;guest_installation=$false;ownership_authority=$false;guard_directory=$guard}
+        }
     }
 }catch{
     $reason=$_.Exception.Message;$rollback='NOT_NEEDED'

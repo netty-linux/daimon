@@ -1,5 +1,12 @@
 # C2 deadline correction and future watchdog proof
 
+Latest status: the second real normal run on `0ce479d` confirmed Off at 70.6801584 s
+and original-memory/journal recovery. The first 91.1312018 s failure remains FAIL.
+The next emergency candidate is a bounded self-thread heartbeat stall, not the
+previously contemplated controller termination. It remains **BLOCKED** on helper
+Job isolation. [Current procedure](HARNESS2_C2_EMERGENCY_PROOF.md) supersedes the
+historical future-termination proposal below; no emergency VM proof is claimed.
+
 No VM was started, stopped, inspected or reconfigured while developing this
 revision. No second boot is authorized here. Original VM profile remains 3/3/4 GiB;
 the temporary candidate remains 2/2/2 GiB with a 6 GiB admission floor. All 18
