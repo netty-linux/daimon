@@ -25,6 +25,8 @@ jobs:
           ./scripts/test-harness2-c2-deadline.ps1
           ./scripts/test-harness2-c2-watchdog.ps1
           ./scripts/test-harness2-c2-emergency-policy.ps1
+          ./scripts/test-harness2-c2-offline-entry.ps1
+          ./scripts/harness2-c2-offline-entry.ps1 -OutputDirectory $env:RUNNER_TEMP -VerifyOnly
           ./scripts/test-harness2-c2-emergency.ps1
 
   ui:

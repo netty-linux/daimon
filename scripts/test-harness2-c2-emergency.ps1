@@ -10,10 +10,25 @@ Import-Module (Join-Path $PSScriptRoot 'harness2-c2-deadline.psm1')
 function Write-Data($path,$data){$tmp=$path+'.'+[guid]::NewGuid().ToString('N')+'.tmp';$data|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $tmp;[IO.File]::Move($tmp,$path,$true)}
 function Read-Data($path){Get-Content -LiteralPath $path -Raw|ConvertFrom-Json -AsHashtable}
 function Wait-File($path,[double]$seconds=15){$c=[Diagnostics.Stopwatch]::StartNew();while(-not (Test-Path -LiteralPath $path)){if($c.Elapsed.TotalSeconds -gt $seconds){throw ('Missing test evidence: '+[IO.Path]::GetFileName($path))};Start-Sleep -Milliseconds 50}}
+function New-TestDirectory([string]$path){
+    if(Test-Path -LiteralPath $path){throw 'Fresh own-user test directory required.'}
+    $sid=[Security.Principal.WindowsIdentity]::GetCurrent().User
+    $acl=[Security.AccessControl.DirectorySecurity]::new();$acl.SetAccessRuleProtection($true,$false);$acl.SetOwner($sid)
+    foreach($identity in @($sid,[Security.Principal.SecurityIdentifier]::new('S-1-5-18'))){
+        $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($identity,'FullControl','ContainerInherit, ObjectInherit','None','Allow'))
+    }
+    [IO.FileSystemAclExtensions]::Create([IO.DirectoryInfo]::new($path),$acl)
+}
 $exe=(Get-Process -Id $PID).Path
 function Spawn($role,$dir){Start-Process -FilePath $exe -ArgumentList @('-NoProfile','-NonInteractive','-File',('"'+$PSCommandPath+'"'),'-Mode',$role,'-CaseDirectory',('"'+$dir+'"')) -WindowStyle Hidden -PassThru -RedirectStandardError (Join-Path $dir ($role+'.stderr.txt')) -RedirectStandardOutput (Join-Path $dir ($role+'.stdout.txt'))}
-function Identity($p){@{pid=$p.Id;started_utc=$p.StartTime.ToUniversalTime().ToString('o');path=$exe}}
-function Bound-Process($i){$p=Get-Process -Id $i.pid -ErrorAction Stop;if($p.StartTime.ToUniversalTime().Ticks -ne ([datetime]$i.started_utc).ToUniversalTime().Ticks -or $p.Path -ine $i.path){throw 'Own test PID/start/path binding failed.'};$p}
+function Identity($p){@{pid=$p.Id;started_utc=$p.StartTime.ToUniversalTime().ToString('o');path=$exe;creator_pid=$PID;directory=$CaseDirectory;entry=$PSCommandPath}}
+function Bound-Process($i){
+    $p=Get-Process -Id $i.pid -ErrorAction Stop
+    if($i.path -ine $exe -or $i.entry -ine $PSCommandPath -or $p.StartTime.ToUniversalTime().Ticks -ne ([datetime]$i.started_utc).ToUniversalTime().Ticks -or $p.Path -ine $exe){throw 'Own test PID/start/path binding failed.'}
+    $metadata=Get-CimInstance Win32_Process -Filter ('ProcessId = '+[int]$i.pid) -OperationTimeoutSec 5 -ErrorAction Stop
+    if($metadata.ParentProcessId -ne $i.creator_pid -or -not $metadata.CommandLine -or $metadata.CommandLine.IndexOf($PSCommandPath,[StringComparison]::OrdinalIgnoreCase) -lt 0 -or $metadata.CommandLine.IndexOf($i.directory,[StringComparison]::OrdinalIgnoreCase) -lt 0){throw 'Own helper creator/entry/case binding failed.'}
+    $p
+}
 if($Mode -eq 'Payload'){Start-Sleep -Seconds 90;exit}
 if($Mode -eq 'Controller'){
     $identity=Assert-C2DedicatedHelper $PSCommandPath
@@ -46,11 +61,10 @@ if($Mode -eq 'Watcher'){
     Write-Data (Join-Path $CaseDirectory 'watch-ready.json') $isolation
     $timing=@{};$policy=Get-C2BootBudget 2
     $reason=Wait-C2WatchdogLease -Policy $policy -PollMilliseconds 100 -ReadHeartbeat {Read-Data (Join-Path $CaseDirectory 'heartbeat.json')} -Sample {Get-C2NativeSample} -Stop {
+        $target=Bound-Process $b.payload;$started=$target.StartTime.ToUniversalTime().Ticks
         $adapter=@{Frequency=[Diagnostics.Stopwatch]::Frequency;Now={[Diagnostics.Stopwatch]::GetTimestamp()}
-          State={$target=Bound-Process $b.payload;$target.Refresh();if($target.HasExited){'Off'}else{'Running'}}.GetNewClosure()
-          Send={$target=Bound-Process $b.payload;$target.Kill();'own-test-payload-kill'}.GetNewClosure();Sleep={param($ms)Start-Sleep -Milliseconds $ms}}
-        # Bound-Process cannot reopen an exited PID; retain its owned Process object for Off observation.
-        $adapter.State={$target.Refresh();if($target.HasExited){'Off'}else{$null=Bound-Process $b.payload;'Running'}}.GetNewClosure()
+          State={$target.Refresh();if($target.HasExited){'Off'}else{'Running'}}.GetNewClosure()
+          Send={if($target.StartTime.ToUniversalTime().Ticks -ne $started -or $target.Path -ine $exe){throw 'Own target changed.'};$target.Kill();'own-test-payload-kill'}.GetNewClosure();Sleep={param($ms)Start-Sleep -Milliseconds $ms}}
         $null=Invoke-C2TimedStop $timing $adapter 15
         if(-not $timing.confirmed_off){throw 'Test payload Off unproved.'}
     }
@@ -80,22 +94,21 @@ if($Mode -eq 'Supervisor'){
     Wait-File (Join-Path $CaseDirectory 'watch-result.json') 10
     exit
 }
-$report=@{vm_access=$false;tests=@();independence='UNPROVEN';utc=[datetime]::UtcNow.ToString('o')}
+$report=@{status='RUNNING';vm_access=$false;tests=@();independence='UNPROVEN';utc=[datetime]::UtcNow.ToString('o')}
 try{
     $isolation=Get-C2HelperIsolation;$report.launcher_isolation=$isolation
     if(-not $isolation.verified){
         $refused=$false;try{$null=Assert-C2HelperIsolation}catch{$refused=$true}
         if(-not $refused){throw 'Attached helper was not refused.'}
-        $report.independence='BLOCKED_ENVIRONMENT_JOB_OR_CONSOLE';$report.tests+=@{name='fail-closed job/console refusal';passed=$true}
+        $report.status='BLOCKED';$report.independence='BLOCKED_ENVIRONMENT_JOB_OR_CONSOLE';$report.tests+=@{name='fail-closed job/console refusal';passed=$true}
         if($RequireIndependent){throw 'Detached helper proof blocked by environment.'}
         'PASS fail-closed isolation refusal; detached proof NOT RUN in this environment.'
     }else{
-        $base=Import-Module (Join-Path $PSScriptRoot 'harness2-c2-lab.psm1') -PassThru
         $root=Join-Path ([IO.Path]::GetTempPath()) ('daimon-c2-emergency-'+[guid]::NewGuid().ToString('N'))
-        & $base {param($p) New-C2Directory $p} $root
+        New-TestDirectory $root
         $report.private_evidence_root=$root
         foreach($scenario in 'stall','supervisor-exit'){
-            $dir=Join-Path $root $scenario;& $base {param($p) New-C2Directory $p} $dir
+            $dir=Join-Path $root $scenario;New-TestDirectory $dir
             Write-Data (Join-Path $dir 'config.json') @{scenario=$scenario}
             $supervisor=$null
             try{
@@ -118,7 +131,7 @@ try{
                     if(Get-Process -Id $children.controller.pid -ErrorAction SilentlyContinue){throw 'Controller did not exit.'}
                     $verdict='WATCHDOG_SURVIVED_OWN_CONTROLLER_AND_SUPERVISOR_EXIT'
                 }
-                $report.tests+=@{name=$scenario;passed=$true;verdict=$verdict;scope='OWN_PROCESS_NOT_VM';fault=$fault;watchdog=$watch;supervisor=$b.supervisor}
+                $report.tests+=@{name=$scenario;passed=$true;verdict=$verdict;scope='OWN_PROCESS_NOT_VM';fault=$fault;watchdog=$watch;supervisor=$b.supervisor;deadline=$d}
                 "PASS real independent process scenario $scenario"
             }finally{
                 # Cleanup only processes created in the private, exact PID/start/path manifest.
@@ -127,7 +140,7 @@ try{
                 if($supervisor){$supervisor.Refresh();if(-not $supervisor.HasExited){$supervisor.Kill();$null=$supervisor.WaitForExit(5000)};$supervisor.Dispose()}
             }
         }
-        $report.independence='PROVEN_FOR_OWN_OS_PROCESSES_NO_SHARED_JOB_OR_CONSOLE';'PASS 2 detached real-process emergency scenarios; VM NOT ACCESSED.'
+        $report.status='PASS';$report.independence='PROVEN_FOR_OWN_OS_PROCESSES_NO_SHARED_JOB_OR_CONSOLE';'PASS 2 detached real-process emergency scenarios; VM NOT ACCESSED.'
     }
-}catch{$report.failure=$_.Exception.Message;$report.independence='BLOCKED';throw}
+}catch{$report.failure=$_.Exception.Message;if($report.status -ne 'BLOCKED'){$report.status='FAIL'};$report.independence='UNPROVEN';throw}
 finally{if($ReportPath){$report|ConvertTo-Json -Depth 18|Set-Content -LiteralPath $ReportPath -Encoding utf8}}

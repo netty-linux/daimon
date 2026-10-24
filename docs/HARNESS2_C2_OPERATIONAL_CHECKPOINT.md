@@ -1,5 +1,27 @@
 # C2 — aquisição executada e preparação operacional
 
+## Entrada externa offline revisada — aguardando execução manual única
+
+Auditoria do artefato anterior removeu sua elevação `RunAs` e a dependência de
+pastas Admin/SYSTEM na suíte offline. Nova entrada única por duplo clique:
+**INICIAR-C2-TESTE-OFFLINE.cmd**, sem UAC, instalação ou override de ExecutionPolicy.
+Abre console separado, usa runtime existente e fontes fixadas por hash, cria apenas
+artefatos/pastas privados do próprio usuário e não importa o módulo do laboratório.
+O marcador local impede repetição automática; política restritiva vira BLOCKED.
+
+O resultado normalizado exige os **dois cenários positivos**, com evidências
+recomputadas; recusa segura de ambiente não é PASS de independência. A suíte foi
+auditada para validar PID/start/executável/criador/entrada/caso antes de fechar
+somente os helpers recém-criados. Não foi reexecutada a inspeção de Job nem a
+suíte positiva dentro do Work nesta tarefa. O bloqueio anterior continua registrado
+até haver um relatório externo válido. [Entrada, artefatos e critérios](HARNESS2_C2_OFFLINE_LAUNCHER.md).
+
+Testes novos cobrem classificação PASS/FAIL/BLOCKED, cenários ausentes/duplicados,
+Off tardio, escopo incorreto, ausência de comando e ACL de pasta própria sem
+requisito administrativo. Não houve acesso à VM, mudanças de aplicativos ou Windows.
+PASS externo apenas prepara pedido separado de ensaio real; nunca inicia VM.
+VM não tocada, PR draft e 18 gates `unverified`; FAIL histórico 91,1312018 preservado.
+
 ## Estado atual: PASS normal registrado; prova emergencial BLOCKED por isolamento do helper
 
 O segundo boot real em `0ce479d` passou: pedido em **70,0426436 s**, envio em
