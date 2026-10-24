@@ -244,6 +244,13 @@ Test 'real parser accepts exact bounded contract' {
 Test 'real validator accepts complete offline configuration' {
     & $module { $j = Reset-ValidationFixture; $null = Assert-C2VM $j -Complete }
 }
+Test '3 GiB probe ceiling requires explicit opt-in; default still requires 4 GiB' {
+    & $module {
+        $j=Reset-ValidationFixture;$script:Fixture.memory.Maximum=3GB
+        try{$null=Assert-C2VM $j -Complete;throw 'default accepted cap'}catch{if($_.Exception.Message -notmatch 'configuration drift'){throw}}
+        $null=Assert-C2VM $j -Complete -ProbeMaximumMemoryGiB 3
+    }
+}
 Test 'real validator refuses parent container in place of exact Hyper-V child directory' {
     Reject { & $module {
         $j = Reset-ValidationFixture

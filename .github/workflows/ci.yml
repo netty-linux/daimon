@@ -19,7 +19,9 @@ jobs:
           persist-credentials: false
       - name: Test clean-lab lifecycle with fault injection
         shell: pwsh
-        run: ./scripts/test-harness2-c2-lab.ps1
+        run: |
+          ./scripts/test-harness2-c2-lab.ps1
+          ./scripts/test-harness2-c2-boot.ps1
 
   ui:
     name: Web UI

@@ -1,5 +1,35 @@
 # C2 — aquisição executada e preparação operacional
 
+## Primeiro boot preparado: BLOCKED por RAM — 2026-10-24
+
+Inspeção elevada somente leitura concluída às 14:36:49Z: VMId e DiskIdentifier
+conferem com o journal protegido; VM Off, configuração completa, ISO autenticada
+novamente íntegra, Secure Boot correto, DVD primeiro e zero NICs. Controle privado
+validado. Interface de desligamento passou em `WhatIf`; desligamento real não executado.
+
+Coleta silenciosa posterior, 15:01–15:04Z, 60 amostras em aproximadamente 182 s:
+RAM disponível mínima **6,569 GiB**, CPU p95 **43%**, commit livre mínimo
+**17,676 GiB**, balancer mínimo **5,881 GiB**, crescimento da ocupação do pagefile
+**0 MiB**. Taxa de I/O de paginação indisponível. A coleta anterior coincidiu com
+preparação/testes locais e não foi usada para concluir pressão persistente de CPU.
+
+**Único bloqueio de admissão observado na coleta silenciosa: orçamento físico.**
+Perfil atual máximo 4 GiB requer 8,5 GiB disponíveis; proposta de teto temporário
+3 GiB requer 7,5 GiB. Ambos mantêm reserva do host de 4 GiB e margem provisória
+de 0,5 GiB. Faltam pelo menos **0,931 GiB** até o perfil leve nesta janela.
+Não reduzir a reserva apenas para obter aprovação. Nenhum aplicativo foi encerrado.
+
+Executor de probe limitado, watchdog separado, monitoramento e reconciliação
+preparados; **64 testes de lifecycle + 29 testes de boot offline** passaram.
+Nenhum executor de boot foi armado ou executado. Nenhuma configuração da VM mudou.
+Ver [procedimento e limites](HARNESS2_C2_FIRST_BOOT.md).
+
+Próxima ação: obter janela sustentada com pelo menos 7,5 GiB disponíveis e demais
+critérios aprovados, então solicitar autorização específica para teto temporário,
+boot de 180 s, desligamento e restauração. Não é necessário mudar serviços globais
+ou Windows para resolver este bloqueio medido. ESU/patches e autenticação independente
+do gVisor seguem pendentes separados; todos os 18 gates permanecem `unverified`.
+
 ## Marco concluído: VM Off configurada e validada — 2026-10-24
 
 **SUCCESS**, observação elevada em 2026-10-24T13:46:35Z, código `da13157` com
