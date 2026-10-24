@@ -5,7 +5,17 @@ or a passing offline test. All 18 isolation gates remain `unverified`.
 
 ## Light calibration revision (supersedes only the earlier first-boot budget)
 
-Current decision: **BLOCKED**. Quiet sampling on 2026-10-24 ended at 17:53:29Z:
+Latest bounded retry ended at **2026-10-24T18:06:55Z: BLOCKED**. Profile 2 GiB and
+the 6 GiB admission floor are unchanged. One 60-sample / 181.93-second baseline
+including two resident helpers measured minimum available **5.84546 GiB**, CPU
+p95 **14%**, minimum commit headroom **14.56987 GiB**, balancing **5.21875 GiB**,
+and pagefile occupancy growth **0 MiB**. Only physical admission failed, by
+**158.25 MiB**. A final point above 6 GiB does not override the failed minimum.
+No additional sampling in this attempt; no VM changes or boot authorization.
+Eight real-process watchdog/transition tests and 99 offline tests passed. Real
+running-VM poweroff remains unproved and requires its own authorized calibration.
+
+Previous decision: **BLOCKED**. Quiet sampling on 2026-10-24 ended at 17:53:29Z:
 60 samples / 182 s, minimum available 5.95535 GiB, CPU p95 15%, minimum commit
 headroom 14.68087 GiB and balancing headroom 5.26367 GiB, pagefile occupancy growth
 0 MiB. The 2-GiB profile misses its 6-GiB threshold by approximately 46 MiB;
@@ -68,6 +78,16 @@ This tests process execution, IPC, timing and a real stop adapter without mocks.
 **It does not prove Hyper-V poweroff**. The VM stop interface was checked in
 read-only WhatIf; its real running-VM shutdown and restoration remain part of a
 separately authorized first calibration. No live VM stop is claimed from offline tests.
+
+The first-boot readiness review additionally found and closed a controller/watchdog
+transition race. A protected existing file lock serializes start and hard-poweroff.
+A stop request writes a persistent protected veto before acquiring that lock;
+the controller checks both veto and live watchdog process inside the start lock,
+including immediately before Start-VM. A later start cannot follow a completed
+watchdog stop. The controller also aborts if the watchdog exits during monitoring.
+Three additional real-process tests verify lock timeout, a veto surviving lock
+release and refusal after watchdog exit. An unresponsive Hyper-V call can still
+prevent timely recovery; the executor must report unresolved rather than claim Off.
 
 References: [Canonical ISO memory requirements](https://ubuntu.com/server/docs/reference/installation/system-requirements/),
 [Hyper-V Ubuntu support](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/supported-ubuntu-virtual-machines-on-hyper-v),

@@ -114,6 +114,25 @@ function Get-C2BootAssessment($Samples,[double]$ElapsedSeconds,$Capabilities,[Va
       configuration_change_required=($GuestMaximumGiB -ne 4)
       scope=('ONE_OFF_'+$p.probe_seconds+'S_STOCK_ISO_BOOT_ONLY_NO_INSTALL_OR_WORKLOAD');budget=$p}
 }
+function Assert-C2StartLease([Diagnostics.Process]$Watchdog,[string]$StopPath) {
+    $Watchdog.Refresh()
+    if($Watchdog.HasExited -or (Test-Path -LiteralPath $StopPath)){throw 'Watchdog unavailable or stop vetoed; no boot.'}
+}
+function Invoke-C2TransitionGate([string]$Path,[scriptblock]$Action,[ValidateRange(1,30)][int]$WaitSeconds=15) {
+    # Caller must create/validate the protected existing lock. Never recreate a missing lock.
+    $clock=[Diagnostics.Stopwatch]::StartNew();$handle=$null
+    try {
+        do {
+            try{$handle=[IO.FileStream]::new($Path,'Open','ReadWrite','None')}
+            catch [IO.IOException]{
+                if(($_.Exception.HResult -band 0xffff) -notin 32,33){throw}
+                if($clock.Elapsed.TotalSeconds -ge $WaitSeconds){throw 'VM transition lock timed out; unresolved.'}
+                Start-Sleep -Milliseconds 50
+            }
+        }while(-not $handle)
+        & $Action
+    }finally{if($handle){$handle.Dispose()}}
+}
 function Wait-C2WatchdogLease([scriptblock]$ReadHeartbeat,[scriptblock]$Sample,[scriptblock]$Stop,
     [hashtable]$Policy,[ValidateRange(20,2000)][int]$PollMilliseconds=2000) {
     # Shared by the real VM watchdog and real-process offline smoke. No simulated clock.
@@ -158,4 +177,4 @@ function Invoke-C2ProbeRollback([hashtable]$Adapter,[switch]$ReconcileJournal) {
     if($ReconcileJournal){& $Adapter.Journal;return 'OFF_MAX4_CONFIGURED'}
     'OFF_MAX4_JOURNAL_PENDING'
 }
-Export-ModuleMember -Function Get-C2NativeSample,Resolve-C2CounterPath,Get-C2CounterValue,Get-C2BootBudget,Get-C2BootAssessment,Get-C2ProbeAbortReason,Invoke-C2ProbeRollback,Wait-C2WatchdogLease
+Export-ModuleMember -Function Get-C2NativeSample,Resolve-C2CounterPath,Get-C2CounterValue,Get-C2BootBudget,Get-C2BootAssessment,Get-C2ProbeAbortReason,Invoke-C2ProbeRollback,Wait-C2WatchdogLease,Invoke-C2TransitionGate,Assert-C2StartLease

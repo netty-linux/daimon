@@ -1,10 +1,15 @@
 #Requires -Version 7.4
 # Real OS processes, real heartbeat files, real native memory samples. Never imports Hyper-V.
 [CmdletBinding()]
-param([ValidateSet('Run','Payload','Watch')][string]$Mode='Run',[string]$CaseDirectory)
+param([ValidateSet('Run','Payload','Watch','GateHolder')][string]$Mode='Run',[string]$CaseDirectory)
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'harness2-c2-boot.psm1') -Force
 if($Mode -eq 'Payload'){Start-Sleep -Seconds 60;exit}
+if($Mode -eq 'GateHolder'){
+    $f=[IO.FileStream]::new((Join-Path $CaseDirectory 'transition.lock'),'Open','ReadWrite','None')
+    try{Set-Content -LiteralPath (Join-Path $CaseDirectory 'stop-requested.json') -Value '{}';Set-Content -LiteralPath (Join-Path $CaseDirectory 'ready') -Value 'locked';Start-Sleep -Seconds 3}finally{$f.Dispose()}
+    exit
+}
 if($Mode -eq 'Watch'){
     $binding=Get-Content -LiteralPath (Join-Path $CaseDirectory 'binding.json') -Raw|ConvertFrom-Json
     $p=Get-C2BootBudget 2;$p.heartbeat_timeout_seconds=2;$p.watchdog_seconds=8
@@ -56,5 +61,25 @@ foreach($scenario in 'stale','deadline','malformed','native-pressure','done'){
         foreach($owned in @($watch,$target)){if($owned){$owned.Refresh();if(-not $owned.HasExited){$owned.Kill();$null=$owned.WaitForExit(5000)};$owned.Dispose()}}
     }
 }
-@{tests=$results;vm_poweroff='NOT_RUN';evidence=$root}|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $root 'summary.json')
-"PASS 5 real-process watchdog tests; VM poweroff NOT RUN; evidence: $root"
+$dir=Join-Path $root 'transition';$null=New-Item -ItemType Directory -Path $dir
+$path=Join-Path $dir 'transition.lock';[IO.File]::WriteAllText($path,'')
+$holder=$null
+try{
+    $holder=Start-Process -FilePath $exe -ArgumentList @('-NoProfile','-File',('"'+$PSCommandPath+'"'),'-Mode','GateHolder','-CaseDirectory',('"'+$dir+'"')) -WindowStyle Hidden -PassThru
+    $clock=[Diagnostics.Stopwatch]::StartNew()
+    while(-not (Test-Path -LiteralPath (Join-Path $dir 'ready'))){if($holder.HasExited -or $clock.Elapsed.TotalSeconds -gt 15){throw 'Real gate holder failed.'};Start-Sleep -Milliseconds 50}
+    $script:entered=$false;$failed=$false
+    try{Invoke-C2TransitionGate $path {$script:entered=$true} -WaitSeconds 1}catch{if($_.Exception.Message -notmatch 'lock timed out'){throw};$failed=$true}
+    if(-not $failed -or $script:entered){throw 'Busy real transition lock admitted action.'}
+    "PASS real-process transition lock timeout"
+    $self=Get-Process -Id $PID;$failed=$false
+    try{Invoke-C2TransitionGate $path {Assert-C2StartLease $self (Join-Path $dir 'stop-requested.json');throw 'unsafe start admitted'} -WaitSeconds 10}catch{if($_.Exception.Message -notmatch 'stop vetoed'){throw};$failed=$true}
+    if(-not $failed){throw 'Stop marker did not veto real transition.'}
+    "PASS real-process stop veto persists after lock release"
+    $null=$holder.WaitForExit(5000);$failed=$false
+    try{Assert-C2StartLease $holder (Join-Path $dir 'absent-marker')}catch{if($_.Exception.Message -notmatch 'no boot'){throw};$failed=$true}
+    if(-not $failed){throw 'Exited watchdog admitted start.'}
+    "PASS real-process exited watchdog veto"
+}finally{if($holder){$holder.Refresh();if(-not $holder.HasExited){$holder.Kill();$null=$holder.WaitForExit(5000)};$holder.Dispose()}}
+@{tests=$results;transition_tests=3;vm_poweroff='NOT_RUN';evidence=$root}|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $root 'summary.json')
+"PASS 8 real-process watchdog/transition tests; VM poweroff NOT RUN; evidence: $root"

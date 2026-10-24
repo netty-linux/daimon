@@ -1,5 +1,33 @@
 # C2 — aquisição executada e preparação operacional
 
+## Única nova tentativa 2 GiB: BLOCKED — 2026-10-24 18:06:55Z
+
+Perfil `bounded-max2` e mínimo **6 GiB** mantidos, sem novo perfil, alteração de
+VM, encerramento de aplicativos, alteração de serviços ou limpeza de caches.
+Uma única coleta silenciosa de **60 amostras / 181,93 s**, incluindo dois helpers
+residentes: mínimo disponível **5,84546 GiB**, CPU p95 **14%**, commit livre mínimo
+**14,56987 GiB**, balancer mínimo **5,21875 GiB**, crescimento da ocupação do
+pagefile **0 MiB**. Apenas o orçamento físico falhou: déficit **0,15454 GiB
+(158,25 MiB; arredondar para pelo menos 159 MiB adicionais)**. O último ponto de
+6,073 GiB não substitui estabilidade: não houve GO. Tentativa encerrada, sem repetir
+diagnósticos. Não foi solicitada autorização de boot com orçamento reprovado.
+
+Antes da coleta, revisão do executor identificou corrida entre fim do watchdog
+e start ainda pendente no controlador. Corrigida com lock de transição protegido,
+veto persistente antes do stop e checagem do processo watchdog dentro do lock e
+durante monitoramento. **Oito testes reais de processos** passaram (cinco de lease
+e três de lock/veto/saída), além de **99 testes offline**. O desligamento de VM em
+execução continua **NOT RUN**; a aptidão do código para o primeiro ensaio não é
+prova de poweroff nem garantia contra Hyper-V não responsivo. Ownership protegido,
+revalidação de ISO e restauração 3/3/4 permanecem obrigatórios após futura aprovação.
+
+A menor intervenção necessária é liberar pontualmente pelo menos **159 MiB
+adicionais sustentados** sem fechar aplicativos; uma margem prática de 256 MiB
+evita mirar o limiar exato. Isso pode exigir ação manual sobre uma atividade/aba
+não utilizada; não é motivo para alterar serviços, reserva ou caches do sistema.
+Nenhuma intervenção dessas foi executada. Todos os 18 gates seguem `unverified`,
+PR draft e sem merge; ESU/gVisor continuam pendências separadas.
+
 ## Calibração leve implementada: BLOCKED por 46 MiB — 2026-10-24
 
 HEAD anterior `8aee9cd`, seis checks aprovados. Nenhuma mutação de VM nesta etapa.

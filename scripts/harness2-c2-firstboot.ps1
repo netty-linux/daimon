@@ -20,7 +20,7 @@ Import-Module (Join-Path $PSScriptRoot 'harness2-c2-boot.psm1') -Force
 $base=Import-Module (Join-Path $PSScriptRoot 'harness2-c2-lab.psm1') -Force -PassThru
 $policy=Get-C2BootBudget $MaximumGiB
 $parameters=@{Root=$Root;IsoPath=$IsoPath;OperationId=$OperationId}
-$script:ref=$null;$script:attempt=$null
+$script:ref=$null;$script:attempt=$null;$script:transitionPath=$null;$script:stopPath=$null
 function Write-Private($Path,$Data){
     & $base {param($p,$d)
         Assert-C2NoLinks $p
@@ -43,7 +43,7 @@ function Get-OwnedVM {
         $v[0]
     } $script:ref
 }
-function Stop-OwnedVM {
+function Stop-OwnedVMCore {
     $v=Get-OwnedVM
     if($v.State -ne 'Off'){
         Stop-VM -VM $v -TurnOff -Force -Confirm:$false -ErrorAction Stop
@@ -51,6 +51,13 @@ function Stop-OwnedVM {
         do{$v=Get-OwnedVM;if($v.State -eq 'Off'){break};Start-Sleep -Milliseconds 250}while($limit.Elapsed.TotalSeconds -lt 15)
         if($v.State -ne 'Off'){throw 'Poweroff unresolved; operator intervention required.'}
     }
+}
+function Stop-OwnedVM {
+    if($script:transitionPath){
+        # Persistent veto precedes lock acquisition: no later start may follow a watchdog stop.
+        Write-Private $script:stopPath @{requested_at_utc=[DateTime]::UtcNow.ToString('o');vm_id=$VMId.ToString()}
+        Invoke-C2TransitionGate $script:transitionPath {Stop-OwnedVMCore}
+    }else{Stop-OwnedVMCore}
 }
 function Restore-OwnedMaximum {
     $v=Get-OwnedVM;if($v.State -ne 'Off'){throw 'Cannot restore memory while running.'}
@@ -117,6 +124,8 @@ try {
         $j=& $base {param($c) Read-C2Journal $c} $c
         if($j.vm_id -cne $script:ref.vm_id -or $j.vm_name -cne $script:ref.vm_name -or $j.operation_id -cne $script:ref.operation_id -or
           $script:ref.configuration -ine [IO.Path]::Combine($j.config,$j.vm_name)){throw 'Guard ownership not established.'}
+        $script:transitionPath=Join-Path $canonical 'transition.lock';$script:stopPath=Join-Path $canonical 'stop-requested.json'
+        & $base {param($p) Assert-C2Acl $p} $script:transitionPath
         # Compile/warm the native sensor before declaring readiness; do not overlap this peak with guest startup.
         $null=Get-C2NativeSample;[GC]::Collect()
         Write-Private (Join-Path $canonical 'ready.json') @{vm_id=$VMId.ToString();operation_id=$OperationId.ToString();process_id=$PID}
@@ -150,6 +159,8 @@ try {
         $baselineCaptured=$true
         $guard=Join-Path $c.root ('firstboot-'+[guid]::NewGuid().ToString('N'))
         & $base {param($g) New-C2Directory $g;Assert-C2Acl $g -Directory} $guard
+        $script:transitionPath=Join-Path $guard 'transition.lock';$script:stopPath=Join-Path $guard 'stop-requested.json'
+        & $base {param($p) $f=New-C2File $p;$f.Dispose();Assert-C2Acl $p} $script:transitionPath
         $script:attempt=@{version=1;operation_id=$OperationId.ToString();vm_id=$VMId.ToString();maximum_gib=$MaximumGiB;original_maximum_gib=4;reference=$script:ref;policy=$policy}
         Write-Private (Join-Path $guard 'policy.json') $script:attempt
         Write-Private (Join-Path $guard 'heartbeat.json') @{utc=[DateTime]::UtcNow.ToString('o');phase='arming'}
@@ -163,11 +174,16 @@ try {
         # Recheck live headroom after arming the extra host process, before any VM setting change.
         $pre=Host-Sample $null
         if($pre.available_gib -lt $policy.required_available_gib -or $pre.balancer_available_gib -lt $policy.required_balancer_gib -or $pre.commit_limit_gib-$pre.commit_gib -lt $policy.required_commit_headroom_gib -or $pre.commit_limit_gib -le 0 -or $pre.commit_gib/$pre.commit_limit_gib -gt $policy.max_commit_ratio){throw 'Live budget changed while arming; no boot.'}
-        $j.state='start-pending';& $base {param($j) Write-C2Journal $j} $j
-        $v=Get-OwnedVM
-        if($MaximumGiB -ne 4){Set-VMMemory -VM $v -MinimumBytes ($policy.guest_startup_gib*1GB) -StartupBytes ($policy.guest_startup_gib*1GB) -MaximumBytes ($MaximumGiB*1GB) -ErrorAction Stop}
-        & $base {param($j,$max,$startup) Assert-C2Acl $j.root -Directory;Assert-C2Acl (Join-Path $j.root 'journal.json');$null=Assert-C2VM $j -Complete -ProbeMaximumMemoryGiB $max -ProbeStartupMemoryGiB $startup} $j $MaximumGiB $policy.guest_startup_gib
-        Start-VM -VM (Get-OwnedVM) -ErrorAction Stop;$started=$true
+        Invoke-C2TransitionGate $script:transitionPath {
+            Assert-C2StartLease $watcher $script:stopPath
+            $j.state='start-pending';& $base {param($j) Write-C2Journal $j} $j
+            $v=Get-OwnedVM
+            if($MaximumGiB -ne 4){Set-VMMemory -VM $v -MinimumBytes ($policy.guest_startup_gib*1GB) -StartupBytes ($policy.guest_startup_gib*1GB) -MaximumBytes ($MaximumGiB*1GB) -ErrorAction Stop}
+            & $base {param($j,$max,$startup) Assert-C2Acl $j.root -Directory;Assert-C2Acl (Join-Path $j.root 'journal.json');$null=Assert-C2VM $j -Complete -ProbeMaximumMemoryGiB $max -ProbeStartupMemoryGiB $startup} $j $MaximumGiB $policy.guest_startup_gib
+            Assert-C2StartLease $watcher $script:stopPath
+            Start-VM -VM (Get-OwnedVM) -ErrorAction Stop
+        }
+        $started=$true
         $j.state='running';& $base {param($j) Write-C2Journal $j} $j
         $clock.Restart();$previous=$null;$last=0.0;$low=0.0;$high=0.0;$run=[Collections.Generic.List[object]]::new();$why=''
         do{
@@ -175,6 +191,7 @@ try {
             $s=Host-Sample $previous;$previous=$s.cpu_ticks;$s.Remove('cpu_ticks');$now=$clock.Elapsed.TotalSeconds;$dt=$now-$last;$last=$now
             $low=if($s.available_gib -lt $policy.low_available_gib){$low+$dt}else{0.0};$high=if($s.cpu_percent -and $s.cpu_percent -gt $policy.abort_cpu_percent){$high+$dt}else{0.0}
             $v=Get-OwnedVM;$aclOK=$true
+            $watcher.Refresh();if($watcher.HasExited -or (Test-Path -LiteralPath $script:stopPath)){throw 'Independent watchdog stopped; aborting own VM.'}
             try{& $base {param($c) Assert-C2Acl $c.root -Directory;Assert-C2Acl (Join-Path $c.root 'journal.json');Assert-C2Acl (Join-Path $c.root 'operation.lock')} $c}catch{$aclOK=$false}
             $state=@{telemetry_ok=$true;ownership_ok=$true;control_acl_ok=$aclOK;low_memory_seconds=$low;high_cpu_seconds=$high;pagefile_growth_mib=$s.pagefile_used_mib-$samples[0].pagefile_used_mib}
             $view=@{network_adapters=@(Get-VMNetworkAdapter -VM $v).Count;assigned_gib=[double]$v.MemoryAssigned/1GB
