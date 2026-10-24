@@ -363,6 +363,11 @@ Não basta aceitar flags, ler um limite ou confiar no relato da própria fixture
 
 ## 8. Critérios objetivos para retomar C2
 
+Os critérios desta seção governam homologação/execução hostil. A preparação de
+VM limpa desligada e seu boot inerte têm escopo separado, autorizado pelo
+proprietário em 2026-10-24, no [runbook do primeiro laboratório](HARNESS2_C2_CLEAN_LAB.md).
+Essa separação não libera execução Harness² nem altera os 18 gates.
+
 1. Autorização explícita para provisionar VM/guest e alterações administrativas
    especificadas; memória/disco livres e suporte/patches do host confirmados.
 2. Manifesto de deployment completo, assinado por autoridade aceita fora do guest;

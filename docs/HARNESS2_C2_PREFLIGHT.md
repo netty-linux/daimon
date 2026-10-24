@@ -1,6 +1,11 @@
 # C2 — decisão de pré-provisionamento Hyper-V
 
 Checkpoint atual: [ISO adquirida/verificada, pacote inspecionado e dry-run](HARNESS2_C2_OPERATIONAL_CHECKPOINT.md).
+O [executor do laboratório limpo](HARNESS2_C2_CLEAN_LAB.md) separa criação Off,
+boot sem instalação e homologação hostil. `-Milestone CleanCreate` no preflight
+retira apenas os bloqueios que pertencem à homologação/boot; não concede autoridade
+administrativa nem autentica ISO por presença. O executor exige o hash fixado,
+aprovação específica e inventário elevado. O default `Hostile` permanece bloqueado.
 Os registros anteriores de ISO não baixada são históricos. Integridade ISO agora
 comprovada; gVisor ainda sem confiança independente completa, Windows/ESU e RAM pendentes.
 

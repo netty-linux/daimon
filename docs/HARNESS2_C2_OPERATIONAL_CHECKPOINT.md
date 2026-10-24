@@ -1,5 +1,37 @@
 # C2 — aquisição executada e preparação operacional
 
+## Marco atual — executor do laboratório limpo, 2026-10-24
+
+Base esperada `e0c12d6c178fc1ff736803e12ea30f496a44478b` confirmada, checkout
+inicialmente limpo. O proprietário autorizou preparar executor e separar criação
+limpa da homologação hostil. [Runbook e revisão do executor](HARNESS2_C2_CLEAN_LAB.md).
+Este marco substitui a trava genérica anterior **apenas para preparar/criar uma
+VM limpa e offline após aprovação específica**; runtime Harness² continua fechado.
+
+- [x] Classificar criação Off, boot de ISO sem instalação e homologação hostil
+  separadamente. ESU não é requisito técnico documentado de Hyper-V, mas permanece
+  pendência de segurança do host para homologação hostil.
+- [x] Revalidar SHA256 integral da ISO existente: pin reproduzido. Sem novo download.
+- [x] Confirmar sessão não administrativa e inventário Hyper-V indisponível.
+  RAM 6,57 GiB e disco 171,04 GiB livres na amostra. Sem repetir scan/licenciamento.
+- [x] Implementar executor Create/Start/Discard/Inspect, journal protegido,
+  ownership por VMId/DiskIdentifier e retomada conservadora após falhas.
+- [x] 43 testes offline PASS, parsing/diff check PASS. Lifecycle administrativo
+  real e criação efetiva de ACL/journal/VM: NOT RUN.
+- [x] Atualizar preflight com marcos CleanCreate/CleanBoot; default Hostile mantém
+  os bloqueios anteriores. Presence-only não autentica ISO: executor confere pin.
+- [ ] Proprietário aprova criação desligada com recursos/destino exatos e risco
+  residual limitado; UAC legítimo e inventário elevado final antes dos efeitos.
+- [ ] Criar a VM desligada, verificar configuração real e registrar evidências.
+- [ ] Boot somente após 8 GiB disponíveis e aprovação própria; sem instalação.
+- [ ] Instalação Ubuntu, gVisor, provas e descarte real: autorizações/requisitos
+  correspondentes pendentes, nenhuma execução realizada neste marco.
+
+Destino novo proposto não existe. Nada criado ou alterado em Hyper-V, nenhum
+switch tocado, app encerrado, patch instalado, reboot ou merge. As seções abaixo
+são históricas; a declaração anterior de executor não implementado foi superada
+somente pelo código limitado do laboratório limpo. 18 gates continuam unverified.
+
 ## Retomada operacional — 2026-10-24
 
 Base local `2d8d7d7`, branch esperada e checkout inicialmente limpo. PR #28
