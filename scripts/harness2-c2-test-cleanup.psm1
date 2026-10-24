@@ -22,7 +22,8 @@ function Register-C2OwnProcess($Identity,[string]$ExpectedEntry,[string]$Expecte
     try {
         # Acquire and retain a kernel handle BEFORE reading identity or allowing the fault.
         $null=$p.SafeHandle
-        if($p.HasExited -or $p.StartTime.ToUniversalTime().Ticks -ne ([datetime]$Identity.started_utc).ToUniversalTime().Ticks -or $p.Path -ine $ExpectedExe){throw 'Own helper registration PID/start/path mismatch or early exit.'}
+        $birth=$p.StartTime.ToUniversalTime().Ticks;$expectedBirth=([datetime]$Identity.started_utc).ToUniversalTime().Ticks;$path=$p.Path;$exited=$p.HasExited
+        if($exited -or $birth -ne $expectedBirth -or $path -ine $ExpectedExe){throw ('Own helper registration mismatch: '+(@{pid=$Identity.pid;exited=$exited;birth=$birth;expected_birth=$expectedBirth;path=$path;expected_path=$ExpectedExe}|ConvertTo-Json -Compress))}
         $m=Get-CimInstance Win32_Process -Filter ('ProcessId = '+[int]$Identity.pid) -OperationTimeoutSec 5 -ErrorAction Stop
         $match=Test-C2OwnMetadata $Identity $m
         if($match -ne 'MATCH' -or $p.HasExited){throw ('Own helper registration metadata '+$match+' or early exit.')}

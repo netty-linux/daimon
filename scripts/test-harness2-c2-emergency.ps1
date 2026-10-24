@@ -30,6 +30,7 @@ function Bound-Process($i){
     if($metadata.ParentProcessId -ne $i.creator_pid -or -not $metadata.CommandLine -or $metadata.CommandLine.IndexOf($PSCommandPath,[StringComparison]::OrdinalIgnoreCase) -lt 0 -or $metadata.CommandLine.IndexOf($i.directory,[StringComparison]::OrdinalIgnoreCase) -lt 0){throw 'Own helper creator/entry/case binding failed.'}
     $p
 }
+if($Mode -ne 'Run'){Write-Data (Join-Path $CaseDirectory ('instance-ready-'+$Mode+'.json')) @{pid=$PID;started_utc=(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o')}}
 if($Mode -eq 'Payload'){Start-Sleep -Seconds 90;exit}
 if($Mode -eq 'Controller'){
     $identity=Assert-C2DedicatedHelper $PSCommandPath
@@ -116,11 +117,13 @@ try{
             $supervisor=$null;$registrations=@{};$caseResult=$null
             try{
                 $supervisor=Spawn 'Supervisor' $dir
+                Wait-File (Join-Path $dir 'instance-ready-Supervisor.json')
                 $registrations.supervisor=Register-C2OwnProcess (Identity $supervisor 'Supervisor' $dir) $PSCommandPath $dir $exe $PID 'Supervisor'
                 Wait-File (Join-Path $dir 'children.json')
                 $manifest=Read-Data (Join-Path $dir 'children.json')
                 foreach($role in 'payload','controller','watcher'){
                     $expectedRole=@{payload='Payload';controller='Controller';watcher='Watcher'}[$role]
+                    Wait-File (Join-Path $dir ('instance-ready-'+$expectedRole+'.json'))
                     $registrations[$role]=Register-C2OwnProcess $manifest[$role] $PSCommandPath $dir $exe $supervisor.Id $expectedRole
                 }
                 Write-Data (Join-Path $dir 'cleanup-handles-ready.json') @{verified=$true;count=$registrations.Count}

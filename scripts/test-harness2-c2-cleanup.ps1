@@ -2,6 +2,7 @@
 [CmdletBinding()]param([string]$Mode='Run',[string]$CaseDirectory,[string]$ReportPath)
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
 if($Mode -eq 'Payload'){
+    Set-Content -LiteralPath (Join-Path $CaseDirectory 'ready') -Value $PID
     $clock=[Diagnostics.Stopwatch]::StartNew()
     while(-not (Test-Path -LiteralPath (Join-Path $CaseDirectory 'exit')) -and $clock.Elapsed.TotalSeconds -lt 20){Start-Sleep -Milliseconds 25}
     exit 0
@@ -88,6 +89,9 @@ try {
             $dir=Join-Path ([IO.Path]::GetTempPath()) ('c2-cleanup-'+[guid]::NewGuid().ToString('N'))
             $null=New-Item -ItemType Directory -Path $dir
             $p=Start-Process -FilePath $exe -ArgumentList @('-NoProfile','-NonInteractive','-File',('"'+$PSCommandPath+'"'),'-Mode','Payload','-CaseDirectory',('"'+$dir+'"')) -WindowStyle Hidden -PassThru
+            $readyClock=[Diagnostics.Stopwatch]::StartNew()
+            while(-not (Test-Path -LiteralPath (Join-Path $dir 'ready'))){if($readyClock.Elapsed.TotalSeconds -gt 5){throw 'Own fixture readiness timeout'};Start-Sleep -Milliseconds 25}
+            if([int](Get-Content -LiteralPath (Join-Path $dir 'ready')) -ne $p.Id){throw 'Own fixture readiness PID mismatch'}
             $id=@{pid=$p.Id;started_utc=$p.StartTime.ToUniversalTime().ToString('o');path=$exe;entry=$PSCommandPath;directory=$dir;creator_pid=$PID;role='Payload'}
             $r=Register-C2OwnProcess $id $PSCommandPath $dir $exe $PID 'Payload'
             try {
