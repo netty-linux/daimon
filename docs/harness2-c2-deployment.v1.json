@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "status": "BLOCKED_ACQUISITION_INCOMPLETE",
+  "purpose": "pre-provisioning proposal; not executable admission policy",
+  "architecture": "amd64",
+  "vm": {
+    "generation": 2,
+    "vcpus": 2,
+    "memory_gib": 4,
+    "vhdx_max_gib": 48,
+    "initial_network": "disconnected",
+    "memory_profile_status": "CANDIDATE_NOT_APPLIED",
+    "proposed_dynamic_memory": {
+      "minimum_gib": 3,
+      "startup_gib": 3,
+      "maximum_gib": 4
+    },
+    "fixture_concurrency": 1
+  },
+  "ubuntu": {
+    "iso": "ubuntu-24.04.5-live-server-amd64.iso",
+    "source": "https://releases.ubuntu.com/24.04/",
+    "download_url": "https://releases.ubuntu.com/24.04/ubuntu-24.04.5-live-server-amd64.iso",
+    "observed_http_content_length": 4080486400,
+    "download_authorized": true,
+    "candidate_sha256": "97f3d7ffb032c3eb3b23d2c8be9cc76e60c2c1f2c0146ba5ba9fe01cafae0fd8",
+    "signing_fingerprint": "843938DF228D22F7B3742BC0D94AA3F0EFE21092",
+    "fingerprint_source": "https://documentation.ubuntu.com/security/software-integrity/image-verification/",
+    "verification_status": "VERIFIED",
+    "signature_verification": "VERIFIED_CHECKSUM_LIST_ONLY",
+    "checksum_list_sha256": "728064ecf411f4ab702d9c3ca0a938ce672771424c028a1b52b2449f7eb5a068",
+    "signature_date": "2026-09-15",
+    "key_expiry_in_downloaded_keyring": null,
+    "revocation_freshness": "UNVERIFIED",
+    "iso_hash_verification": "PASS",
+    "pending": [
+      "fresh revocation review before installation"
+    ],
+    "actual_size": 4080486400,
+    "actual_sha256": "97f3d7ffb032c3eb3b23d2c8be9cc76e60c2c1f2c0146ba5ba9fe01cafae0fd8",
+    "verified_on": "2026-10-23",
+    "media_manifest_inventory": [
+      {
+        "path": "casper/ubuntu-server-minimal.manifest",
+        "sha256": "c034ebbbfa00c6ef322ce8686925ff95b71cf3b19753af484308157d8560cd2a",
+        "size": 12651,
+        "status": "VERIFIED_ISO_CONTENT_NOT_INSTALLED"
+      },
+      {
+        "path": "casper/ubuntu-server-minimal.ubuntu-server.installer.generic.manifest",
+        "sha256": "66ec9175d31bc874c382c56c991d8aaac51ceec033ea9a57021f86fb854e6106",
+        "size": 2606,
+        "status": "VERIFIED_ISO_CONTENT_NOT_INSTALLED"
+      },
+      {
+        "path": "casper/ubuntu-server-minimal.ubuntu-server.installer.generic-hwe.manifest",
+        "sha256": "65d7084f4c2b3394102054d7c25086af75215eb1047f2931be7deba96e499f07",
+        "size": 2735,
+        "status": "VERIFIED_ISO_CONTENT_NOT_INSTALLED"
+      }
+    ],
+    "media_declared_components": {
+      "systemd": "255.4-1ubuntu8.17",
+      "libc6:amd64": "2.39-0ubuntu8.8",
+      "python3.12": "3.12.3-1ubuntu0.16",
+      "ubuntu-keyring": "2023.11.28.1",
+      "ga_kernel": "6.8.0-139.139",
+      "hwe_kernel": "7.0.0-31.31~24.04.1",
+      "status": "MEDIA_DECLARATIONS_ONLY_NOT_DEPLOYMENT_LOCK"
+    }
+  },
+  "gvisor": {
+    "candidate_release": "release-20261019.0",
+    "candidate_commit": "760b80785dc53311d4c87bd2de167525a99709c1",
+    "candidate_asset": "gvisor-x86_64.tar.bz2",
+    "candidate_sha256": "1298e8ed9c3fee900f00d2ea96ec2d79d80ed93f2175812f29b7e7da718041a3",
+    "platform": "systrap",
+    "producer_authentication": "UNRESOLVED",
+    "verification_status": "UNVERIFIED",
+    "complete_layout_inventory": [
+      {
+        "path": "usr/bin/containerd-shim-runsc-v1",
+        "size": 24024733,
+        "sha256": "d795ec13f457def10f49eaf58d25b9ed1c10dd234b8b25045b090b9a89b17314",
+        "elf": true,
+        "dynamic_segment": false,
+        "interpreters": []
+      },
+      {
+        "path": "usr/bin/runsc",
+        "size": 18605915,
+        "sha256": "5b4016fa43a9d35835253925cb6d05d3e42fdb9eb8bcd426c8b25444090e93e6",
+        "elf": true,
+        "dynamic_segment": false,
+        "interpreters": []
+      },
+      {
+        "path": "usr/bin/gvisor-bin/checkpointgofer",
+        "size": 48438588,
+        "sha256": "58f5bcbf9e59608e4d9bfa611119c4c16c14115c1bb1044cbb5a141f3d090b23",
+        "elf": true,
+        "dynamic_segment": false,
+        "interpreters": []
+      },
+      {
+        "path": "usr/bin/gvisor-bin/gvisor-proc-umounter",
+        "size": 1280,
+        "sha256": "b3bbbaef5ddc62084e5febd19d3acca14f3d42b2a25d8552fb40def699467019",
+        "elf": true,
+        "dynamic_segment": false,
+        "interpreters": []
+      },
+      {
+        "path": "usr/bin/gvisor-bin/gvisor-sentry-prewarmer",
+        "size": 1416,
+        "sha256": "46d5c028723ac5fbe40b863f95100f15a00d2aa0cd39c69d892500a988c930bd",
+        "elf": true,
+        "dynamic_segment": false,
+        "interpreters": []
+      },
+      {
+        "path": "usr/bin/gvisor-bin/gvisor_sentry",
+        "size": 52831883,
+        "sha256": "d6ed13cadb297cad16e66c7df7d597d1e79a87bd6e5a6c9769ca98e72e41f68f",
+        "elf": true,
+        "dynamic_segment": false,
+        "interpreters": []
+      },
+      {
+        "path": "usr/bin/gvisor-bin/runsc-fd-parking",
+        "size": 1320,
+        "sha256": "03af90d07ea466c10ecc3e3ba839b2a59540959dd3286aea3886917cba850c11",
+        "elf": true,
+        "dynamic_segment": false,
+        "interpreters": []
+      },
+      {
+        "path": "usr/bin/gvisor-bin/runsc-metric-server",
+        "size": 20994414,
+        "sha256": "3e0234ab0d7bdd0cea17fe763e760d3861d8e2384bd6e5021d64bafcc87f759b",
+        "elf": true,
+        "dynamic_segment": false,
+        "interpreters": []
+      },
+      {
+        "path": "etc/containerd/runsc.toml",
+        "size": 302,
+        "sha256": "ea5ada6422655b972fd3af73f7a23b88cc3385c98767cca2f360b2aa749d114c",
+        "elf": false,
+        "dynamic_segment": false,
+        "interpreters": []
+      }
+    ],
+    "source_declared_layout": [
+      "runsc",
+      "containerd-shim-runsc-v1",
+      "gvisor-bin/gvisor_sentry",
+      "gvisor-bin/checkpointgofer",
+      "gvisor-bin/runsc-metric-server",
+      "gvisor-bin/runsc-fd-parking",
+      "gvisor-bin/gvisor-sentry-prewarmer",
+      "gvisor-bin/gvisor-proc-umounter"
+    ],
+    "layout_source": "https://github.com/google/gvisor/blob/760b80785dc53311d4c87bd2de167525a99709c1/tools/release.bzl",
+    "apt": {
+      "origin": "https://storage.googleapis.com/gvisor/releases/",
+      "version": "20261019.0",
+      "architecture": "amd64",
+      "package": "pool/20261019.0/binary-amd64/runsc.deb",
+      "package_size": 76131500,
+      "published_package_sha256": "24e9740411c15f229151155e9b890388a18cfb4c9fce5c8d7ea6ed9f926e7a52",
+      "release_sha256": "ea5e20f4714c99bf7bc1e2ab43dc3b56d311555dd4456087a5fdd90c391b5b40",
+      "packages_sha256": "9eee2a2c0c09542751dfd12741597d42206c5d0b21ba9e20519b734f71eadc64",
+      "observed_signing_fingerprint": "6F1DF85E3A71C24918E727D56FC6D554E32BD943",
+      "signature_math": "PASS",
+      "packages_digest_matches_release": true,
+      "independent_key_authentication": "UNVERIFIED",
+      "key_cross_channel_match": "PASS_OFFICIAL_WEBSITE_AND_GITHUB",
+      "key_sha256": "757d2ebdf00cdc5661f88443e2bea848d3e2ded0780cbd2d811be05e0c1d5dd",
+      "key_corroboration_url": "https://github.com/google/gvisor/blob/760b80785dc53311d4c87bd2de167525a99709c1/website/archive.key",
+      "key_history_commit_signature": "UNSIGNED",
+      "package_byte_verification": "PASS",
+      "metadata_valid_until": null,
+      "actual_package_sha256": "24e9740411c15f229151155e9b890388a18cfb4c9fce5c8d7ea6ed9f926e7a52",
+      "github_package_attestation_query": "HTTP_404_NO_EVIDENCE"
+    },
+    "dependencies": [
+      "Linux 5.6+ upstream minimum; supported patched kernel still pending",
+      "complete same-version sidecars",
+      "deployment-controlled OCI rootfs and cgroup v2 supervisor"
+    ],
+    "pending": [
+      "independent signing-key provenance",
+      "deployment/rootfs/kernel closure",
+      "anti-replay and revocation policy"
+    ],
+    "layout_verification": "PASS_BYTES_ONLY_NOT_PRODUCER_AUTHENTICATION",
+    "maintainer_scripts_review": "postinst may configure/reload Docker; NOT_EXECUTED"
+  },
+  "kernel_packages": null,
+  "systemd_packages": null,
+  "dependency_closure": null,
+  "rootfs_inventory": null,
+  "revocation_snapshot": null,
+  "security_gates": "all-18-unverified"
+}
