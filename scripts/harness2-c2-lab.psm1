@@ -26,6 +26,14 @@ function Assert-C2NoLinks([string]$Path) {
     }
 }
 
+function ConvertTo-C2ResourceId($Value) {
+    $id = [guid]::Empty
+    if (-not [guid]::TryParse([string]$Value, [ref]$id) -or $id -eq [guid]::Empty) {
+        throw 'Missing or invalid nonzero resource GUID.'
+    }
+    $id.ToString('D')
+}
+
 function Get-C2Contract([string]$Root, [string]$IsoPath, [guid]$OperationId) {
     $r = Get-C2Path $Root
     $iso = Get-C2Path $IsoPath
@@ -243,7 +251,7 @@ function Get-C2VM($j, [switch]$AllowAbsent) {
 function Assert-C2Disk($j) {
     Assert-C2NoLinks $j.disk
     $disk = Get-VHD -Path $j.disk -ErrorAction Stop
-    if ($disk.DiskIdentifier.ToString() -ne $j.disk_id -or $disk.VhdType -ne 'Dynamic' -or
+    if ((ConvertTo-C2ResourceId $disk.DiskIdentifier) -cne $j.disk_id -or $disk.VhdType -ne 'Dynamic' -or
         $disk.VhdFormat -ne 'VHDX' -or $disk.Size -ne 48GB -or $disk.ParentPath) { throw 'Disk identity/layout mismatch.' }
     $disk
 }
@@ -354,14 +362,14 @@ function New-C2Backend {
             Assert-C2NoLinks $j.disk
             if (Test-Path -LiteralPath $j.disk) { throw 'Disk path already exists.' }
             $vhd = New-VHD -Path $j.disk -Dynamic -SizeBytes 48GB -ErrorAction Stop
-            $vhd.DiskIdentifier.ToString()
+            ConvertTo-C2ResourceId $vhd.DiskIdentifier
         }
         VM = { param($j)
             if (@(Get-VM -ErrorAction Stop | Where-Object Name -eq $j.vm_name).Count) { throw 'VM name conflict; no adoption.' }
             Assert-C2NoLinks $j.config
             if (Test-Path -LiteralPath $j.config) { throw 'New configuration directory required; no adoption.' }
             $vm = New-VM -Name $j.vm_name -Generation 2 -MemoryStartupBytes 3GB -NoVHD -Path $j.config -ErrorAction Stop
-            $vm.Id.ToString()
+            ConvertTo-C2ResourceId $vm.Id
         }
         Configure = { param($j)
             $vm = Assert-C2VM $j

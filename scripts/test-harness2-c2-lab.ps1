@@ -243,6 +243,22 @@ Test 'real parser accepts exact bounded contract' {
 Test 'real validator accepts complete offline configuration' {
     & $module { $j = Reset-ValidationFixture; $null = Assert-C2VM $j -Complete }
 }
+Test 'real adapter normalizes braced upper-case VHD GUID before recording' {
+    & $module {
+        $j = Reset-ValidationFixture
+        $script:Fixture.disk.DiskIdentifier = '{6ABC46DF-80CE-46AE-8AA5-BB536B3C3505}'
+        function script:New-VHD { param($Path,[switch]$Dynamic,$SizeBytes,$ErrorAction) $script:Fixture.disk }
+        $backend = New-C2Backend
+        $captured = & $backend.Disk $j
+        if ($captured -cne $j.disk_id) { throw 'Noncanonical ID returned from real adapter.' }
+        $null = Assert-C2Disk $j
+    }
+}
+Test 'resource normalization still rejects empty and malformed identities' {
+    foreach ($value in '', 'not-a-guid', '00000000-0000-0000-0000-000000000000') {
+        Reject { & $module { param($v) ConvertTo-C2ResourceId $v } $value } 'invalid nonzero'
+    }
+}
 foreach ($change in 'nic','integration','memory','cpu','secureboot','bootorder','notes','checkpoint','foreigndisk','externalpaging') {
     Test "real validator rejects $change drift" {
         Reject { & $module { param($change)

@@ -105,7 +105,7 @@ não existem neste executor.
 
 ## Revisão e evidências deste marco
 
-- PASS: 44 testes offline, incluindo escrita perdida antes/depois de efeitos,
+- PASS: 46 testes offline, incluindo escrita perdida antes/depois de efeitos,
   Start com resposta perdida, idempotência, cleanup interrompido, estado Running,
   IDs divergentes, journal adulterado/duplicado/excessivo, VM/path/VHD trocados,
   refs estrangeiras e drift de rede, integração, boot, memória e firmware.
@@ -125,6 +125,11 @@ não existem neste executor.
   atualização do journal por esse erro, antes da cópia ISO/VHDX/VM. Retomada da
   operação original depende da validação do journal protegido; não apagar a raiz
   nem criar uma segunda operação para contornar o estado existente.
+- Retomada com null corrigido: execução chegou à criação do VHDX, mas recusou
+  registro de resource ID antes de New-VM. Adaptador passou a normalizar GUID
+  string com chaves/maiúsculas, sem alterar o VHDX. O formato real neste host
+  aguarda consulta elevada: UAC da inspeção foi cancelado. Estado pendente não
+  autoriza reutilizar/apagar o arquivo; requer reconciliação explícita.
 - NOT RUN: VM, boot, instalação, calibração e descarte real. Testes simulados
   não substituem o ensaio administrativo. Os 18 gates continuam unverified.
 

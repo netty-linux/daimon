@@ -1,5 +1,36 @@
 # C2 — aquisição executada e preparação operacional
 
+## Execução autorizada retomada — 2026-10-24, VHDX pendente
+
+O proprietário confirmou reapresentar UAC e continuar somente a criação Off.
+Código `a5bb6f5` reconferido por SHA256, checkout limpo e seis checks SUCCESS antes
+do lançamento. A elevação iniciou a mesma operação, sem uma segunda raiz/VM.
+
+Resultado externo do executor: REFUSED_OR_UNRESOLVED, `Invalid resource ID.`
+em 2026-10-24T10:12:20Z. Pela ordem de chamadas, a cópia privada da ISO e suas
+verificações chegaram ao ponto de criação do VHDX; o registro do identificador
+falhou antes de iniciar New-VM. Não houve boot ou instalação. Estado durável
+esperado: disk-pending, ainda a confirmar pela leitura elevada; não tratar esta
+inferência ou o recibo do operador como autoridade de ownership.
+
+Foi preparada consulta elevada somente leitura ao journal e ao VHDX exatos,
+incluindo formato bruto do ID, tipo/tamanho/parent/Attached, owner e referências
+em VMs/checkpoints. O Windows reportou cancelamento do UAC dessa consulta; ela
+não executou. Proprietário deve confirmar disponibilidade/intenção antes de
+reapresentar esse diálogo. Não tentar novo Create nem descartar o disco pendente.
+
+O adaptador agora normaliza GUIDs retornados como strings com chaves/maiúsculas
+para a representação canônica do journal, tanto na captura quanto na comparação.
+Isso não altera bytes/ID do VHDX nem aceita GUID vazio/malformado. **46 testes
+offline PASS**. O formato efetivo do ID deste host ainda não foi observado;
+esta correção de representação não resolve automaticamente a identidade perdida.
+
+Próxima ação concreta: consulta elevada restrita, reconciliação explícita do ID
+com evidências de ownership e só então retomada da mesma criação Off, dentro da
+autorização já recebida. Nenhuma adoção por nome/prefixo ou reset do identificador.
+ISO/VHDX pendentes preservados; VM não chegou à chamada de criação. Gates e C3
+inalterados. Metadados/recibos privados ficam fora do Git.
+
 ## Marco atual — executor do laboratório limpo, 2026-10-24
 
 Base esperada `e0c12d6c178fc1ff736803e12ea30f496a44478b` confirmada, checkout
