@@ -22,7 +22,7 @@ $base=Import-Module (Join-Path $PSScriptRoot 'harness2-c2-lab.psm1') -Force -Pas
 $policy=Get-C2BootBudget $MaximumGiB
 $parameters=@{Root=$Root;IsoPath=$IsoPath;OperationId=$OperationId}
 $script:ref=$null;$script:attempt=$null;$script:transitionPath=$null;$script:stopPath=$null
-$script:deadline=$null;$script:timing=@{};$script:stopJob=$null;$script:timingPath=$null
+$script:deadline=$null;$script:timing=@{};$script:stopJob=$null;$script:timingPath=$null;$script:stopVm=$null
 function Save-Timing {
     if($script:timingPath){Write-Private $script:timingPath @{actor=$Mode;timing=$script:timing;deadline=$script:deadline;utc=[datetime]::UtcNow.ToString('o')}}
 }
@@ -54,8 +54,11 @@ function Get-OwnedVM {
 }
 function Stop-OwnedVMCore {
     $adapter=@{Frequency=[Diagnostics.Stopwatch]::Frequency;Now={[Diagnostics.Stopwatch]::GetTimestamp()}
-      State={(Get-OwnedVM).State.ToString()};Send={
-        if(-not $script:stopJob){$script:stopJob=Stop-VM -VM (Get-OwnedVM) -TurnOff -Force -AsJob -Confirm:$false -ErrorAction Stop}
+      State={$script:stopVm=Get-OwnedVM;$script:stopVm.State.ToString()};Send={
+        # State has just authenticated this exact object. No extra provider query between the dispatch stamp and command.
+        $script:timing.stop_job_reused=[bool]$script:stopJob
+        if(-not $script:stopJob){$script:stopJob=Stop-VM -VM $script:stopVm -TurnOff -Force -AsJob -Confirm:$false -ErrorAction Stop}
+        $script:timing.stop_job_id=[string]$script:stopJob.InstanceId
         $script:stopJob
       };CommandState={param($job) $job.State.ToString()};Sleep={param($ms) Start-Sleep -Milliseconds $ms}}
     try{$null=Invoke-C2TimedStop $script:timing $adapter 15}finally{Save-Timing}

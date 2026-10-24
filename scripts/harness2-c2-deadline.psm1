@@ -50,14 +50,15 @@ function Invoke-C2TimedStop([hashtable]$Timing,[hashtable]$Adapter,[double]$Time
         if(-not $Timing.ContainsKey('off_observed_ticks')){$Timing.off_observed_ticks=$now}
         $Timing.confirmed_off=$true;return $Timing
     }
-    $Timing.stop_command_invoked_ticks=[long](& $Adapter.Now)
-    if($Timing.stop_command_invoked_ticks -lt $last){$Timing.clock_invalid=$true;throw 'Stop clock reversed.'}
-    $sent=$Timing.stop_command_invoked_ticks
+    $sent=[long](& $Adapter.Now)
+    if($sent -lt $last){$Timing.clock_invalid=$true;throw 'Stop clock reversed.'}
+    if(-not $Timing.ContainsKey('stop_command_invoked_ticks')){$Timing.stop_command_invoked_ticks=$sent}
     $Timing.last_non_off_ticks=$Timing.state_before_stop_ticks
     try{$ticket=& $Adapter.Send}catch{$Timing.command_error=$_.Exception.Message;$ticket=$null}
-    $Timing.stop_command_returned_ticks=[long](& $Adapter.Now)
-    if($Timing.stop_command_returned_ticks -lt $sent){$Timing.clock_invalid=$true;throw 'Stop clock reversed.'}
-    $last=$Timing.stop_command_returned_ticks
+    $returned=[long](& $Adapter.Now)
+    if($returned -lt $sent){$Timing.clock_invalid=$true;throw 'Stop clock reversed.'}
+    if(-not $Timing.ContainsKey('stop_command_returned_ticks')){$Timing.stop_command_returned_ticks=$returned}
+    $last=$returned
     do {
         $state=[string](& $Adapter.State);$now=[long](& $Adapter.Now)
         if($now -lt $last){$Timing.clock_invalid=$true;throw 'Stop clock reversed.'};$last=$now

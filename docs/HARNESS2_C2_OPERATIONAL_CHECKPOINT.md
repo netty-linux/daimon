@@ -24,7 +24,7 @@ inválido ou timeout anterior não viram PASS após recuperação. Heartbeat usa
 monotônicos e `done` exige leitura real de Off. Restauração serializada; journal
 continua com escritor único; watchdog não reconcilia journal do controlador morto.
 
-**Validação local: 66 lifecycle + 33 política + 24 deadline determinísticos e
+**Validação local: 66 lifecycle + 33 política + 25 deadline determinísticos e
 12 testes de processos reais passaram.** Rotas incluem perda de produtor real de
 heartbeat, deadline apesar de lease fresco, falso `done`, ticks futuros, timeout
 e veto concorrente. Isso não prova o novo `Stop-VM -AsJob`, a margem temporal ou

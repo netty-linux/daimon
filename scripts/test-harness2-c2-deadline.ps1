@@ -66,6 +66,12 @@ Test 'timeout stops observation and leaves Off unconfirmed'{
     $f=FakeAdapter 30000;$t=@{};$null=Invoke-C2TimedStop $t $f.adapter 15
     Check ($t.confirmation_timeout -and -not $t.confirmed_off -and $f.model.sleep_count -eq 150) 'unbounded or false Off'
 }
+Test 'a recovery observation cannot replace original dispatch timestamps or erase timeout'{
+    $f=FakeAdapter 30000;$t=@{};$null=Invoke-C2TimedStop $t $f.adapter 15
+    $f.model.off_at=$f.model.now+500;$null=Invoke-C2TimedStop $t $f.adapter 15
+    Check ($t.confirmed_off -and $t.stop_requested_ticks -eq 71000 -and $t.stop_command_invoked_ticks -eq 71000 -and $t.stop_command_returned_ticks -eq 71000) 'recovery overwrote dispatch'
+    Check ((Get-C2TemporalVerdict (Contract) $t) -eq 'STOP_CONFIRMATION_TIMEOUT') 'recovery erased failure'
+}
 Test 'dispatch failure plus completed status cannot prove shutdown'{
     $f=FakeAdapter 0 -SendFailure;$t=@{};$null=Invoke-C2TimedStop $t $f.adapter 1
     Check ($t.command_error -and -not $t.confirmed_off) 'dispatch failure passed'
