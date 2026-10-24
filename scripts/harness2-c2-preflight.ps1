@@ -27,6 +27,21 @@ while ($ancestor) {
 }
 $os = Get-CimInstance Win32_OperatingSystem
 $machine = Get-CimInstance Win32_ComputerSystem
+$build = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+# These observations never establish consumer enrollment or authorize servicing.
+# Select only counts/status; do not emit license IDs, partial keys or accounts.
+$esuEntries = $null
+$esuLicensed = $null
+$esuQuery = 'UNAVAILABLE'
+try {
+    $esu = @(Get-CimInstance SoftwareLicensingProduct -Filter "Name LIKE '%ESU%'" -OperationTimeoutSec 15 -ErrorAction Stop)
+    $esuEntries = $esu.Count
+    $esuLicensed = @($esu | Where-Object LicenseStatus -eq 1).Count
+    $esuQuery = 'OBSERVED_NOT_ENROLLMENT_PROOF'
+} catch { $blocked.Add('esu-license-query-unavailable') }
+$cbsReboot = Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending'
+$updateReboot = Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired'
+if ($cbsReboot -or $updateReboot) { $blocked.Add('servicing-reboot-indicator-present') }
 $freeGiB = [math]::Round(([double]$os.FreePhysicalMemory * 1KB / 1GB), 2)
 $volume = Get-Volume -DriveLetter $target.Substring(0,1)
 $diskGiB = [math]::Round(($volume.SizeRemaining / 1GB), 2)
@@ -37,11 +52,13 @@ $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 if (-not $admin) { $blocked.Add('administrative-session-unavailable') }
 $vmCount = $null
 $switchCount = $null
+$inventoryStatus = 'UNAVAILABLE'
 try {
     $vms = @(Get-VM -ErrorAction Stop)
     $vmCount = $vms.Count
     if (@($vms | Where-Object Name -eq $VMName).Count) { $blocked.Add('vm-name-conflict') }
     $switchCount = @(Get-VMSwitch -ErrorAction Stop).Count
+    $inventoryStatus = 'OBSERVED_NOT_CREATION_AUTHORITY'
 } catch { $blocked.Add('hyper-v-inventory-unavailable') }
 $isoPresent = Test-Path -LiteralPath $IsoPath -PathType Leaf
 if (-not $isoPresent) { $blocked.Add('iso-not-found-at-explicit-path') }
@@ -53,6 +70,15 @@ $blocked.Add('deployment-package-closure-incomplete')
     schema_version = 1; status = 'BLOCKED'; administrative_changes = 0
     available_memory_gib = $freeGiB; available_disk_gib = $diskGiB
     logical_cpus = $machine.NumberOfLogicalProcessors; administrator = $admin
+    observed_at_utc = [DateTime]::UtcNow.ToString('o')
+    windows = [ordered]@{
+        caption = $os.Caption; build = ('{0}.{1}' -f $build.CurrentBuild, $build.UBR)
+        esu_query = $esuQuery; esu_entry_count = $esuEntries
+        esu_licensed_count = $esuLicensed; coverage = 'UNVERIFIED'
+        cbs_reboot_indicator = $cbsReboot; update_reboot_indicator = $updateReboot
+        online_update_search = 'NOT_RUN'
+    }
+    hyper_v_inventory = $inventoryStatus
     vm_count = $vmCount; switch_count = $switchCount; iso_present = $isoPresent
     blockers = @($blocked); security_gates = 'unverified'; enforcement = 'NOT_RUN'
 } | ConvertTo-Json -Depth 4

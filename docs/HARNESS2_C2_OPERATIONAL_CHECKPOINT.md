@@ -1,5 +1,84 @@
 # C2 — aquisição executada e preparação operacional
 
+## Retomada operacional — 2026-10-24
+
+Base local `2d8d7d7`, branch esperada e checkout inicialmente limpo. PR #28
+reconfirmado OPEN/DRAFT; quatro checks SUCCESS nesse HEAD. Windows 10 Pro
+preservado. Nenhuma instalação, ativação, reboot, VM, mudança de switch ou merge.
+
+### Diagnóstico executado, somente leitura
+
+- Windows permanece `19045.6466`. Consulta local de licenciamento retornou 24
+  entradas ESU e zero Licensed; isso não exclui modalidades consumer e não
+  comprova cobertura. ESU permanece **UNVERIFIED**.
+- Busca online deliberada por `Microsoft.Update.Session`, critério
+  `IsInstalled=0 and IsHidden=0 and Type='Software'`, retornou ResultCode=2
+  (sucesso), uma oferta e somente KB2267602. Não foram chamados downloader ou
+  installer. Isso supera a ausência anterior de scan e não reproduz as falhas
+  históricas de transporte nessa tentativa; não prova elegibilidade ESU nem
+  explica a ausência de oferta cumulativa do OS. Não há fundamento novo para
+  reset de Windows Update, DNS/proxy ou reparo administrativo.
+- RAM disponível: 6,89 GiB na primeira amostra e 7,09 GiB no preflight; ambas
+  abaixo dos 8 GiB exigidos. Disco de trabalho: 171,04 GiB livres. Nenhum app
+  encerrado e nenhum limite reduzido para obter admissão.
+- Sessão não elevada; Get-VM/Get-VMSwitch indisponíveis. Serviços vmms,
+  vmcompute, hns, wuauserv, UsoSvc e BITS Running na amostra. Inventário elevado
+  previamente informado pelo proprietário é histórico, não autoridade desta
+  sessão. Indicadores CBS/WindowsUpdate de reboot: false.
+- Computer Use tentou abrir Configurações; erro `launched app did not expose a
+  targetable window`. Nova listagem não encontrou janela de Configurações.
+  Proprietário respondeu nesta retomada: **ainda não verificou** ESU manualmente.
+  Status/validade permanecem pendentes; nenhuma conta, chave ou ID solicitado.
+  Não houve automação de autenticação nem contorno de UAC.
+
+### Preparação verificável
+
+O preflight agora emite timestamp UTC, build, contagens ESU quando disponíveis,
+indicadores de reboot e estado explícito do inventário Hyper-V, sem identificadores
+de licença. Consulta ESU tem timeout operacional de 15 segundos: no ensaio final
+ficou UNAVAILABLE/null, preservando bloqueio e sem reaproveitar silenciosamente
+os números da consulta anterior. Saída real: BLOCKED, zero mudanças
+administrativas, ISO presente, enforcement NOT_RUN. O próprio preflight não
+executa scan online; a busca acima foi uma operação separada.
+
+A descrição do entry point reservado foi alinhada ao plano dinâmico 3/3/4 GiB.
+Validação sintática PowerShell PASS; chamada explícita com `-Apply` recusada
+antes de qualquer efeito. O executor continua **não implementado**, conforme
+a trava de closure/autenticação/revisão; não há provisionador real homologado.
+
+Releitura da [instalação oficial gVisor](https://gvisor.dev/docs/user_guide/install/)
+confirma chave distribuída pelo site, rotação documentada em 2021-07-13 e necessidade
+do conjunto de sidecars. Não fornece nova âncora independente de confiança para
+o fingerprint já observado. Nenhum artefato adquirido foi executado.
+O serviço treg retornou HTTP 401/invalid token; fontes oficiais foram consultadas
+pela ferramenta web disponível, sem serviço pago nem tentativa de login.
+
+[Microsoft consumer ESU](https://www.microsoft.com/en-us/windows/extended-security-updates)
+e [orientação comercial](https://learn.microsoft.com/windows/whats-new/enable-extended-security-updates)
+foram consultadas separadamente; não presumir modalidade pela edição Pro nem
+confundir pacote preparatório com inscrição. Referência cumulativa
+[KB5126657 / 19045.7807](https://support.microsoft.com/en-gb/servicing/os/windows-10/2026/10/kb5126657-windows-10-21h2-22h2-security-update)
+reconfirmada; aplicabilidade/oferta neste host não comprovada. Nenhuma recomendação
+de migração/reinstalação: preservar Windows 10 Pro é restrição permanente.
+
+### Checklist persistente
+
+- [x] Retomar checkout/PR e substituir hipótese de falha atual de transporte por scan real.
+- [x] Medir RAM/disco/acesso atual sem alterar o host.
+- [x] Tornar diagnóstico do preflight reproduzível e alinhar descrição de recursos.
+- [ ] Proprietário informa status/validade ESU; UI inacessível pela ferramenta.
+- [ ] Revisar oferta/atualização do Windows 10 após comprovar ESU; instalação,
+  ativação, backup e reboot dependem de autorizações específicas aplicáveis.
+- [ ] Obter pelo menos 8 GiB disponíveis sem encerrar apps sem autorização.
+- [ ] Completar confiança independente gVisor e closure kernel/systemd/rootfs.
+- [ ] Implementar/revisar executor e recuperação por ownership após pré-requisitos;
+  obter autorização específica de recursos antes de criar qualquer VM.
+- [ ] Laboratório, smoke tests inertes e provas externas: **NOT RUN**.
+
+Os 18 gates continuam **unverified**, execução de candidatos desabilitada e C3
+fora do escopo. Mudança de scripts somente diagnóstica/textual; nenhuma alteração
+de runtime Go/Python/UI que justifique repetir suas suítes completas neste marco.
+
 ## Continuação independente da pendência ESU
 
 O proprietário confirmou que ainda não verificou manualmente ESU; manter

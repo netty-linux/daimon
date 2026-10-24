@@ -5,8 +5,9 @@ Os registros anteriores de ISO não baixada são históricos. Integridade ISO ag
 comprovada; gVisor ainda sem confiança independente completa, Windows/ESU e RAM pendentes.
 
 Plano operacional atualizado: [remediação Windows, aquisição e autorizações](HARNESS2_C2_REMEDIATION.md).
-Estado BLOCKED preservado; ISO exige aprovação específica de download, chave
-gVisor apenas corroborada em canais oficiais, ESU/patches ainda não comprovados.
+Estado BLOCKED preservado; ISO já adquirida/verificada, chave gVisor apenas
+corroborada em canais oficiais, ESU/patches ainda não comprovados. Seções datadas
+abaixo são históricas; a retomada de 2026-10-24 está no checkpoint prioritário.
 
 ## Windows e supply chain — verificação de 2026-10-23
 

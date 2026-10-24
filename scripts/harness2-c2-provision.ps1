@@ -3,7 +3,7 @@
 [CmdletBinding()]
 param([switch]$Apply, [switch]$Discard)
 $ErrorActionPreference = 'Stop'
-Write-Output 'PROPOSED ONLY: one Generation-2 VM; 2 vCPU; 4 GiB static RAM; 48 GiB maximum VHDX.'
+Write-Output 'PROPOSED ONLY: one Generation-2 VM; 2 vCPU; dynamic RAM 3/3/4 GiB (minimum/startup/maximum); 48 GiB maximum VHDX.'
 Write-Output 'Private new directory; initially no NIC; no existing switch modified; no automatic start.'
 Write-Output 'No resources created or deleted. No artifact installation is authorized by this script.'
 if ($Apply -or $Discard) {
