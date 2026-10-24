@@ -1,6 +1,31 @@
 # C2 — aquisição executada e preparação operacional
 
-## Entrada externa offline revisada — aguardando execução manual única
+## Cleanup offline corrigido — prova externa corrigida ainda BLOCKED
+
+O ensaio externo anterior completou os dois cenários operacionais, mas terminou
+**FAIL** na limpeza do segundo cenário. Esse FAIL permanece. O erro veio da
+consulta creator/entry/case em `Bound-Process`, após o sucesso operacional; o
+relatório não registrou o campo divergente nem o estado naquele instante. Não há
+prova retrospectiva de reutilização de PID ou de qual metadado faltou. O cleanup
+não distinguia uma instância encerrada de uma que exigia metadados vivos.
+
+A correção retém handles das quatro instâncias validadas antes da injeção,
+distingue encerramento comprovado, processo próprio vivo, divergência e estado
+indeterminado; revalida antes de encerrar somente a instância própria. Não mata
+por PID, não ignora exceções e exige cleanup completo antes de marcar cada caso
+PASS. [Auditoria e limites](HARNESS2_C2_CLEANUP_IDENTITY.md).
+
+**213 verificações locais passaram**, incluindo 27 de cleanup com fixtures reais
+próprias. Uma tentativa corrigida da suíte independente foi bloqueada antes de
+criar helpers: Work fornece Job e console compartilhado. Não foi repetida. Os dois
+cenários corrigidos aguardam execução externa única no lançador da pasta local
+`outputs/C2-cleanup-corrigido`, sem UAC/bypass. Relatórios antigos preservados.
+**Não solicitar ensaio emergencial real antes de PASS global novo.**
+
+VM não acessada, watchdog temporal de produção inalterado, Windows/aplicativos,
+PR draft e 18 gates `unverified` preservados. FAIL 91,1312018 s permanente.
+
+## Histórico: entrada externa offline revisada
 
 Auditoria do artefato anterior removeu sua elevação `RunAs` e a dependência de
 pastas Admin/SYSTEM na suíte offline. Nova entrada única por duplo clique:

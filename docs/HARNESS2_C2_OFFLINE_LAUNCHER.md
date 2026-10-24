@@ -1,5 +1,12 @@
 # One local offline entry — no elevation
 
+Cleanup correction: see [identity audit](HARNESS2_C2_CLEANUP_IDENTITY.md). The first
+external result remains FAIL despite both operational scenarios succeeding.
+Corrected cases must now prove cleanup for all four retained, pre-registered
+original instances before any PASS. The new external attempt uses a fresh sibling
+output directory, preserving the old report/lock; never remove the old marker or
+reinterpret old operational messages as global PASS.
+
 The previous generated `C2-run-offline-helper-test-outside-Work.ps1` requested
 `RunAs` and depended indirectly on administrator-only evidence directories.
 That artifact is retired. Its replacement is the single double-click entry

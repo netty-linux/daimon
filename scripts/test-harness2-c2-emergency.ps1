@@ -7,6 +7,7 @@ $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'harness2-c2-helper.psm1')
 Import-Module (Join-Path $PSScriptRoot 'harness2-c2-boot.psm1')
 Import-Module (Join-Path $PSScriptRoot 'harness2-c2-deadline.psm1')
+Import-Module (Join-Path $PSScriptRoot 'harness2-c2-test-cleanup.psm1')
 function Write-Data($path,$data){$tmp=$path+'.'+[guid]::NewGuid().ToString('N')+'.tmp';$data|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $tmp;[IO.File]::Move($tmp,$path,$true)}
 function Read-Data($path){Get-Content -LiteralPath $path -Raw|ConvertFrom-Json -AsHashtable}
 function Wait-File($path,[double]$seconds=15){$c=[Diagnostics.Stopwatch]::StartNew();while(-not (Test-Path -LiteralPath $path)){if($c.Elapsed.TotalSeconds -gt $seconds){throw ('Missing test evidence: '+[IO.Path]::GetFileName($path))};Start-Sleep -Milliseconds 50}}
@@ -21,7 +22,7 @@ function New-TestDirectory([string]$path){
 }
 $exe=(Get-Process -Id $PID).Path
 function Spawn($role,$dir){Start-Process -FilePath $exe -ArgumentList @('-NoProfile','-NonInteractive','-File',('"'+$PSCommandPath+'"'),'-Mode',$role,'-CaseDirectory',('"'+$dir+'"')) -WindowStyle Hidden -PassThru -RedirectStandardError (Join-Path $dir ($role+'.stderr.txt')) -RedirectStandardOutput (Join-Path $dir ($role+'.stdout.txt'))}
-function Identity($p){@{pid=$p.Id;started_utc=$p.StartTime.ToUniversalTime().ToString('o');path=$exe;creator_pid=$PID;directory=$CaseDirectory;entry=$PSCommandPath}}
+function Identity($p,$role,$dir){@{pid=$p.Id;started_utc=$p.StartTime.ToUniversalTime().ToString('o');path=$exe;creator_pid=$PID;directory=$dir;entry=$PSCommandPath;role=$role}}
 function Bound-Process($i){
     $p=Get-Process -Id $i.pid -ErrorAction Stop
     if($i.path -ine $exe -or $i.entry -ine $PSCommandPath -or $p.StartTime.ToUniversalTime().Ticks -ne ([datetime]$i.started_utc).ToUniversalTime().Ticks -or $p.Path -ine $exe){throw 'Own test PID/start/path binding failed.'}
@@ -35,6 +36,8 @@ if($Mode -eq 'Controller'){
     $b=Read-Data (Join-Path $CaseDirectory 'binding.json')
     Write-Data (Join-Path $CaseDirectory 'heartbeat.json') @{phase='arming';monotonic_ticks=[Diagnostics.Stopwatch]::GetTimestamp()}
     Wait-File (Join-Path $CaseDirectory 'watch-ready.json')
+    # The root must hold verified handles before either helper is allowed to exit.
+    Wait-File (Join-Path $CaseDirectory 'cleanup-handles-ready.json')
     $ready=Read-Data (Join-Path $CaseDirectory 'watch-ready.json')
     if(-not $ready.verified){throw 'Test watchdog not isolated.'}
     $stamp=Get-C2MonotonicStamp
@@ -78,12 +81,12 @@ if($Mode -eq 'Supervisor'){
     $isolation=Assert-C2DedicatedHelper $PSCommandPath
     $config=Read-Data (Join-Path $CaseDirectory 'config.json')
     $payload=Spawn 'Payload' $CaseDirectory
-    $binding=@{operation_id=[guid]::NewGuid().ToString();origin_ticks=[Diagnostics.Stopwatch]::GetTimestamp();payload=Identity $payload;scenario=$config.scenario;supervisor=$isolation}
+    $binding=@{operation_id=[guid]::NewGuid().ToString();origin_ticks=[Diagnostics.Stopwatch]::GetTimestamp();payload=Identity $payload 'Payload' $CaseDirectory;scenario=$config.scenario;supervisor=$isolation}
     Write-Data (Join-Path $CaseDirectory 'binding.json') $binding
     $controller=Spawn 'Controller' $CaseDirectory
     Wait-File (Join-Path $CaseDirectory 'heartbeat.json')
     $watcher=Spawn 'Watcher' $CaseDirectory
-    Write-Data (Join-Path $CaseDirectory 'children.json') @{payload=Identity $payload;controller=Identity $controller;watcher=Identity $watcher}
+    Write-Data (Join-Path $CaseDirectory 'children.json') @{payload=Identity $payload 'Payload' $CaseDirectory;controller=Identity $controller 'Controller' $CaseDirectory;watcher=Identity $watcher 'Watcher' $CaseDirectory}
     Wait-File (Join-Path $CaseDirectory 'fault-active.json')
     if($config.scenario -eq 'supervisor-exit'){
         Write-Data (Join-Path $CaseDirectory 'supervisor-exit.json') @{pid=$PID;isolation=$isolation;utc=[datetime]::UtcNow.ToString('o')}
@@ -110,10 +113,17 @@ try{
         foreach($scenario in 'stall','supervisor-exit'){
             $dir=Join-Path $root $scenario;New-TestDirectory $dir
             Write-Data (Join-Path $dir 'config.json') @{scenario=$scenario}
-            $supervisor=$null
+            $supervisor=$null;$registrations=@{};$caseResult=$null
             try{
                 $supervisor=Spawn 'Supervisor' $dir
+                $registrations.supervisor=Register-C2OwnProcess (Identity $supervisor 'Supervisor' $dir) $PSCommandPath $dir $exe $PID 'Supervisor'
                 Wait-File (Join-Path $dir 'children.json')
+                $manifest=Read-Data (Join-Path $dir 'children.json')
+                foreach($role in 'payload','controller','watcher'){
+                    $expectedRole=@{payload='Payload';controller='Controller';watcher='Watcher'}[$role]
+                    $registrations[$role]=Register-C2OwnProcess $manifest[$role] $PSCommandPath $dir $exe $supervisor.Id $expectedRole
+                }
+                Write-Data (Join-Path $dir 'cleanup-handles-ready.json') @{verified=$true;count=$registrations.Count}
                 if(-not $supervisor.WaitForExit(45000)){throw 'Own supervisor timeout.'}
                 if($supervisor.ExitCode -ne 0){throw 'Own supervisor failed; inspect private stderr.'}
                 Wait-File (Join-Path $dir 'watch-result.json') 35
@@ -128,17 +138,27 @@ try{
                     if(-not (Test-Path -LiteralPath (Join-Path $dir 'supervisor-exit.json'))){throw 'Supervisor exit missing.'}
                     if($watch.reason -ne 'controller-heartbeat-lost' -or -not $watch.timing.confirmed_off -or $watch.timing.state_before_stop -ne 'Running' -or -not $watch.isolation.verified -or -not $watch.poweroff_command_issued){throw 'Independent process stop unproved.'}
                     $children=Read-Data (Join-Path $dir 'children.json')
-                    if(Get-Process -Id $children.controller.pid -ErrorAction SilentlyContinue){throw 'Controller did not exit.'}
+                    if(-not $registrations.controller.process.HasExited){throw 'Original controller did not exit.'}
                     $verdict='WATCHDOG_SURVIVED_OWN_CONTROLLER_AND_SUPERVISOR_EXIT'
                 }
-                $report.tests+=@{name=$scenario;passed=$true;verdict=$verdict;scope='OWN_PROCESS_NOT_VM';fault=$fault;watchdog=$watch;supervisor=$b.supervisor;deadline=$d}
-                "PASS real independent process scenario $scenario"
+                $caseResult=@{name=$scenario;passed=$false;verdict=$verdict;scope='OWN_PROCESS_NOT_VM';fault=$fault;watchdog=$watch;supervisor=$b.supervisor;deadline=$d;cleanup=@()}
+                $report.tests+=$caseResult
             }finally{
-                # Cleanup only processes created in the private, exact PID/start/path manifest.
-                $children=Join-Path $dir 'children.json'
-                if(Test-Path -LiteralPath $children){foreach($i in (Read-Data $children).Values){$p=Get-Process -Id $i.pid -ErrorAction SilentlyContinue;if($p){$p=Bound-Process $i;$p.Kill();$null=$p.WaitForExit(5000)}}}
-                if($supervisor){$supervisor.Refresh();if(-not $supervisor.HasExited){$supervisor.Kill();$null=$supervisor.WaitForExit(5000)};$supervisor.Dispose()}
+                $cleanup=@();$unsafe=$false
+                foreach($role in $registrations.Keys){
+                    $r=$registrations[$role]
+                    try {$e=Invoke-C2OwnProcessCleanup $r;$cleanup+=$e;if($e.status -notin 'EXITED_PROVEN','STOPPED_OWN_PROVEN','ALREADY_CLEAN'){$unsafe=$true}}
+                    catch {$unsafe=$true;$cleanup+=@{status='INDETERMINATE';identity=$r.identity;error=$_.Exception.Message;kill_issued=$false}}
+                    finally {$r.process.Dispose()}
+                }
+                if($supervisor){$supervisor.Dispose()}
+                Write-Data (Join-Path $dir 'cleanup-result.json') @{entries=$cleanup;complete=($registrations.Count -eq 4 -and -not $unsafe);external_processes_terminated=$false}
+                if($caseResult){$caseResult.cleanup=$cleanup;$caseResult.cleanup_complete=($registrations.Count -eq 4 -and -not $unsafe);$caseResult.external_processes_terminated=$false}
+                if($unsafe){throw 'Own helper cleanup identity divergent or indeterminate; no unverified process terminated. Inspect cleanup-result.json.'}
             }
+            if(-not $caseResult.cleanup_complete){throw 'Own helper cleanup incomplete.'}
+            $caseResult.passed=$true
+            "PASS real independent process scenario $scenario including verified cleanup"
         }
         $report.status='PASS';$report.independence='PROVEN_FOR_OWN_OS_PROCESSES_NO_SHARED_JOB_OR_CONSOLE';'PASS 2 detached real-process emergency scenarios; VM NOT ACCESSED.'
     }

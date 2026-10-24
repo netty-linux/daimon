@@ -15,6 +15,13 @@ function Get-C2OfflineResult($Suite,[int]$ExitCode) {
     foreach($name in 'stall','supervisor-exit'){
         $case=@($Suite.tests|Where-Object {$_.name -ceq $name})
         if($case.Count -ne 1 -or -not $case[0].passed -or $case[0].scope -ne 'OWN_PROCESS_NOT_VM' -or -not $case[0].supervisor.verified){return @{status='FAIL';reason='MISSING_POSITIVE_SCENARIO';correction='Require exactly one verified positive result for each scenario.'}}
+        $c=$case[0]
+        if(-not $c.Contains('cleanup_complete') -or -not $c.cleanup_complete -or -not $c.Contains('external_processes_terminated') -or $c.external_processes_terminated -ne $false -or -not $c.Contains('cleanup') -or $c.cleanup.Count -ne 4){return @{status='FAIL';reason='CLEANUP_NOT_PROVEN';correction='Require complete verified cleanup for all four original own-process instances.'}}
+        foreach($role in 'Payload','Controller','Watcher','Supervisor'){
+            $entry=@($c.cleanup|Where-Object {$_.identity.role -ceq $role})
+            if($entry.Count -ne 1 -or $entry[0].status -notin 'EXITED_PROVEN','STOPPED_OWN_PROVEN','ALREADY_CLEAN' -or $entry[0].Contains('error') -or
+               $entry[0].registration.metadata -ne 'MATCH' -or -not $entry[0].registration.handle_retained){return @{status='FAIL';reason='CLEANUP_IDENTITY_OR_EXIT_FAILED';correction='Preserve the mismatched or unknown instance without terminating it; correct the precise cleanup evidence failure.'}}
+        }
     }
     $stall=@($Suite.tests|Where-Object {$_.name -ceq 'stall'})[0]
     if((Get-C2EmergencyProofVerdict $stall.fault $stall.watchdog $stall.deadline) -ne 'WATCHDOG_POWEROFF_PROVEN'){return @{status='FAIL';reason='STALL_PROOF_REJECTED';correction='Correct the heartbeat/timing/binding failure recorded by the stalled-controller case.'}}
