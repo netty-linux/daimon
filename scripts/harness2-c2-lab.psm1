@@ -116,7 +116,7 @@ namespace DaimonC2 {
     }
 }
 
-function New-C2File([string]$Path) {
+function New-C2FileAcl {
     $acl = [Security.AccessControl.FileSecurity]::new()
     $acl.SetAccessRuleProtection($true, $false)
     $acl.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))
@@ -124,9 +124,13 @@ function New-C2File([string]$Path) {
         $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new(
             [Security.Principal.SecurityIdentifier]::new($sid), 'FullControl', 'Allow'))
     }
+    $acl
+}
+
+function New-C2File([string]$Path) {
     [IO.FileSystemAclExtensions]::Create([IO.FileInfo]::new($Path), [IO.FileMode]::CreateNew,
         [Security.AccessControl.FileSystemRights]::FullControl, [IO.FileShare]::None,
-        4096, [IO.FileOptions]::WriteThrough, $acl)
+        4096, [IO.FileOptions]::WriteThrough, (New-C2FileAcl))
 }
 
 function Assert-C2Acl([string]$Path, [switch]$Directory) {
@@ -183,6 +187,57 @@ function Assert-C2MediaAcl($j, [string]$Kind) {
     $actual = Get-Acl -LiteralPath $path
     $expected = Get-C2MediaAcl $j $Kind
     Assert-C2MediaDescriptor $actual $expected
+}
+
+function Get-C2ControlCandidate($actual, $expected, [Security.Principal.SecurityIdentifier]$vmSid) {
+    if ($vmSid.Value -notmatch '^S-1-5-83-1-') { throw 'Exact virtual-machine SID required.' }
+    $copy = [Activator]::CreateInstance($actual.GetType())
+    $copy.SetSecurityDescriptorBinaryForm($actual.GetSecurityDescriptorBinaryForm())
+    $extra = @($copy.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) |
+        Where-Object { $_.IdentityReference.Value -notin 'S-1-5-18','S-1-5-32-544' })
+    if ($extra.Count -gt 1) { throw 'Unexpected control-domain trustees.' }
+    foreach ($rule in $extra) {
+        if ($rule.IdentityReference.Value -ne $vmSid.Value -or $rule.AccessControlType -ne 'Allow' -or $rule.IsInherited) {
+            throw 'Unexpected control-domain trustee or rule.'
+        }
+        $copy.RemoveAccessRuleSpecific($rule)
+    }
+    Assert-C2MediaDescriptor $copy $expected
+    @{ acl = $copy; revoked_rules = $extra.Count }
+}
+
+function Repair-C2OwnedControl($j, [switch]$ValidateOnly) {
+    # Only narrow grants to this known Off VM during clean pre-boot creation. Never trust a weakened journal.
+    Assert-C2Acl (Join-Path $j.root 'journal.json')
+    if ($j.state -notin 'vm-recorded','configured') { throw 'Control repair requires recorded pre-boot ownership.' }
+    $null = Assert-C2VM $j
+    $sid = [Security.Principal.NTAccount]::new('NT VIRTUAL MACHINE', $j.vm_id).Translate([Security.Principal.SecurityIdentifier])
+    $actions = @()
+    foreach ($role in @(@{path=$j.root;directory=$true}, @{path=(Join-Path $j.root 'operation.lock');directory=$false})) {
+        Assert-C2NoLinks $role.path
+        $actual = Get-Acl -LiteralPath $role.path
+        $expected = if ($role.directory) { New-C2Acl } else { New-C2FileAcl }
+        $candidate = Get-C2ControlCandidate $actual $expected $sid
+        $actions += @{path=$role.path;directory=$role.directory;candidate=$candidate}
+    }
+    if ($ValidateOnly) { return }
+    foreach ($action in $actions) {
+        if ($action.candidate.revoked_rules) {
+            Set-Acl -LiteralPath $action.path -AclObject $action.candidate.acl -ErrorAction Stop
+        }
+        Assert-C2Acl $action.path -Directory:$action.directory
+    }
+    $changed = @($actions | Where-Object { $_.candidate.revoked_rules })
+    if ($changed.Count) {
+        $record = @{operation_id=$j.operation_id; vm_id=$j.vm_id; action='revoke-own-vm-control-domain-grant'
+            roles=@($changed | ForEach-Object { if ($_.directory) { 'root' } else { 'operation-lock' } })
+            observed_at_utc=[DateTime]::UtcNow.ToString('o'); guest_boot_authorized=$false}
+        $stream = New-C2File (Join-Path $j.root ('control-repair-' + [guid]::NewGuid().ToString('N') + '.json'))
+        try {
+            $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($record | ConvertTo-Json -Compress))
+            $stream.Write($bytes,0,$bytes.Length); $stream.Flush($true)
+        } finally { $stream.Dispose() }
+    }
 }
 
 function ConvertFrom-C2JournalText([string]$raw, $c) {
@@ -344,13 +399,22 @@ function New-C2Backend {
                 Assert-C2NoLinks $c.root
                 New-C2Directory $c.root
             }
-            Assert-C2Acl $c.root -Directory
             $lockPath = Join-Path $c.root 'operation.lock'
+            $repair = $false
+            try {
+                Assert-C2Acl $c.root -Directory
+                if (Test-Path -LiteralPath $lockPath) { Assert-C2Acl $lockPath }
+            } catch {
+                if (-not $create -or $fresh) { throw }
+                $peek = Read-C2Journal $c
+                Repair-C2OwnedControl $peek -ValidateOnly
+                $repair = $true
+            }
             if (Test-Path -LiteralPath $lockPath) {
-                Assert-C2Acl $lockPath
                 $lock = [IO.FileStream]::new($lockPath, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
             } else { $lock = New-C2File $lockPath }
             try {
+                if ($repair) { Repair-C2OwnedControl (Read-C2Journal $c) }
                 Assert-C2Acl $c.root -Directory
                 if (-not $fresh -and -not (Test-Path -LiteralPath (Join-Path $c.root 'journal.json'))) { throw 'Unresolved root without journal; no adoption.' }
                 @{ Lock = $lock; Fresh = $fresh }
@@ -408,6 +472,7 @@ function New-C2Backend {
             Set-Acl -LiteralPath $j.iso -AclObject (Get-C2MediaAcl $j 'iso') -ErrorAction Stop
             Set-VMFirmware -VM $vm -EnableSecureBoot On -SecureBootTemplate MicrosoftUEFICertificateAuthority -FirstBootDevice $dvd -ErrorAction Stop
             foreach ($service in @(Get-VMIntegrationService -VM $vm -ErrorAction Stop)) { Disable-VMIntegrationService -VMIntegrationService $service -ErrorAction Stop }
+            Repair-C2OwnedControl $j
         }
         Validate = { param($j,$running)
             Assert-C2MediaAcl $j 'iso'; Assert-C2MediaAcl $j 'disk'

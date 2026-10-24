@@ -369,6 +369,49 @@ foreach ($change in 'write','foreignsid','deny','extra','unprotected','owner','i
         } $change } 'Media.*changed'
     }
 }
+Test 'control candidate revokes only the exact own VM grant and restores private rules' {
+    & $module {
+        $expected = New-C2Acl
+        $actual = New-C2Acl
+        $sid = [Security.Principal.SecurityIdentifier]::new('S-1-5-83-1-1-2-3-4')
+        $actual.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($sid,'FullControl','Allow'))
+        $candidate = Get-C2ControlCandidate $actual $expected $sid
+        if ($candidate.revoked_rules -ne 1) { throw 'Exact VM grant not removed.' }
+        Assert-C2MediaDescriptor $candidate.acl $expected
+        if (@($actual.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])).Count -ne 3) { throw 'Candidate mutated input before validation.' }
+    }
+}
+foreach ($change in 'foreign','broadgroup','deny','owner','unprotected','adminrights') {
+    Test "control candidate refuses $change instead of resetting arbitrary permissions" {
+        Reject { & $module { param($change)
+            $expected = New-C2FileAcl
+            $actual = New-C2FileAcl
+            $sid = [Security.Principal.SecurityIdentifier]::new('S-1-5-83-1-1-2-3-4')
+            switch ($change) {
+                'foreign' { $actual.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new('S-1-5-83-1-4-3-2-1'),'Read','Allow')) }
+                'broadgroup' { $actual.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new('S-1-5-32-545'),'Read','Allow')) }
+                'deny' { $actual.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($sid,'Read','Deny')) }
+                'owner' { $actual.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-545')) }
+                'unprotected' { $actual.SetAccessRuleProtection($false,$true) }
+                'adminrights' { $actual.SetAccessRule([Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'),'Read','Allow')) }
+            }
+            $null = Get-C2ControlCandidate $actual $expected $sid
+        } $change }
+    }
+}
+Test 'control repair refuses running or uncommitted state before changing ACLs' {
+    & $module {
+        $j = Reset-ValidationFixture
+        $script:Fixture.foreignIso = @()
+        $script:Fixture.acl = New-C2FileAcl
+        $j.state = 'running'
+        try { Repair-C2OwnedControl $j; throw 'accepted running journal' }
+        catch { if ($_.Exception.Message -notmatch 'pre-boot ownership') { throw } }
+        $j.state = 'vm-recorded'; $script:Fixture.vms[0].State = 'Running'
+        try { Repair-C2OwnedControl $j; throw 'accepted Running VM' }
+        catch { if ($_.Exception.Message -notmatch 'must be Off') { throw } }
+    }
+}
 Test 'real NTFS journal replacement survives successive durable states' {
     # Actual FileStream/Flush/Replace/parser; only ACL authority is simulated for unelevated CI/local tests.
     $scratchParent = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\.git'))

@@ -105,7 +105,7 @@ não existem neste executor.
 
 ## Revisão e evidências deste marco
 
-- PASS: 55 testes offline, incluindo escrita perdida antes/depois de efeitos,
+- PASS: 63 testes offline, incluindo escrita perdida antes/depois de efeitos,
   Start com resposta perdida, idempotência, cleanup interrompido, estado Running,
   IDs divergentes, journal adulterado/duplicado/excessivo, VM/path/VHD trocados,
   refs estrangeiras e drift de rede, integração, boot, memória e firmware.
@@ -138,6 +138,11 @@ não existem neste executor.
   marca Windows AutoInherited com DACL ainda protegida e ACEs idênticas. Removida
   comparação textual de SDDL em favor de comparação completa de regras efetivas,
   owner e proteção. Não se ignoram ACEs extras, direitos, denies ou herança real.
+- Proteção do domínio de controle continua independente. Create pode somente
+  revogar uma concessão explícita ao SID exato da VM própria Off, após verificar
+  journal estritamente privado e todos os IDs/referências; baseline deve continuar
+  Administradores/SYSTEM. Não adota ACL desconhecida ou corrige journal enfraquecido.
+  Repara só raiz/lock dessa operação, sob exclusividade, com registro protegido.
 - NOT RUN: boot, instalação, calibração e descarte real. Configuração final da
   VM ainda precisa ser concluída e validada. Os 18 gates continuam unverified.
 

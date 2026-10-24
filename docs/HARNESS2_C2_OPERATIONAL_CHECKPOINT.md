@@ -1,5 +1,26 @@
 # C2 — aquisição executada e preparação operacional
 
+## Domínio de controle preservado — 2026-10-24
+
+Revalidação com comparação semântica de mídia recusou `Unexpected journal/root
+access rules.` Journal protegido continua legível/validado, IDs e estado
+vm-recorded inalterados. VM Off, 2 vCPUs, dinâmica 3/3/4 GiB e zero NICs novamente
+observados; não houve boot. Papel exato com divergência (raiz/lock) ainda deve ser
+confirmado; não presumir que qualquer trustee extra seja legítimo.
+
+Executor ganhou recuperação **restritiva**, só no Create pré-boot, com VM Off e
+VMId/disco/localização/referências previamente validados. Aceita retirar no máximo
+uma ACE Allow explícita ao SID **exato da própria VM**, se o restante da DACL
+protegida/owner já corresponder integralmente a Administradores/SYSTEM. Trustees
+desconhecidos, grupos amplos, denies, owner alterado, herança não protegida e
+journal enfraquecido bloqueiam a recuperação. Nunca concede novos direitos.
+
+Valida todos os candidatos antes de mudar ACLs, usa lock exclusivo, confere de
+novo sob lock e registra a revogação em arquivo protegido. Reaplica essa separação
+após configurar a VM. Inspect/Start/Discard não fazem reparos administrativos
+silenciosos; running/start-pending não são elegíveis. **63 testes offline PASS**.
+Próxima retomada deve comprovar permissões reais antes de marcar configured.
+
 ## Configuração aplicada; comparação de ACL corrigida — 2026-10-24
 
 Retomada elevada da mesma VM concluiu os setters: 2 vCPUs, nested=false, memória
