@@ -339,6 +339,36 @@ Test 'real root ACL validator rejects extra user access' {
         catch { if ($_.Exception.Message -notmatch 'Unexpected journal/root access') { throw } }
     }
 }
+Test 'media descriptor accepts Windows AI metadata with identical protected explicit ACEs' {
+    & $module {
+        $expected = [Security.AccessControl.FileSecurity]::new()
+        $expected.SetSecurityDescriptorSddlForm('O:BAD:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FR;;;S-1-5-83-1-1-2-3-4)')
+        $actual = [Security.AccessControl.FileSecurity]::new()
+        $actual.SetSecurityDescriptorSddlForm('O:BAD:PAI(A;;FA;;;SY)(A;;FA;;;BA)(A;;FR;;;S-1-5-83-1-1-2-3-4)')
+        Assert-C2MediaDescriptor $actual $expected
+    }
+}
+foreach ($change in 'write','foreignsid','deny','extra','unprotected','owner','inherited') {
+    Test "media descriptor still rejects $change change" {
+        Reject { & $module { param($change)
+            $sddl = 'O:BAD:PAI(A;;FA;;;SY)(A;;FA;;;BA)(A;;FR;;;S-1-5-83-1-1-2-3-4)'
+            $expected = [Security.AccessControl.FileSecurity]::new()
+            $expected.SetSecurityDescriptorSddlForm($sddl)
+            switch ($change) {
+                'write' { $sddl = $sddl.Replace(';;FR;', ';;FA;') }
+                'foreignsid' { $sddl = $sddl.Replace('-1-1-2-3-4)', '-1-1-2-3-5)') }
+                'deny' { $sddl = $sddl.Replace('(A;;FR;', '(D;;FR;') }
+                'extra' { $sddl += '(A;;FR;;;BU)' }
+                'unprotected' { $sddl = $sddl.Replace('D:PAI', 'D:AI') }
+                'owner' { $sddl = $sddl.Replace('O:BA', 'O:BU') }
+                'inherited' { $sddl = $sddl.Replace('(A;;FR;', '(A;ID;FR;') }
+            }
+            $actual = [Security.AccessControl.FileSecurity]::new()
+            $actual.SetSecurityDescriptorSddlForm($sddl)
+            Assert-C2MediaDescriptor $actual $expected
+        } $change } 'Media.*changed'
+    }
+}
 Test 'real NTFS journal replacement survives successive durable states' {
     # Actual FileStream/Flush/Replace/parser; only ACL authority is simulated for unelevated CI/local tests.
     $scratchParent = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\.git'))

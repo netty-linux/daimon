@@ -105,7 +105,7 @@ não existem neste executor.
 
 ## Revisão e evidências deste marco
 
-- PASS: 47 testes offline, incluindo escrita perdida antes/depois de efeitos,
+- PASS: 55 testes offline, incluindo escrita perdida antes/depois de efeitos,
   Start com resposta perdida, idempotência, cleanup interrompido, estado Running,
   IDs divergentes, journal adulterado/duplicado/excessivo, VM/path/VHD trocados,
   refs estrangeiras e drift de rede, integração, boot, memória e firmware.
@@ -134,6 +134,10 @@ não existem neste executor.
   VM criada **Off**, VMId persistido; configuração interrompida pela expectativa
   incorreta de ConfigurationLocation. Corrigido layout real: New-VM -Path indica
   container e Hyper-V acrescenta o nome da VM. Validação permanece exata.
+- Configuração aplicada na retomada seguinte; validação de mídia encontrou a
+  marca Windows AutoInherited com DACL ainda protegida e ACEs idênticas. Removida
+  comparação textual de SDDL em favor de comparação completa de regras efetivas,
+  owner e proteção. Não se ignoram ACEs extras, direitos, denies ou herança real.
 - NOT RUN: boot, instalação, calibração e descarte real. Configuração final da
   VM ainda precisa ser concluída e validada. Os 18 gates continuam unverified.
 

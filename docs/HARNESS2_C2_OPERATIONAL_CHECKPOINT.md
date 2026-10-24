@@ -1,5 +1,28 @@
 # C2 — aquisição executada e preparação operacional
 
+## Configuração aplicada; comparação de ACL corrigida — 2026-10-24
+
+Retomada elevada da mesma VM concluiu os setters: 2 vCPUs, nested=false, memória
+dinâmica 3/3/4 GiB, zero NICs, disco e DVD próprios, ordem de boot DVD primeiro e
+template MicrosoftUEFICertificateAuthority. VM continua Off, sem boot/instalação.
+Antes de marcar configured, validador recusou `Media access rules changed.`
+
+Leitura elevada capturou descritores reais/esperados: proprietário Administradores,
+DACL protegida e mesmas três ACEs (SYSTEM/Administradores FullControl; SID exato
+da VM Read para ISO/FullControl para VHDX). Única diferença no texto de Access:
+Windows acrescentou controle AutoInherited (`D:PAI` versus `D:P`). Nenhuma ACE
+adicional ou herdada foi observada. Descritores/IDs privados não publicados.
+
+Comparação corrigida para owner/proteção e conjunto completo de ACEs: SID,
+máscara, allow/deny, flags de herança/propagação e IsInherited. Aceita somente a
+diferença de metadado AI com regras efetivas idênticas; herança desprotegida,
+direitos extra, SID trocado, deny extra e owner divergente continuam recusados.
+**55 testes offline PASS**, incluindo a regressão Windows e sete recusas.
+
+Journal segue vm-recorded porque a validação final não foi concluída. Próxima
+ação é revalidar a mesma VM após CI/UAC e persistir configured, sem recriar mídia
+ou VM. Não declarar homologação/boot liberados: os 18 gates continuam unverified.
+
 ## VM criada Off, configuração pendente — 2026-10-24
 
 Consulta elevada do disco concluída: GUID real é string em maiúsculas, não vazio;

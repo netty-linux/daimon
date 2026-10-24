@@ -159,16 +159,30 @@ function Get-C2MediaAcl($j, [string]$Kind) {
     $acl
 }
 
+function Assert-C2MediaDescriptor($actual, $expected) {
+    if ($actual.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne 'S-1-5-32-544' -or
+        -not $actual.AreAccessRulesProtected) { throw 'Media owner/protection changed.' }
+    # Windows may add DACL AutoInherited (AI) while keeping protection and identical explicit ACEs.
+    # Compare every effective rule, including masks/flags/inherited status; never ignore extra or deny ACEs.
+    $signatures = @()
+    foreach ($acl in @($actual, $expected)) {
+        $rules = @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))
+        $rows = @($rules | ForEach-Object {
+            '{0}|{1}|{2}|{3}|{4}|{5}' -f $_.IdentityReference.Value, [int]$_.FileSystemRights,
+                [int]$_.AccessControlType, [int]$_.InheritanceFlags, [int]$_.PropagationFlags, $_.IsInherited
+        } | Sort-Object -CaseSensitive)
+        $signatures += ,($rows -join "`n")
+    }
+    if ($signatures[0] -cne $signatures[1]) { throw 'Media access rules changed.' }
+}
+
 function Assert-C2MediaAcl($j, [string]$Kind) {
     $path = $j[$Kind]
     if (-not $j.vm_id) { Assert-C2Acl $path; return }
     Assert-C2NoLinks $path
     $actual = Get-Acl -LiteralPath $path
     $expected = Get-C2MediaAcl $j $Kind
-    # Ignore SACL; compare owner/group-independent DACL and owner separately.
-    if ($actual.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne 'S-1-5-32-544' -or
-        $actual.GetSecurityDescriptorSddlForm([Security.AccessControl.AccessControlSections]::Access) -cne
-        $expected.GetSecurityDescriptorSddlForm([Security.AccessControl.AccessControlSections]::Access)) { throw 'Media access rules changed.' }
+    Assert-C2MediaDescriptor $actual $expected
 }
 
 function ConvertFrom-C2JournalText([string]$raw, $c) {
