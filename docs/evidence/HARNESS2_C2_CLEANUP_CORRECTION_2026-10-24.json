@@ -1,0 +1,52 @@
+{
+  "status": "BLOCKED",
+  "scope": "OFFLINE_CLEANUP_ONLY_NO_VM",
+  "utc": "2026-10-24T23:24:30.6649488Z",
+  "historical_external": {
+    "status": "FAIL",
+    "failure": "Own helper creator/entry/case binding failed.",
+    "exact_failed_field": "NOT_RECORDED_IN_OLD_REPORT",
+    "operational_cases": [
+      {
+        "passed": true,
+        "name": "stall"
+      },
+      {
+        "passed": true,
+        "name": "supervisor-exit"
+      }
+    ],
+    "sha256": "F8F8EE6E2BD03AEF3DBA5288E97996D87D72DF62D81016209BE4DD994696184C",
+    "historical_result_reclassified": false
+  },
+  "correction": {
+    "live_identity_revalidated": true,
+    "unknown_or_divergent_not_terminated": true,
+    "registered_before_fault": true,
+    "retained_original_handles": true,
+    "pid_only_cleanup_kill": false,
+    "command_errors_never_pass": true,
+    "cleanup_required_before_case_pass": true
+  },
+  "local_checks": {
+    "passed": 213,
+    "cleanup": 27,
+    "real_watchdog_transition": 12,
+    "normalized_entry": 26,
+    "real_cleanup_fixtures": 3
+  },
+  "corrected_independence_attempt": {
+    "status": "BLOCKED",
+    "failure": "Detached helper proof blocked by environment.",
+    "in_job": true,
+    "verified": false,
+    "sha256": "946787A61CD9E6054000A45610FA844E7F02B7DA1B7C49A58266082641D6663E",
+    "console_count": 2,
+    "graph_started": false
+  },
+  "vm_access": false,
+  "production_watchdog_timing_changed": false,
+  "external_processes_terminated": false,
+  "gates": "all-18-unverified",
+  "next_step": "One manual external execution of the corrected entry; no real-VM authorization before global PASS."
+}

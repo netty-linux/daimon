@@ -1,0 +1,32 @@
+{
+  "classification": "BOOT_AND_RECOVERY_VERIFIED_TIMING_NONCONFORMITY",
+  "source_head": "6450e389088d78fd7a8716b273ee596192428ffe",
+  "events": [
+    {"id": 18500, "utc": "2026-10-24T19:05:26.8046477Z", "meaning": "VM started"},
+    {"id": 18601, "utc": "2026-10-24T19:05:59.9266254Z", "meaning": "OS initialized"},
+    {"id": 18502, "utc": "2026-10-24T19:06:57.9358495Z", "meaning": "VM turned off"}
+  ],
+  "authorized_limit_seconds": 90,
+  "event_interval_seconds": 91.1312018,
+  "overrun_seconds": 1.1312018,
+  "temporal_pass": false,
+  "last_monitor_elapsed_seconds": 90.5544802,
+  "monitor_interval_min_seconds": 3.1773945,
+  "monitor_interval_max_seconds": 3.5362849,
+  "stop_request_timestamp": "NOT_CAPTURED",
+  "stop_command_timestamp": "NOT_CAPTURED",
+  "first_off_observation_timestamp": "NOT_CAPTURED_AS_MONOTONIC_STAGE",
+  "raw_receipt_sha256": "CDB400C7DB1A1E4813F9B6790E5EB517F2A8167C100558A713DC601DF17BD0B7",
+  "raw_final_proof_sha256": "28E2D8F0D28073DB9776D40C19E0C6BF0C0CDBCFE3E022A22F49B8A270477015",
+  "final_state": "Off",
+  "final_dynamic_memory_gib": [3, 3, 4],
+  "journal_state": "configured",
+  "control_acl": "PRIVATE_VALIDATED",
+  "network_adapters": 0,
+  "host_minimum_available_gib_during_probe": 5.5718841552734375,
+  "host_cpu_p95": 49,
+  "watchdog_emergency_poweroff": "NOT_TRIGGERED_NOT_PROVEN",
+  "installation": "NOT_PERFORMED",
+  "isolation_gates": "all-18-unverified",
+  "sanitized": true
+}

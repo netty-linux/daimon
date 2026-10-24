@@ -8,6 +8,28 @@ permissions:
   contents: read
 
 jobs:
+  c2-offline:
+    name: C2 offline lifecycle / Windows
+    runs-on: windows-2025
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Test clean-lab lifecycle with fault injection
+        shell: pwsh
+        run: |
+          ./scripts/test-harness2-c2-lab.ps1
+          ./scripts/test-harness2-c2-boot.ps1
+          ./scripts/test-harness2-c2-deadline.ps1
+          ./scripts/test-harness2-c2-watchdog.ps1
+          ./scripts/test-harness2-c2-emergency-policy.ps1
+          ./scripts/test-harness2-c2-cleanup.ps1
+          ./scripts/test-harness2-c2-offline-entry.ps1
+          ./scripts/harness2-c2-offline-entry.ps1 -OutputDirectory $env:RUNNER_TEMP -VerifyOnly
+          ./scripts/test-harness2-c2-emergency.ps1
+
   ui:
     name: Web UI
     runs-on: ubuntu-24.04

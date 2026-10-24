@@ -1,0 +1,20 @@
+{
+  "classification": "BLOCKED_HELPER_INDEPENDENCE_UNPROVEN",
+  "observed_utc": "2026-10-24T22:22:43.4484761Z",
+  "launch": "SEPARATE_NONINTERACTIVE_HELPER_NORMAL_UAC_MANUALLY_CONFIRMED",
+  "job_query_ok": true,
+  "in_job": true,
+  "console_isolated": true,
+  "console_process_count": 1,
+  "runtime_isolation_verified": false,
+  "fault_injected": false,
+  "positive_detached_process_scenarios": "NOT_RUN_ISOLATION_GATE_REFUSED",
+  "vm_access": false,
+  "raw_report_sha256": "527DC8449A50054EB518582E91E70F367215E0900FC340E3489C6C0B06BC493B",
+  "same_job_as_work": "NOT_PROVEN",
+  "job_kill_on_close_behavior": "NOT_QUERIED_NOT_INFERRED_FROM_MEMBERSHIP",
+  "work_closure_kills_watchdog": "NOT_PROVEN",
+  "boot_authorization_requested": false,
+  "isolation_gates": "all-18-unverified",
+  "sanitized": true
+}
