@@ -1,5 +1,54 @@
 # C2 — aquisição executada e preparação operacional
 
+## Marco concluído: VM Off configurada e validada — 2026-10-24
+
+**SUCCESS**, observação elevada em 2026-10-24T13:46:35Z, código `da13157` com
+63 testes offline e seis checks CI aprovados antes da operação. Journal protegido
+persistido em **configured**, relido e configuração real validada novamente.
+Não executar nova criação nem tratar recibos do operador como autoridade.
+
+| Item observado | Resultado real |
+| --- | --- |
+| VM | Generation 2, Off; VMId exato preservado no journal privado |
+| CPU | 2 vCPUs; nested virtualization desabilitada |
+| Memória | Dinâmica: 3 GiB mínimo, 3 GiB startup, 4 GiB máximo |
+| Disco | VHDX Dynamic, máximo 48 GiB; mesmo DiskIdentifier reconciliado |
+| ISO | Cópia privada, hash fixado novamente validado; DVD primeiro no boot |
+| Rede | Zero adaptadores; nenhum switch criado/modificado |
+| Firmware | Secure Boot On, MicrosoftUEFICertificateAuthority |
+| Integração/checkpoints | Zero serviços de integração habilitados; zero checkpoints |
+| Autostart | Nothing |
+| Controle | Raiz, journal e lock validados: somente Administradores/SYSTEM |
+| RAM host atual | **7,11 GiB** disponíveis; boot bloqueado pelo mínimo local de 8 GiB |
+
+O domínio de controle não foi afrouxado. A leitura elevada mostrou template
+Hyper-V na raiz com CreatorOwner, grupo Virtual Machines e uma capability Windows;
+o reparo automático conservador corretamente o recusou. Revisão explícita do
+operador conferiu template **exato**, owner/proteção, journal/IDs, VM Off,
+configuração completa, mídias e inexistência de outra VM referenciando a raiz.
+Mídias foram mantidas abertas contra escrita/substituição durante sua conferência.
+Restaurada somente a ACL privada original da raiz própria, com registro protegido.
+Depois disso, apenas validação/readback e persistência configured, sem reaplicar
+setters Hyper-V. Nenhuma permissão foi alterada fora da raiz recém-criada da C2.
+
+**Limitação conhecida:** concessões amplas do template Hyper-V exigem revisão
+explícita, não são aceitas/limpas automaticamente pelo executor. Não declarar
+criação fresca ou descarte real completamente automáticos/homologados. Antes e
+depois de futuro boot, conferir novamente o domínio de controle e a estabilidade
+dessas permissões; um boot bem-sucedido não homologa isolamento.
+
+- [x] VM limpa criada, configuração e ownership reais validados enquanto Off.
+- [x] ISO privada e journal/control ACL conferidos; evidências privadas preservadas.
+- [ ] Boot: disponibilizar **pelo menos 8 GiB** sem fechar apps automaticamente,
+  medir imediatamente antes e obter autorização específica para esta VM/escopo.
+- [ ] Instalação Ubuntu: autorização e plano próprios; **NOT RUN**.
+- [ ] Calibração em execução, gVisor e provas: requisitos/autorização correspondentes.
+- [ ] Descarte real: **NOT RUN**, exige autorização; não apagar o laboratório.
+
+Windows 10 Pro preservado; nenhuma atualização/ativação/reinicialização, instalação
+ou boot realizados. Nenhum merge. **C2 não concluída; 18 gates unverified; C3 e
+execução de candidatos continuam bloqueados.** Seções seguintes são histórico.
+
 ## Domínio de controle preservado — 2026-10-24
 
 Revalidação com comparação semântica de mídia recusou `Unexpected journal/root

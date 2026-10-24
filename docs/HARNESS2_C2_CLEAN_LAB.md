@@ -1,5 +1,12 @@
 # C2 — primeiro laboratório limpo, offline
 
+**Marco real em 2026-10-24:** VM Generation 2 criada, configurada e validada
+**Off**; journal configured. 2 vCPUs, dinâmica 3/3/4 GiB, VHDX até 48 GiB, zero
+NICs, Secure Boot On, zero checkpoints/integrações, controle Administradores/SYSTEM.
+RAM host 7,11 GiB: boot continua bloqueado até 8 GiB e autorização própria.
+Instalação, boot, calibração, gVisor e descarte real ainda NOT RUN. Estado mais
+recente e limitações no [checkpoint operacional](HARNESS2_C2_OPERATIONAL_CHECKPOINT.md).
+
 ## Decisão de escopo — 2026-10-24
 
 Esta revisão atende à separação solicitada pelo proprietário. Não altera a
@@ -143,8 +150,12 @@ não existem neste executor.
   journal estritamente privado e todos os IDs/referências; baseline deve continuar
   Administradores/SYSTEM. Não adota ACL desconhecida ou corrige journal enfraquecido.
   Repara só raiz/lock dessa operação, sob exclusividade, com registro protegido.
-- NOT RUN: boot, instalação, calibração e descarte real. Configuração final da
-  VM ainda precisa ser concluída e validada. Os 18 gates continuam unverified.
+- PASS real: finalização explícita da ACL privada original da raiz após revisão
+  do template Hyper-V observado, sem conceder novos direitos ou reaplicar setters;
+  journal configured relido e configuração da VM Off validada. Reparo amplo não
+  foi incorporado como limpeza automática de trustees desconhecidos. Concessões
+  do template Hyper-V exigem revisão manual do operador; conferir após futuro boot.
+- NOT RUN: boot, instalação, calibração e descarte real. Os 18 gates continuam unverified.
 
 Correções da revisão: criação segura sem adotar diretório concorrente; prevenção
 de merge de checkpoints; referências estrangeiras também para ISO; permissões
