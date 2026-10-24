@@ -356,7 +356,8 @@ function Assert-C2ExclusiveIso($j, [switch]$AllowOwned) {
 }
 
 function Assert-C2VM($j, [switch]$Complete, [switch]$Running,
-    [ValidateSet(3,4)][int]$ProbeMaximumMemoryGiB=4) {
+    [ValidateScript({$_ -in @(2,2.5,3,4)})][double]$ProbeMaximumMemoryGiB=4,
+    [ValidateScript({$_ -in @(2,2.5,3)})][double]$ProbeStartupMemoryGiB=3) {
     $vm = Get-C2VM $j
     $expected = if ($Running) { 'Running' } else { 'Off' }
     if ($vm.State -ne $expected) { throw "Owned VM must be $expected." }
@@ -375,7 +376,7 @@ function Assert-C2VM($j, [switch]$Complete, [switch]$Running,
             @(Get-VMNetworkAdapter -VM $vm -ErrorAction Stop).Count -ne 0 -or
             $vm.AutomaticStartAction -ne 'Nothing' -or $vm.AutomaticStopAction -ne 'TurnOff' -or $vm.AutomaticCheckpointsEnabled -or
             $vm.CheckpointType -ne 'Disabled' -or $cpu.Count -ne 2 -or $cpu.ExposeVirtualizationExtensions -or
-            -not $mem.DynamicMemoryEnabled -or $mem.Minimum -ne 3GB -or $mem.Startup -ne 3GB -or $mem.Maximum -ne ($ProbeMaximumMemoryGiB*1GB) -or
+            -not $mem.DynamicMemoryEnabled -or $mem.Minimum -ne ($ProbeStartupMemoryGiB*1GB) -or $mem.Startup -ne ($ProbeStartupMemoryGiB*1GB) -or $mem.Maximum -ne ($ProbeMaximumMemoryGiB*1GB) -or
             $fw.SecureBoot -ne 'On' -or $fw.SecureBootTemplate -ne 'MicrosoftUEFICertificateAuthority' -or
             $boot.Count -lt 1 -or $boot[0].BootType -ne 'Drive' -or $null -eq $boot[0].Device -or $boot[0].Device.Path -ine $j.iso -or
             @(Get-VMIntegrationService -VM $vm -ErrorAction Stop | Where-Object Enabled).Count) { throw 'Clean-lab configuration drift.' }

@@ -251,6 +251,16 @@ Test '3 GiB probe ceiling requires explicit opt-in; default still requires 4 GiB
         $null=Assert-C2VM $j -Complete -ProbeMaximumMemoryGiB 3
     }
 }
+foreach($size in 2,2.5){
+    Test "light $size GiB profile cannot pass the original validator without explicit opt-in" {
+        & $module {param($size)
+            $j=Reset-ValidationFixture
+            $script:Fixture.memory.Minimum=$size*1GB;$script:Fixture.memory.Startup=$size*1GB;$script:Fixture.memory.Maximum=$size*1GB
+            try{$null=Assert-C2VM $j -Complete;throw 'default accepted light profile'}catch{if($_.Exception.Message -notmatch 'configuration drift'){throw}}
+            $null=Assert-C2VM $j -Complete -ProbeMaximumMemoryGiB $size -ProbeStartupMemoryGiB $size
+        } $size
+    }
+}
 Test 'real validator refuses parent container in place of exact Hyper-V child directory' {
     Reject { & $module {
         $j = Reset-ValidationFixture

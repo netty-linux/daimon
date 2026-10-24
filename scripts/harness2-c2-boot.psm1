@@ -67,17 +67,20 @@ function Get-C2CounterValue([string]$Path) {
     if($valid.Count -ne 1){throw 'Expected one valid host balancer instance.'}
     [double]$valid[0].CookedValue
 }
-function Get-C2BootBudget([ValidateSet(3,4)][int]$GuestMaximumGiB=4) {
-    # Engineering reserve, not an upstream guarantee. No 2-GiB VM reconfiguration or ballooning assumption.
-    @{version=1;profile=('bounded-max'+$GuestMaximumGiB);guest_startup_gib=3.0;guest_max_gib=$GuestMaximumGiB
-      host_overhead_allowance_gib=0.5;host_reserve_gib=4.0;required_available_gib=($GuestMaximumGiB+4.5)
+function Get-C2BootBudget([ValidateScript({$_ -in @(2,2.5,3,4)})][double]$GuestMaximumGiB=4) {
+    # Separate clean-boot calibration policy; never an adversarial quota or upstream guarantee.
+    # The 2/2.5-GiB profiles explicitly cap startup/minimum/maximum; no reclaim assumption.
+    $light=$GuestMaximumGiB -lt 3
+    $reserve=if($light){3.5}else{4.0}
+    @{version=2;profile=('bounded-max'+$GuestMaximumGiB.ToString([cultureinfo]::InvariantCulture));guest_startup_gib=if($light){$GuestMaximumGiB}else{3.0};guest_max_gib=$GuestMaximumGiB
+      host_overhead_allowance_gib=0.5;host_reserve_gib=$reserve;required_available_gib=($GuestMaximumGiB+$reserve+0.5)
       required_commit_headroom_gib=($GuestMaximumGiB+2.5);required_balancer_gib=($GuestMaximumGiB+0.5);max_commit_ratio=0.8
       baseline_seconds=120;baseline_min_samples=40;max_baseline_cpu_p95=60.0
-      probe_seconds=180;watchdog_seconds=210;heartbeat_timeout_seconds=10;sample_seconds=2
-      low_available_gib=4.0;low_available_seconds=5;critical_available_gib=2.0
+      probe_seconds=if($light){90}else{180};watchdog_seconds=if($light){120}else{210};heartbeat_timeout_seconds=10;sample_seconds=2
+      low_available_gib=if($light){3.75}else{4.0};low_available_seconds=if($light){2}else{5};critical_available_gib=if($light){3.5}else{2.0}
       abort_commit_ratio=0.9;abort_cpu_percent=85.0;abort_cpu_seconds=10;abort_pagefile_growth_mib=256}
 }
-function Get-C2BootAssessment($Samples,[double]$ElapsedSeconds,$Capabilities,[ValidateSet(3,4)][int]$GuestMaximumGiB=4) {
+function Get-C2BootAssessment($Samples,[double]$ElapsedSeconds,$Capabilities,[ValidateScript({$_ -in @(2,2.5,3,4)})][double]$GuestMaximumGiB=4) {
     $p=Get-C2BootBudget $GuestMaximumGiB;$reasons=[Collections.Generic.List[string]]::new()
     if($Samples.Count -lt $p.baseline_min_samples -or $ElapsedSeconds -lt $p.baseline_seconds){$reasons.Add('baseline-incomplete')}
     if(-not $Capabilities.vm_validated){$reasons.Add('vm-or-journal-validation-incomplete')}
@@ -86,12 +89,12 @@ function Get-C2BootAssessment($Samples,[double]$ElapsedSeconds,$Capabilities,[Va
     if(-not $Capabilities.events_readable){$reasons.Add('hyper-v-event-read-unavailable')}
     $a=@();$head=@();$ratios=@();$cpus=@();$balances=@();$pagefiles=@()
     foreach($s in $Samples){
-        if($null -eq $s.available_gib -or $s.commit_limit_gib -le 0 -or $null -eq $s.balancer_available_gib -or $null -eq $s.pagefile_used_mib){$reasons.Add('required-telemetry-unavailable');continue}
+        if($null -eq $s.available_gib -or $s.available_gib -lt 0 -or $s.commit_limit_gib -le 0 -or $null -eq $s.commit_gib -or $s.commit_gib -lt 0 -or $null -eq $s.balancer_available_gib -or $null -eq $s.pagefile_used_mib){$reasons.Add('required-telemetry-unavailable');continue}
         $a+=[double]$s.available_gib;$head+=([double]$s.commit_limit_gib-[double]$s.commit_gib)
         $ratios+=([double]$s.commit_gib/[double]$s.commit_limit_gib);$balances+=[double]$s.balancer_available_gib
         $pagefiles+=[double]$s.pagefile_used_mib;if($null -ne $s.cpu_percent){$cpus+=[double]$s.cpu_percent}
     }
-    if(-not $a.Count -or -not $cpus.Count){$reasons.Add('required-telemetry-unavailable')}
+    if(-not $a.Count -or $cpus.Count -lt ($p.baseline_min_samples-1)){$reasons.Add('required-telemetry-unavailable')}
     $minimum=if($a.Count){($a|Measure-Object -Minimum).Minimum}else{$null}
     $commitHead=if($head.Count){($head|Measure-Object -Minimum).Minimum}else{$null}
     $balance=if($balances.Count){($balances|Measure-Object -Minimum).Minimum}else{$null}
@@ -108,8 +111,31 @@ function Get-C2BootAssessment($Samples,[double]$ElapsedSeconds,$Capabilities,[Va
       samples=$Samples.Count;elapsed_seconds=$ElapsedSeconds;minimum_available_gib=$minimum
       minimum_commit_headroom_gib=$commitHead;minimum_balancer_gib=$balance;cpu_p95=$p95
       pagefile_growth_mib=$growth;paging_io_rate_available=$Capabilities.paging_io_rate
-      configuration_change_required=($GuestMaximumGiB -eq 3)
-      scope='ONE_OFF_180S_STOCK_ISO_BOOT_ONLY_NO_INSTALL_OR_WORKLOAD';budget=$p}
+      configuration_change_required=($GuestMaximumGiB -ne 4)
+      scope=('ONE_OFF_'+$p.probe_seconds+'S_STOCK_ISO_BOOT_ONLY_NO_INSTALL_OR_WORKLOAD');budget=$p}
+}
+function Wait-C2WatchdogLease([scriptblock]$ReadHeartbeat,[scriptblock]$Sample,[scriptblock]$Stop,
+    [hashtable]$Policy,[ValidateRange(20,2000)][int]$PollMilliseconds=2000) {
+    # Shared by the real VM watchdog and real-process offline smoke. No simulated clock.
+    $clock=[Diagnostics.Stopwatch]::StartNew();$reason=''
+    try {
+        do {
+            $h=& $ReadHeartbeat
+            if($h.phase -notin 'arming','running','done','unresolved'){throw 'Invalid heartbeat phase.'}
+            $age=([DateTime]::UtcNow-([datetime]$h.utc).ToUniversalTime()).TotalSeconds
+            if($age -lt -2){throw 'Future heartbeat.'}
+            if($h.phase -eq 'done'){return 'controller-finished'}
+            if($age -gt $Policy.heartbeat_timeout_seconds){$reason='controller-heartbeat-lost';break}
+            $s=& $Sample
+            if($null -eq $s.available_gib -or $s.commit_limit_gib -le 0 -or $null -eq $s.commit_gib){throw 'Invalid watchdog telemetry.'}
+            if($s.available_gib -lt $Policy.critical_available_gib){$reason='watchdog-critical-memory';break}
+            if($s.commit_gib/$s.commit_limit_gib -ge $Policy.abort_commit_ratio){$reason='watchdog-commit-pressure';break}
+            if($clock.Elapsed.TotalSeconds -ge $Policy.watchdog_seconds){$reason='watchdog-deadline';break}
+            Start-Sleep -Milliseconds $PollMilliseconds
+        }while($true)
+    }catch{$reason='watchdog-input-failed'}
+    & $Stop
+    $reason
 }
 function Get-C2ProbeAbortReason($Sample,$State,[double]$Seconds,$Policy,$Vm) {
     if(-not $State.telemetry_ok){return 'telemetry-unavailable'}
@@ -132,4 +158,4 @@ function Invoke-C2ProbeRollback([hashtable]$Adapter,[switch]$ReconcileJournal) {
     if($ReconcileJournal){& $Adapter.Journal;return 'OFF_MAX4_CONFIGURED'}
     'OFF_MAX4_JOURNAL_PENDING'
 }
-Export-ModuleMember -Function Get-C2NativeSample,Resolve-C2CounterPath,Get-C2CounterValue,Get-C2BootBudget,Get-C2BootAssessment,Get-C2ProbeAbortReason,Invoke-C2ProbeRollback
+Export-ModuleMember -Function Get-C2NativeSample,Resolve-C2CounterPath,Get-C2CounterValue,Get-C2BootBudget,Get-C2BootAssessment,Get-C2ProbeAbortReason,Invoke-C2ProbeRollback,Wait-C2WatchdogLease

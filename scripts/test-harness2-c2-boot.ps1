@@ -7,6 +7,17 @@ function Check($c,$why){if(-not $c){throw $why}}
 function Test($name,[scriptblock]$body){& $body;$script:count++;"PASS $name"}
 function Samples([double]$available=9){@(1..60|ForEach-Object{@{available_gib=$available;commit_gib=14;commit_limit_gib=34;balancer_available_gib=7;pagefile_used_mib=3000;cpu_percent=15}})}
 $caps=@{vm_validated=$true;iso_verified=$true;stop_interface=$true;events_readable=$true;paging_io_rate=$false}
+foreach($size in 2,2.5){
+    Test "light calibration $size keeps a 3.5 GiB free host reserve and fixed guest ceiling" {
+        $p=Get-C2BootBudget $size
+        Check ($p.guest_startup_gib -eq $size -and $p.host_reserve_gib -eq 3.5 -and $p.required_available_gib -eq ($size+4) -and $p.probe_seconds -eq 90 -and $p.critical_available_gib -eq 3.5) 'light budget wrong'
+        Check ($p.guest_startup_gib*1024%128 -eq 0) 'Hyper-V memory granularity wrong'
+        $a=Get-C2BootAssessment (Samples ($p.required_available_gib-.01)) 180 $caps $size
+        Check ($a.status -eq 'BLOCKED') 'light profile admits deficit'
+        $a=Get-C2BootAssessment (Samples $p.required_available_gib) 180 $caps $size
+        Check ($a.status -eq 'GO_FOR_SEPARATE_AUTHORIZATION' -and $a.configuration_change_required) 'eligible proposal refused'
+    }
+}
 Test 'full ceiling includes 4 GiB guest, host reserve and explicit overhead'{
     $p=Get-C2BootBudget 4;Check ($p.required_available_gib -eq 8.5 -and $p.host_reserve_gib -eq 4) 'budget wrong'
 }
@@ -28,6 +39,20 @@ foreach($cap in 'vm_validated','iso_verified','stop_interface','events_readable'
 }
 Test 'missing telemetry is not converted to zero pressure'{
     $s=Samples;$s[5].balancer_available_gib=$null;$a=Get-C2BootAssessment $s 180 $caps 3;Check ($a.reasons -contains 'required-telemetry-unavailable') 'missing data accepted'
+}
+Test 'light admission refuses missing commit or sparse CPU telemetry'{
+    $s=Samples 6.2;$s[3].commit_gib=$null
+    $a=Get-C2BootAssessment $s 180 $caps 2;Check ($a.reasons -contains 'required-telemetry-unavailable') 'missing commit accepted'
+    $s=Samples 6.2;foreach($row in $s){$row.cpu_percent=$null};$s[0].cpu_percent=10
+    $a=Get-C2BootAssessment $s 180 $caps 2;Check ($a.reasons -contains 'required-telemetry-unavailable') 'sparse CPU accepted'
+}
+Test 'light reserve aborts at 3.5 immediately and 3.75 after two seconds'{
+    $p=Get-C2BootBudget 2;$m=@{available_gib=3.49;commit_gib=14;commit_limit_gib=34}
+    $s=@{telemetry_ok=$true;ownership_ok=$true;control_acl_ok=$true;low_memory_seconds=0;high_cpu_seconds=0;pagefile_growth_mib=0}
+    $v=@{network_adapters=0;assigned_gib=2}
+    Check ((Get-C2ProbeAbortReason $m $s 1 $p $v) -eq 'critical-host-memory') 'critical reserve ignored'
+    $m.available_gib=3.74;$s.low_memory_seconds=2
+    Check ((Get-C2ProbeAbortReason $m $s 2 $p $v) -eq 'low-host-memory') 'early reserve ignored'
 }
 Test 'commit and pagefile growth independently block admission'{
     $s=Samples;$s[15].commit_gib=32;$s[20].pagefile_used_mib=3400;$a=Get-C2BootAssessment $s 180 $caps 3

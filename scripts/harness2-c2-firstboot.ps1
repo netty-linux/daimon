@@ -7,13 +7,14 @@ param(
     [Parameter(Mandatory)][string]$IsoPath,
     [Parameter(Mandatory)][guid]$OperationId,
     [Parameter(Mandatory)][guid]$VMId,
-    [ValidateSet(3,4)][int]$MaximumGiB=3,
+    [ValidateScript({$_ -in @(2,2.5,3,4)})][double]$MaximumGiB=2,
     [string]$Authorization,
     [Parameter(Mandatory)][string]$ReceiptPath,
     [string]$GuardDirectory
 )
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
-$ack='FIRSTBOOT-PROBE:'+ $OperationId.ToString()+':'+$VMId.ToString()+':MAX'+$MaximumGiB
+$profileText=$MaximumGiB.ToString([cultureinfo]::InvariantCulture)
+$ack='FIRSTBOOT-PROBE:'+ $OperationId.ToString()+':'+$VMId.ToString()+':MAX'+$profileText
 if($Authorization -cne $ack){throw 'Specific boot/cap/poweroff authorization required; no action performed.'}
 Import-Module (Join-Path $PSScriptRoot 'harness2-c2-boot.psm1') -Force
 $base=Import-Module (Join-Path $PSScriptRoot 'harness2-c2-lab.psm1') -Force -PassThru
@@ -54,10 +55,12 @@ function Stop-OwnedVM {
 function Restore-OwnedMaximum {
     $v=Get-OwnedVM;if($v.State -ne 'Off'){throw 'Cannot restore memory while running.'}
     $m=Get-VMMemory -VM $v
-    if($m.Minimum -ne 3GB -or $m.Startup -ne 3GB -or -not $m.DynamicMemoryEnabled){throw 'Unexpected memory drift; no arbitrary reset.'}
-    if($m.Maximum -eq 4GB){return}
-    if($MaximumGiB -ne 3 -or $m.Maximum -ne 3GB){throw 'Unexpected memory ceiling; no arbitrary reset.'}
-    Set-VMMemory -VM $v -MaximumBytes 4GB -ErrorAction Stop
+    $startup=$policy.guest_startup_gib*1GB;$ceiling=$MaximumGiB*1GB
+    if(-not $m.DynamicMemoryEnabled -or $m.Minimum -notin @(3GB,$startup) -or $m.Startup -notin @(3GB,$startup) -or $m.Maximum -notin @(4GB,$ceiling)){throw 'Unexpected memory drift; no arbitrary reset.'}
+    if($m.Minimum -eq 3GB -and $m.Startup -eq 3GB -and $m.Maximum -eq 4GB){return}
+    Set-VMMemory -VM $v -MinimumBytes 3GB -StartupBytes 3GB -MaximumBytes 4GB -ErrorAction Stop
+    $m=Get-VMMemory -VM (Get-OwnedVM)
+    if($m.Minimum -ne 3GB -or $m.Startup -ne 3GB -or $m.Maximum -ne 4GB){throw 'Original memory restoration unverified.'}
 }
 function Host-Sample($Previous){
     $s=Get-C2NativeSample $Previous
@@ -117,18 +120,10 @@ try {
         # Compile/warm the native sensor before declaring readiness; do not overlap this peak with guest startup.
         $null=Get-C2NativeSample;[GC]::Collect()
         Write-Private (Join-Path $canonical 'ready.json') @{vm_id=$VMId.ToString();operation_id=$OperationId.ToString();process_id=$PID}
-        $clock=[Diagnostics.Stopwatch]::StartNew();$reason=''
-        do{
-            $heartbeat=Read-Private (Join-Path $canonical 'heartbeat.json')
-            if($heartbeat.phase -eq 'done'){break}
-            if(([DateTime]::UtcNow-[datetime]::Parse($heartbeat.utc).ToUniversalTime()).TotalSeconds -gt $policy.heartbeat_timeout_seconds){$reason='controller-heartbeat-lost';break}
-            $s=Get-C2NativeSample
-            if($s.available_gib -lt $policy.critical_available_gib){$reason='watchdog-critical-memory';break}
-            if($s.commit_gib/$s.commit_limit_gib -ge $policy.abort_commit_ratio){$reason='watchdog-commit-pressure';break}
-            if($clock.Elapsed.TotalSeconds -ge $policy.watchdog_seconds){$reason='watchdog-deadline';break}
-            Start-Sleep -Seconds 2
-        }while($true)
-        if($reason){$null=Invoke-C2ProbeRollback @{Stop={Stop-OwnedVM};State={(Get-OwnedVM).State.ToString()};Restore={Restore-OwnedMaximum}};Write-Private (Join-Path $canonical 'watchdog-result.json') @{status='POWERED_OFF';reason=$reason}}
+        $reason=Wait-C2WatchdogLease -ReadHeartbeat {Read-Private (Join-Path $canonical 'heartbeat.json')} -Sample {Get-C2NativeSample} -Policy $policy -Stop {
+            $null=Invoke-C2ProbeRollback @{Stop={Stop-OwnedVM};State={(Get-OwnedVM).State.ToString()};Restore={Restore-OwnedMaximum}}
+        }
+        if($reason -ne 'controller-finished'){Write-Private (Join-Path $canonical 'watchdog-result.json') @{status='POWERED_OFF';reason=$reason}}
         $report=@{status='WATCHDOG_FINISHED';reason=$reason;ownership_authority=$false}
     }else{
         # Receipt must be an explicit new operator file, outside the protected root.
@@ -158,7 +153,7 @@ try {
         $script:attempt=@{version=1;operation_id=$OperationId.ToString();vm_id=$VMId.ToString();maximum_gib=$MaximumGiB;original_maximum_gib=4;reference=$script:ref;policy=$policy}
         Write-Private (Join-Path $guard 'policy.json') $script:attempt
         Write-Private (Join-Path $guard 'heartbeat.json') @{utc=[DateTime]::UtcNow.ToString('o');phase='arming'}
-        $childArgs=@('-NoProfile','-NonInteractive','-File',('"'+$PSCommandPath+'"'),'-Mode','Watchdog','-Root',('"'+$Root+'"'),'-IsoPath',('"'+$IsoPath+'"'),'-OperationId',$OperationId.ToString(),'-VMId',$VMId.ToString(),'-MaximumGiB',$MaximumGiB,'-Authorization',('"'+$ack+'"'),'-ReceiptPath',('"'+(Join-Path $guard 'watchdog-receipt.json')+'"'),'-GuardDirectory',('"'+$guard+'"')) -join ' '
+        $childArgs=@('-NoProfile','-NonInteractive','-File',('"'+$PSCommandPath+'"'),'-Mode','Watchdog','-Root',('"'+$Root+'"'),'-IsoPath',('"'+$IsoPath+'"'),'-OperationId',$OperationId.ToString(),'-VMId',$VMId.ToString(),'-MaximumGiB',$profileText,'-Authorization',('"'+$ack+'"'),'-ReceiptPath',('"'+(Join-Path $guard 'watchdog-receipt.json')+'"'),'-GuardDirectory',('"'+$guard+'"')) -join ' '
         $watcher=Start-Process -FilePath (Get-Command pwsh.exe).Source -ArgumentList $childArgs -WindowStyle Hidden -PassThru
         $ready=[Diagnostics.Stopwatch]::StartNew()
         while(-not (Test-Path -LiteralPath (Join-Path $guard 'ready.json'))){
@@ -170,8 +165,8 @@ try {
         if($pre.available_gib -lt $policy.required_available_gib -or $pre.balancer_available_gib -lt $policy.required_balancer_gib -or $pre.commit_limit_gib-$pre.commit_gib -lt $policy.required_commit_headroom_gib -or $pre.commit_limit_gib -le 0 -or $pre.commit_gib/$pre.commit_limit_gib -gt $policy.max_commit_ratio){throw 'Live budget changed while arming; no boot.'}
         $j.state='start-pending';& $base {param($j) Write-C2Journal $j} $j
         $v=Get-OwnedVM
-        if($MaximumGiB -eq 3){Set-VMMemory -VM $v -MaximumBytes 3GB -ErrorAction Stop}
-        & $base {param($j,$max) Assert-C2Acl $j.root -Directory;Assert-C2Acl (Join-Path $j.root 'journal.json');$null=Assert-C2VM $j -Complete -ProbeMaximumMemoryGiB $max} $j $MaximumGiB
+        if($MaximumGiB -ne 4){Set-VMMemory -VM $v -MinimumBytes ($policy.guest_startup_gib*1GB) -StartupBytes ($policy.guest_startup_gib*1GB) -MaximumBytes ($MaximumGiB*1GB) -ErrorAction Stop}
+        & $base {param($j,$max,$startup) Assert-C2Acl $j.root -Directory;Assert-C2Acl (Join-Path $j.root 'journal.json');$null=Assert-C2VM $j -Complete -ProbeMaximumMemoryGiB $max -ProbeStartupMemoryGiB $startup} $j $MaximumGiB $policy.guest_startup_gib
         Start-VM -VM (Get-OwnedVM) -ErrorAction Stop;$started=$true
         $j.state='running';& $base {param($j) Write-C2Journal $j} $j
         $clock.Restart();$previous=$null;$last=0.0;$low=0.0;$high=0.0;$run=[Collections.Generic.List[object]]::new();$why=''

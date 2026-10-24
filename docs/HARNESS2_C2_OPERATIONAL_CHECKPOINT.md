@@ -1,5 +1,46 @@
 # C2 — aquisição executada e preparação operacional
 
+## Calibração leve implementada: BLOCKED por 46 MiB — 2026-10-24
+
+HEAD anterior `8aee9cd`, seis checks aprovados. Nenhuma mutação de VM nesta etapa.
+Preparados perfis temporários dinâmicos **2/2/2 GiB** e **2,5/2,5/2,5 GiB**,
+exclusivamente para boot confiável da ISO por 90 s; não autorizam instalação.
+Perfil original 3/3/4 GiB e quotas dos experimentos permanecem intactos.
+
+Nova coleta silenciosa concluída às **17:53:29Z**, 60 amostras / 182 s, com dois
+helpers de sensores residentes: mínimo físico **5,95535 GiB**, CPU p95 **15%**,
+commit livre mínimo **14,68087 GiB**, balancer mínimo **5,26367 GiB**, crescimento
+da ocupação do pagefile **0 MiB**. Taxa de I/O de paginação continua indisponível.
+Helpers: soma bruta de working sets 347–360 MiB (inclui páginas compartilhadas;
+não representa custo físico líquido). Disponibilidade nativa já inclui sua presença.
+
+Budget leve: guest máximo + **3,5 GiB de folga física adicional para o host** +
+**0,5 GiB de overhead incremental provisório**. Requer **6 GiB** para guest 2 e
+**6,5 GiB** para guest 2,5. O menor perfil falhou por **0,04465 GiB (~46 MiB)**.
+Não arredondar o déficit nem reduzir a reserva para transformar esta coleta em GO.
+Reserva reduzida é restrita a este probe mais curto, com desligamento imediato
+abaixo de 3,5 GiB e antecipado abaixo de 3,75 GiB por 2 s. Não é mínimo universal
+do Windows nem perfil homologado. Overhead real Hyper-V ainda exige calibração.
+
+**66 testes lifecycle + 33 testes de política offline passaram.** Adicionalmente,
+**cinco testes reais de watchdog com processos Windows** passaram: heartbeat
+vencido, prazo, JSON inválido, pressão nativa com limiar deliberadamente alto e
+conclusão normal. Mesma função usada no watchdog da VM; arquivos, relógio,
+sensores e término de processo são reais. O teste real corrigiu conversão de
+timestamp no JSON; valores 2,5 são validados sem dependência de separador decimal.
+Não houve desligamento real de VM. Evidência anterior WhatIf permanece válida;
+prova de poweroff/restauração de VM em execução depende de futura autorização.
+
+Executor restaura mínimo/startup/máximo 3/3/4, relê e só reconcilia journal após
+validar o perfil original completo. Ownership e controle privado são obrigatórios;
+ACL desconhecida nunca é reparada automaticamente.
+
+Próxima condição concreta: janela sustentada >= **6 GiB** livres, demais critérios
+e nova checagem após armar watchdog. Somente então solicitar aprovação única do
+probe de 90 s, ajustes temporários, hard poweroff e restauração. Não houve pedido
+de aprovação com orçamento reprovado. Todos os 18 gates continuam `unverified`;
+ESU/patches e autenticação independente gVisor permanecem separados.
+
 ## Primeiro boot preparado: BLOCKED por RAM — 2026-10-24
 
 Inspeção elevada somente leitura concluída às 14:36:49Z: VMId e DiskIdentifier
