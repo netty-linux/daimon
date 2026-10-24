@@ -143,6 +143,7 @@ try {
         $script:transitionPath=Join-Path $canonical 'transition.lock';$script:stopPath=Join-Path $canonical 'stop-requested.json'
         $script:timingPath=Join-Path $canonical 'watchdog-timing.json'
         & $base {param($p) Assert-C2Acl $p} $script:transitionPath
+        Assert-C2AsyncStopCapability (Get-Command Stop-VM -ErrorAction Stop)
         # Compile/warm the native sensor before declaring readiness; do not overlap this peak with guest startup.
         $null=Get-C2NativeSample;[GC]::Collect()
         Write-Private (Join-Path $canonical 'ready.json') @{vm_id=$VMId.ToString();operation_id=$OperationId.ToString();process_id=$PID}
@@ -170,6 +171,7 @@ try {
         if($receipt.StartsWith($c.root+'\',[StringComparison]::OrdinalIgnoreCase) -or (Test-Path -LiteralPath $receipt) -or -not (Test-Path -LiteralPath ([IO.Path]::GetDirectoryName($receipt)) -PathType Container)){throw 'New external receipt required.'}
         $ReceiptPath=$receipt;$receiptAllowed=$true
         & $base {param($c) Assert-C2Host 'Inspect' $c;Assert-C2Acl $c.root -Directory;Assert-C2Acl (Join-Path $c.root 'operation.lock')} $c
+        Assert-C2AsyncStopCapability (Get-Command Stop-VM -ErrorAction Stop)
         $lock=[IO.FileStream]::new((Join-Path $c.root 'operation.lock'),'Open','ReadWrite','None')
         $j=& $base {param($c,$id)
             $j=Read-C2Journal $c

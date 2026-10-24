@@ -60,6 +60,8 @@ The latter two bound the observed state transition; Hyper-V event UTC is separat
 corroboration, not a substitute for monotonic confirmation. `Stop-VM -AsJob` avoids
 waiting synchronously for the whole poweroff before starting the observer timeout.
 Completed job state alone is never Off evidence.
+Both controller and watchdog must validate native Hyper-V `Stop-VM` metadata,
+including `AsJob`, before any boot/readiness approval. Missing support fails closed.
 
 Only a fresh, verified Off observation at or before 90 s yields `OFF_BY_DEADLINE`.
 Late Off yields `OFF_LATE`; no observation yields `OFF_UNCONFIRMED`. A prior

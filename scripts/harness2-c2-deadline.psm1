@@ -4,6 +4,12 @@ $ErrorActionPreference='Stop'
 function Get-C2MonotonicStamp {
     @{ticks=[Diagnostics.Stopwatch]::GetTimestamp();frequency=[Diagnostics.Stopwatch]::Frequency;utc=[datetime]::UtcNow.ToString('o')}
 }
+function Assert-C2AsyncStopCapability($Command) {
+    if($Command.Name -cne 'Stop-VM' -or $Command.ModuleName -cne 'Hyper-V'){throw 'Native Hyper-V Stop-VM metadata required before boot.'}
+    foreach($parameter in 'VM','TurnOff','Force','AsJob'){
+        if(-not $Command.Parameters.ContainsKey($parameter)){throw 'Required asynchronous poweroff interface unavailable; no boot.'}
+    }
+}
 function New-C2Deadline([long]$OriginTicks,[long]$Frequency,[double]$LimitSeconds=90) {
     if($OriginTicks -le 0 -or $Frequency -le 0 -or $LimitSeconds -lt 30){throw 'Invalid monotonic deadline contract.'}
     @{version=1;origin_ticks=$OriginTicks;frequency=$Frequency;limit_seconds=$LimitSeconds
@@ -75,4 +81,4 @@ function Invoke-C2TimedStop([hashtable]$Timing,[hashtable]$Adapter,[double]$Time
     $Timing.confirmed_off=$false;$Timing.confirmation_timeout=$true
     $Timing
 }
-Export-ModuleMember -Function Get-C2MonotonicStamp,New-C2Deadline,Get-C2DeadlineState,Get-C2TemporalVerdict,Invoke-C2TimedStop
+Export-ModuleMember -Function Get-C2MonotonicStamp,Assert-C2AsyncStopCapability,New-C2Deadline,Get-C2DeadlineState,Get-C2TemporalVerdict,Invoke-C2TimedStop

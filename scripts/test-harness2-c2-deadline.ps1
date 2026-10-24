@@ -8,6 +8,15 @@ function Check($value,$message){if(-not $value){throw $message}}
 function Test($name,[scriptblock]$body){& $body;$script:count++;"PASS $name"}
 function Contract {New-C2Deadline 1000 1000 90}
 function ObservedOff($seconds){@{confirmed_off=$true;off_observed_ticks=[long](1000+1000*$seconds)}}
+Test 'missing asynchronous Stop-VM support blocks before any dispatch'{
+    $c=@{Name='Stop-VM';ModuleName='Hyper-V';Parameters=@{VM=1;TurnOff=1;Force=1}};$failed=$false
+    try{Assert-C2AsyncStopCapability $c}catch{$failed=$true};Check $failed 'missing AsJob accepted'
+    $c.Parameters.AsJob=1;Assert-C2AsyncStopCapability $c
+}
+Test 'foreign stop command metadata is refused'{
+    $c=@{Name='Stop-VM';ModuleName='foreign';Parameters=@{VM=1;TurnOff=1;Force=1;AsJob=1}};$failed=$false
+    try{Assert-C2AsyncStopCapability $c}catch{$failed=$true};Check $failed 'foreign stop command accepted'
+}
 Test 'unchanged absolute deadline has 20-second controller and 18-second watchdog lead'{
     $d=Contract;Check ($d.limit_seconds -eq 90 -and $d.controller_stop_at_seconds -eq 70 -and $d.watchdog_stop_at_seconds -eq 72) 'deadline changed'
 }
