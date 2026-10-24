@@ -16,18 +16,23 @@ VM limpa e offline após aprovação específica**; runtime Harness² continua f
   RAM 6,57 GiB e disco 171,04 GiB livres na amostra. Sem repetir scan/licenciamento.
 - [x] Implementar executor Create/Start/Discard/Inspect, journal protegido,
   ownership por VMId/DiskIdentifier e retomada conservadora após falhas.
-- [x] 43 testes offline PASS, parsing/diff check PASS. Lifecycle administrativo
-  real e criação efetiva de ACL/journal/VM: NOT RUN.
+- [x] 44 testes offline PASS, incluindo gravação NTFS/Replace real e recusa de
+  destino bloqueado; parsing/diff check PASS. Autoridade ACL simulada nesse teste.
 - [x] Atualizar preflight com marcos CleanCreate/CleanBoot; default Hostile mantém
   os bloqueios anteriores. Presence-only não autentica ISO: executor confere pin.
-- [ ] Proprietário aprova criação desligada com recursos/destino exatos e risco
-  residual limitado; UAC legítimo e inventário elevado final antes dos efeitos.
+- [x] Proprietário aprovou somente criação desligada com recursos/destino exatos
+  e risco residual limitado. Primeiro UAC legítimo despachado; operação iniciou
+  e recusou atualização do journal (backup path vazio no File.Replace), antes
+  da cópia ISO/VHDX/VM. Corrigido marshalling de null; retomar a mesma operação
+  com journal existente, sem apagar raiz ou adotar por nome.
 - [ ] Criar a VM desligada, verificar configuração real e registrar evidências.
 - [ ] Boot somente após 8 GiB disponíveis e aprovação própria; sem instalação.
 - [ ] Instalação Ubuntu, gVisor, provas e descarte real: autorizações/requisitos
   correspondentes pendentes, nenhuma execução realizada neste marco.
 
-Destino novo proposto não existe. Nada criado ou alterado em Hyper-V, nenhum
+Destino estava ausente na proposta; a tentativa aprovada criou metadata privada
+antes da falha de journal. Retomada deve conferir essa mesma raiz/journal. Nada
+criado ou alterado em Hyper-V, nenhum
 switch tocado, app encerrado, patch instalado, reboot ou merge. As seções abaixo
 são históricas; a declaração anterior de executor não implementado foi superada
 somente pelo código limitado do laboratório limpo. 18 gates continuam unverified.

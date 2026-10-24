@@ -315,5 +315,42 @@ Test 'real root ACL validator rejects extra user access' {
         catch { if ($_.Exception.Message -notmatch 'Unexpected journal/root access') { throw } }
     }
 }
+Test 'real NTFS journal replacement survives successive durable states' {
+    # Actual FileStream/Flush/Replace/parser; only ACL authority is simulated for unelevated CI/local tests.
+    $scratchParent = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\.git'))
+    $scratch = Join-Path $scratchParent ('c2-journal-test-' + [guid]::NewGuid().ToString('N'))
+    $null = [IO.Directory]::CreateDirectory($scratch)
+    try {
+        & $module { param($root)
+            $script:Fixture.acl = New-C2Acl
+            function script:New-C2File([string]$Path) {
+                [IO.FileStream]::new($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite,
+                    [IO.FileShare]::None, 4096, [IO.FileOptions]::WriteThrough)
+            }
+            $j = Get-C2Contract $root 'D:\c2-fixture.iso' 'ace3eaf4-4e8d-45d0-ae5e-f8029c326a16'
+            Write-C2Journal $j
+            $j.state = 'iso-pending'; Write-C2Journal $j
+            $actual = Read-C2Journal (Get-C2Contract $root 'D:\c2-fixture.iso' ([guid]$j.operation_id))
+            if ($actual.state -ne 'iso-pending') { throw 'Durable replacement not observed.' }
+            $j.state = 'iso-ready'
+            $held = [IO.FileStream]::new((Join-Path $root 'journal.json'), 'Open', 'Read', 'Read')
+            $failed = $false
+            try { Write-C2Journal $j } catch { $failed = $true } finally { $held.Dispose() }
+            if (-not $failed) { throw 'Locked destination did not prevent replacement.' }
+            $actual = Read-C2Journal (Get-C2Contract $root 'D:\c2-fixture.iso' ([guid]$j.operation_id))
+            if ($actual.state -ne 'iso-pending') { throw 'Failed replacement corrupted prior journal.' }
+            Write-C2Journal $j
+            $actual = Read-C2Journal (Get-C2Contract $root 'D:\c2-fixture.iso' ([guid]$j.operation_id))
+            if ($actual.state -ne 'iso-ready') { throw 'Second replacement not observed.' }
+        } $scratch
+    } finally {
+        # Exact generated test directory, checked inside the checkout's .git; never delete supplied roots.
+        $resolved = [IO.Path]::GetFullPath($scratch)
+        if (-not $resolved.StartsWith($scratchParent + '\', [StringComparison]::OrdinalIgnoreCase) -or
+            [IO.Path]::GetFileName($resolved) -notmatch '^c2-journal-test-[a-f0-9]{32}$' -or
+            ((Get-Item -LiteralPath $resolved).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Unsafe test cleanup target.' }
+        [IO.Directory]::Delete($resolved, $true)
+    }
+}
 Remove-Module harness2-c2-lab
 Write-Output "PASS $script:passed offline tests; real VM/ACL lifecycle NOT RUN."

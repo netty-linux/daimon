@@ -105,21 +105,28 @@ não existem neste executor.
 
 ## Revisão e evidências deste marco
 
-- PASS: 43 testes offline, incluindo escrita perdida antes/depois de efeitos,
+- PASS: 44 testes offline, incluindo escrita perdida antes/depois de efeitos,
   Start com resposta perdida, idempotência, cleanup interrompido, estado Running,
   IDs divergentes, journal adulterado/duplicado/excessivo, VM/path/VHD trocados,
   refs estrangeiras e drift de rede, integração, boot, memória e firmware.
 - PASS: criação nativa em caminho **já existente** foi recusada, com ACL original
   inalterada. Validador de ACL testado com objetos de segurança simulados.
+- PASS: teste NTFS real de escrita/Flush/Replace e leitura, com autoridade ACL
+  simulada para rodar sem elevação; destino bloqueado preserva o journal anterior.
+  Regressão da primeira tentativa administrativa: PowerShell converte `$null`
+  em string vazia no argumento backup do File.Replace; corrigido com NullString.
 - PASS: parsing PowerShell e diff check. CI Windows executa os testes sem Hyper-V
   real; repositório público, runner padrão, sem novo serviço pago.
 - PASS: SHA256 integral da ISO existente novamente igual ao pin; não houve novo
   download. Disco: 171,04 GiB livres; destino proposto não existe.
 - BLOCKED para autoridade atual: sessão não administrativa; inventário Hyper-V
   recusado. Não se repetiu ESU/Windows Update nem os inventários autenticados já válidos.
-- NOT RUN: criação privada real com ACL, journal administrativo real, VM, boot,
-  instalação, calibração e descarte real. Testes simulados não substituem o primeiro
-  ensaio administrativo autorizado. Os 18 gates continuam unverified.
+- Primeira tentativa administrativa autorizada: criação iniciou e parou na
+  atualização do journal por esse erro, antes da cópia ISO/VHDX/VM. Retomada da
+  operação original depende da validação do journal protegido; não apagar a raiz
+  nem criar uma segunda operação para contornar o estado existente.
+- NOT RUN: VM, boot, instalação, calibração e descarte real. Testes simulados
+  não substituem o ensaio administrativo. Os 18 gates continuam unverified.
 
 Correções da revisão: criação segura sem adotar diretório concorrente; prevenção
 de merge de checkpoints; referências estrangeiras também para ISO; permissões
@@ -127,10 +134,10 @@ do SID da VM separadas das do journal; boot separado da criação e de instalaç
 recusa de boot repetido/ambíguo com estado Off. O código foi revisado nesta sessão;
 não houve revisão independente de outro agente ou homologação administrativa.
 
-## Próxima autorização concreta
+## Escopo da autorização de criação
 
-Autorizar **somente criação desligada**, com aceitação do risco residual ESU/host
-UNVERIFIED para esse marco limitado. A operação fará a checagem elevada final,
+O proprietário autorizou **somente criação desligada**, com aceitação do risco
+residual ESU/host UNVERIFIED para esse marco limitado. A operação faz a checagem elevada final,
 recusará conflitos e criará um diretório privado novo, journal/lock, cópia ISO,
 VHDX vazio e uma única VM. Se a checagem elevada falhar, não contornará o bloqueio.
 Parâmetros privados exatos e UUID do plano são apresentados localmente ao

@@ -194,7 +194,8 @@ function Write-C2Journal($j) {
     $stream = New-C2File $tmp
     try { $stream.Write($bytes, 0, $bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
     Assert-C2Acl $tmp
-    if (Test-Path -LiteralPath $path) { Assert-C2Acl $path; [IO.File]::Replace($tmp, $path, $null) }
+    # PowerShell marshals $null as an empty string for this overload; NullString is a real null backup path.
+    if (Test-Path -LiteralPath $path) { Assert-C2Acl $path; [IO.File]::Replace($tmp, $path, [System.Management.Automation.Language.NullString]::Value) }
     else { [IO.File]::Move($tmp, $path) }
     Assert-C2Acl $path
 }
