@@ -1,5 +1,43 @@
 # C2 — aquisição executada e preparação operacional
 
+## Estado atual: primeiro boot real, falha temporal preservada e correção offline
+
+A única tentativa real autorizada no código `6450e38` iniciou a VM e o sistema
+operacional (eventos 18500/18601), desligou por `TurnOff` (18502), restaurou 3/3/4
+GiB e reconciliou journal `configured` e ACLs privadas. **Não houve sucesso temporal:
+91,1312018 s reais contra máximo autorizado de 90 s.** A violação permanece registrada
+permanentemente em [evidência sanitizada](evidence/HARNESS2_C2_FIRST_BOOT_2026-10-24.json),
+com timestamps e hashes dos recibos privados. Watchdog emergencial não foi acionado
+nem comprovado. Host manteve mínimo de 5,57188 GiB livres durante o probe e CPU p95
+49%, dentro das reservas operacionais. Nenhuma instalação foi realizada.
+
+Causa: stopwatch reiniciado depois do start; checagem de prazo após coleta lenta;
+intervalos de 3,177–3,536 s; última amostra já em 90,55448 s; parada síncrona e
+ausência de veredito pelo momento real de confirmação de Off. O recibo antigo não
+permite decompor exatamente a latência do comando e da observação.
+
+Revisão atual, **sem novo boot, inspeção ou reconfiguração de VM**: origem monotônica
+anterior ao start, pedido de parada em 70 s, watchdog em 72 s, deadline absoluto
+inalterado de 90 s. Confirmação limitada a 15 s após envio assíncrono; pedido, envio,
+retorno e observação Off registrados separadamente. Off tardio, ausente, clock
+inválido ou timeout anterior não viram PASS após recuperação. Heartbeat usa ticks
+monotônicos e `done` exige leitura real de Off. Restauração serializada; journal
+continua com escritor único; watchdog não reconcilia journal do controlador morto.
+
+**Validação local: 66 lifecycle + 33 política + 24 deadline determinísticos e
+12 testes de processos reais passaram.** Rotas incluem perda de produtor real de
+heartbeat, deadline apesar de lease fresco, falso `done`, ticks futuros, timeout
+e veto concorrente. Isso não prova o novo `Stop-VM -AsJob`, a margem temporal ou
+poweroff emergencial do watchdog em uma VM real. Hyper-V travado pode ultrapassar
+qualquer margem; sem Off confirmado o estado deve permanecer não resolvido.
+
+Nova autorização específica é obrigatória antes de outro ensaio. Nenhum pedido
+de boot nesta revisão. [Auditoria, limites e procedimento da prova futura](HARNESS2_C2_DEADLINE_RECOVERY.md).
+Perfil candidato 2/2/2, mínimo de 6 GiB e todos os demais limites preservados.
+Windows, aplicativos e VM não alterados nesta tarefa; 18 gates `unverified` e PR draft.
+
+As seções abaixo preservam checkpoints históricos, não substituem este estado.
+
 ## Única nova tentativa 2 GiB: BLOCKED — 2026-10-24 18:06:55Z
 
 Perfil `bounded-max2` e mínimo **6 GiB** mantidos, sem novo perfil, alteração de

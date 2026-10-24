@@ -3,6 +3,25 @@
 No boot or installation is authorized by this document, an acknowledgement string,
 or a passing offline test. All 18 isolation gates remain `unverified`.
 
+## Current revision: deadline correction after the first real probe
+
+One real probe on `6450e38` verified boot, controller poweroff, restored 3/3/4 GiB
+and a consistent private journal. Its **91.1312018 seconds violated the authorized
+90-second limit** and remain permanently classified as temporal failure.
+[Original sanitized evidence](evidence/HARNESS2_C2_FIRST_BOOT_2026-10-24.json).
+
+The corrected executor uses an origin before start, controller stop at 70 s,
+watchdog boot stop at 72 s and absolute Off confirmation deadline at 90 s.
+Async dispatch and a 15 s observation budget are distinct from actual Off evidence.
+Only timely confirmed Off can pass timing; recovery never erases late/unknown or
+failed timing. Heartbeats are monotonic; journal ownership/writer restrictions and
+all host budgets are preserved. Old acknowledgement/guard version is refused.
+
+**This revision was tested offline only; no new VM inspection, boot or configuration
+change.** The new timing path and emergency Hyper-V poweroff require fresh explicit
+authorization and live proof. See [deadline and recovery procedure](HARNESS2_C2_DEADLINE_RECOVERY.md).
+Historical preparation and blocked measurements below are retained as history.
+
 ## Light calibration revision (supersedes only the earlier first-boot budget)
 
 Latest bounded retry ended at **2026-10-24T18:06:55Z: BLOCKED**. Profile 2 GiB and

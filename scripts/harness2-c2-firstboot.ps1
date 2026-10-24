@@ -14,13 +14,22 @@ param(
 )
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
 $profileText=$MaximumGiB.ToString([cultureinfo]::InvariantCulture)
-$ack='FIRSTBOOT-PROBE:'+ $OperationId.ToString()+':'+$VMId.ToString()+':MAX'+$profileText
+$ack='FIRSTBOOT-DEADLINE-V2:'+ $OperationId.ToString()+':'+$VMId.ToString()+':MAX'+$profileText
 if($Authorization -cne $ack){throw 'Specific boot/cap/poweroff authorization required; no action performed.'}
 Import-Module (Join-Path $PSScriptRoot 'harness2-c2-boot.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'harness2-c2-deadline.psm1')
 $base=Import-Module (Join-Path $PSScriptRoot 'harness2-c2-lab.psm1') -Force -PassThru
 $policy=Get-C2BootBudget $MaximumGiB
 $parameters=@{Root=$Root;IsoPath=$IsoPath;OperationId=$OperationId}
 $script:ref=$null;$script:attempt=$null;$script:transitionPath=$null;$script:stopPath=$null
+$script:deadline=$null;$script:timing=@{};$script:stopJob=$null;$script:timingPath=$null
+function Save-Timing {
+    if($script:timingPath){Write-Private $script:timingPath @{actor=$Mode;timing=$script:timing;deadline=$script:deadline;utc=[datetime]::UtcNow.ToString('o')}}
+}
+function Write-Heartbeat([string]$Phase) {
+    $stamp=Get-C2MonotonicStamp
+    Write-Private (Join-Path $guard 'heartbeat.json') @{utc=$stamp.utc;monotonic_ticks=$stamp.ticks;phase=$Phase}
+}
 function Write-Private($Path,$Data){
     & $base {param($p,$d)
         Assert-C2NoLinks $p
@@ -37,29 +46,30 @@ function Get-OwnedVM {
     # Immutable reference captured from protected journal before boot. Never scan-delete or target by name alone.
     & $base {param($r)
         Assert-C2NoLinks $r.configuration
-        $all=@(Get-VM -ErrorAction Stop);$v=@($all|Where-Object{$_.Id.ToString() -eq $r.vm_id})
+        $v=@(Get-VM -Id $r.vm_id -ErrorAction Stop)
         if($v.Count -ne 1 -or $v[0].Name -cne $r.vm_name -or $v[0].Generation -ne 2 -or
           (Get-C2Path $v[0].ConfigurationLocation) -ine $r.configuration -or $v[0].Notes -cne ('DAIMON-C2:'+$r.operation_id)){throw 'Exact VM ownership unavailable; no foreign stop.'}
         $v[0]
     } $script:ref
 }
 function Stop-OwnedVMCore {
-    $v=Get-OwnedVM
-    if($v.State -ne 'Off'){
-        Stop-VM -VM $v -TurnOff -Force -Confirm:$false -ErrorAction Stop
-        $limit=[Diagnostics.Stopwatch]::StartNew()
-        do{$v=Get-OwnedVM;if($v.State -eq 'Off'){break};Start-Sleep -Milliseconds 250}while($limit.Elapsed.TotalSeconds -lt 15)
-        if($v.State -ne 'Off'){throw 'Poweroff unresolved; operator intervention required.'}
-    }
+    $adapter=@{Frequency=[Diagnostics.Stopwatch]::Frequency;Now={[Diagnostics.Stopwatch]::GetTimestamp()}
+      State={(Get-OwnedVM).State.ToString()};Send={
+        if(-not $script:stopJob){$script:stopJob=Stop-VM -VM (Get-OwnedVM) -TurnOff -Force -AsJob -Confirm:$false -ErrorAction Stop}
+        $script:stopJob
+      };CommandState={param($job) $job.State.ToString()};Sleep={param($ms) Start-Sleep -Milliseconds $ms}}
+    try{$null=Invoke-C2TimedStop $script:timing $adapter 15}finally{Save-Timing}
+    if(-not $script:timing.confirmed_off){throw 'Poweroff unconfirmed after bounded observation; no restore or reconciliation.'}
 }
 function Stop-OwnedVM {
+    if(-not $script:timing.ContainsKey('stop_requested_ticks')){$script:timing.stop_requested_ticks=[Diagnostics.Stopwatch]::GetTimestamp()}
     if($script:transitionPath){
         # Persistent veto precedes lock acquisition: no later start may follow a watchdog stop.
         Write-Private $script:stopPath @{requested_at_utc=[DateTime]::UtcNow.ToString('o');vm_id=$VMId.ToString()}
         Invoke-C2TransitionGate $script:transitionPath {Stop-OwnedVMCore}
     }else{Stop-OwnedVMCore}
 }
-function Restore-OwnedMaximum {
+function Restore-OwnedMaximumCore {
     $v=Get-OwnedVM;if($v.State -ne 'Off'){throw 'Cannot restore memory while running.'}
     $m=Get-VMMemory -VM $v
     $startup=$policy.guest_startup_gib*1GB;$ceiling=$MaximumGiB*1GB
@@ -68,6 +78,9 @@ function Restore-OwnedMaximum {
     Set-VMMemory -VM $v -MinimumBytes 3GB -StartupBytes 3GB -MaximumBytes 4GB -ErrorAction Stop
     $m=Get-VMMemory -VM (Get-OwnedVM)
     if($m.Minimum -ne 3GB -or $m.Startup -ne 3GB -or $m.Maximum -ne 4GB){throw 'Original memory restoration unverified.'}
+}
+function Restore-OwnedMaximum {
+    if($script:transitionPath){Invoke-C2TransitionGate $script:transitionPath {Restore-OwnedMaximumCore}}else{Restore-OwnedMaximumCore}
 }
 function Host-Sample($Previous){
     $s=Get-C2NativeSample $Previous
@@ -118,22 +131,36 @@ try {
         if([IO.Path]::GetFullPath($ReceiptPath) -ine (Join-Path $canonical 'watchdog-receipt.json')){throw 'Unexpected watchdog receipt path.'}
         $receiptAllowed=$true
         $script:attempt=Read-Private (Join-Path $canonical 'policy.json')
-        if($script:attempt.operation_id -cne $OperationId.ToString() -or $script:attempt.vm_id -cne $VMId.ToString() -or
+        if($script:attempt.version -ne 2 -or $script:attempt.operation_id -cne $OperationId.ToString() -or $script:attempt.vm_id -cne $VMId.ToString() -or
           $script:attempt.maximum_gib -ne $MaximumGiB -or $script:attempt.original_maximum_gib -ne 4){throw 'Guard binding mismatch.'}
         $script:ref=$script:attempt.reference
         $j=& $base {param($c) Read-C2Journal $c} $c
         if($j.vm_id -cne $script:ref.vm_id -or $j.vm_name -cne $script:ref.vm_name -or $j.operation_id -cne $script:ref.operation_id -or
           $script:ref.configuration -ine [IO.Path]::Combine($j.config,$j.vm_name)){throw 'Guard ownership not established.'}
         $script:transitionPath=Join-Path $canonical 'transition.lock';$script:stopPath=Join-Path $canonical 'stop-requested.json'
+        $script:timingPath=Join-Path $canonical 'watchdog-timing.json'
         & $base {param($p) Assert-C2Acl $p} $script:transitionPath
         # Compile/warm the native sensor before declaring readiness; do not overlap this peak with guest startup.
         $null=Get-C2NativeSample;[GC]::Collect()
         Write-Private (Join-Path $canonical 'ready.json') @{vm_id=$VMId.ToString();operation_id=$OperationId.ToString();process_id=$PID}
         $reason=Wait-C2WatchdogLease -ReadHeartbeat {Read-Private (Join-Path $canonical 'heartbeat.json')} -Sample {Get-C2NativeSample} -Policy $policy -Stop {
             $null=Invoke-C2ProbeRollback @{Stop={Stop-OwnedVM};State={(Get-OwnedVM).State.ToString()};Restore={Restore-OwnedMaximum}}
+        } -ReadDeadline {
+            $path=Join-Path $canonical 'boot-clock.json'
+            if(Test-Path -LiteralPath $path){
+                $record=Read-Private $path
+                if($record.vm_id -cne $VMId.ToString() -or $record.operation_id -cne $OperationId.ToString() -or $record.deadline.limit_seconds -ne $policy.probe_seconds){throw 'Boot clock binding mismatch.'}
+                if(-not $script:deadline){$script:deadline=New-C2Deadline $record.deadline.origin_ticks $record.deadline.frequency $policy.probe_seconds}
+                $script:deadline
+            }
+        } -VerifyDone {
+            if((Get-OwnedVM).State -ne 'Off'){return $false}
+            if(-not $script:timing.ContainsKey('off_observed_ticks')){$script:timing.off_observed_ticks=[Diagnostics.Stopwatch]::GetTimestamp()}
+            $script:timing.confirmed_off=$true;Save-Timing;$true
         }
-        if($reason -ne 'controller-finished'){Write-Private (Join-Path $canonical 'watchdog-result.json') @{status='POWERED_OFF';reason=$reason}}
-        $report=@{status='WATCHDOG_FINISHED';reason=$reason;ownership_authority=$false}
+        $temporal=if($script:deadline){Get-C2TemporalVerdict $script:deadline $script:timing}else{'NO_BOOT_CLOCK'}
+        if($reason -ne 'controller-finished'){Write-Private (Join-Path $canonical 'watchdog-result.json') @{status='OFF_VERIFIED';reason=$reason;timing=$script:timing;temporal_verdict=$temporal;poweroff_command_issued=$script:timing.ContainsKey('stop_command_invoked_ticks')}}
+        $report=@{status=if($temporal -in 'OFF_BY_DEADLINE','NO_BOOT_CLOCK'){'WATCHDOG_FINISHED'}else{'WATCHDOG_FAILED_OFF_VERIFIED'};reason=$reason;timing=$script:timing;temporal_verdict=$temporal;ownership_authority=$false}
     }else{
         # Receipt must be an explicit new operator file, outside the protected root.
         $receipt=& $base {param($p) $r=Get-C2Path $p;Assert-C2NoLinks $r;$r} $ReceiptPath
@@ -159,11 +186,13 @@ try {
         $baselineCaptured=$true
         $guard=Join-Path $c.root ('firstboot-'+[guid]::NewGuid().ToString('N'))
         & $base {param($g) New-C2Directory $g;Assert-C2Acl $g -Directory} $guard
+        $script:timingPath=Join-Path $guard 'controller-timing.json'
         $script:transitionPath=Join-Path $guard 'transition.lock';$script:stopPath=Join-Path $guard 'stop-requested.json'
         & $base {param($p) $f=New-C2File $p;$f.Dispose();Assert-C2Acl $p} $script:transitionPath
-        $script:attempt=@{version=1;operation_id=$OperationId.ToString();vm_id=$VMId.ToString();maximum_gib=$MaximumGiB;original_maximum_gib=4;reference=$script:ref;policy=$policy}
+        $script:attempt=@{version=2;operation_id=$OperationId.ToString();vm_id=$VMId.ToString();maximum_gib=$MaximumGiB;original_maximum_gib=4;reference=$script:ref;policy=$policy
+          controller_pid=$PID;controller_started_utc=(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o')}
         Write-Private (Join-Path $guard 'policy.json') $script:attempt
-        Write-Private (Join-Path $guard 'heartbeat.json') @{utc=[DateTime]::UtcNow.ToString('o');phase='arming'}
+        Write-Heartbeat 'arming'
         $childArgs=@('-NoProfile','-NonInteractive','-File',('"'+$PSCommandPath+'"'),'-Mode','Watchdog','-Root',('"'+$Root+'"'),'-IsoPath',('"'+$IsoPath+'"'),'-OperationId',$OperationId.ToString(),'-VMId',$VMId.ToString(),'-MaximumGiB',$profileText,'-Authorization',('"'+$ack+'"'),'-ReceiptPath',('"'+(Join-Path $guard 'watchdog-receipt.json')+'"'),'-GuardDirectory',('"'+$guard+'"')) -join ' '
         $watcher=Start-Process -FilePath (Get-Command pwsh.exe).Source -ArgumentList $childArgs -WindowStyle Hidden -PassThru
         $ready=[Diagnostics.Stopwatch]::StartNew()
@@ -181,15 +210,33 @@ try {
             if($MaximumGiB -ne 4){Set-VMMemory -VM $v -MinimumBytes ($policy.guest_startup_gib*1GB) -StartupBytes ($policy.guest_startup_gib*1GB) -MaximumBytes ($MaximumGiB*1GB) -ErrorAction Stop}
             & $base {param($j,$max,$startup) Assert-C2Acl $j.root -Directory;Assert-C2Acl (Join-Path $j.root 'journal.json');$null=Assert-C2VM $j -Complete -ProbeMaximumMemoryGiB $max -ProbeStartupMemoryGiB $startup} $j $MaximumGiB $policy.guest_startup_gib
             Assert-C2StartLease $watcher $script:stopPath
-            Start-VM -VM (Get-OwnedVM) -ErrorAction Stop
+            $startVm=Get-OwnedVM
+            $stamp=Get-C2MonotonicStamp
+            $script:deadline=New-C2Deadline $stamp.ticks $stamp.frequency $policy.probe_seconds
+            $script:timing.start_requested_ticks=$stamp.ticks
+            Write-Private (Join-Path $guard 'boot-clock.json') @{vm_id=$VMId.ToString();operation_id=$OperationId.ToString();deadline=$script:deadline;start_requested_utc=$stamp.utc}
+            Save-Timing
+            Assert-C2StartLease $watcher $script:stopPath
+            Start-VM -VM $startVm -ErrorAction Stop
+            $script:timing.start_command_returned_ticks=[Diagnostics.Stopwatch]::GetTimestamp()
+            Save-Timing
         }
         $started=$true
         $j.state='running';& $base {param($j) Write-C2Journal $j} $j
-        $clock.Restart();$previous=$null;$last=0.0;$low=0.0;$high=0.0;$run=[Collections.Generic.List[object]]::new();$why=''
+        $previous=$null;$last=0.0;$low=0.0;$high=0.0;$run=[Collections.Generic.List[object]]::new();$why=''
         do{
-            Write-Private (Join-Path $guard 'heartbeat.json') @{utc=[DateTime]::UtcNow.ToString('o');phase='running'}
-            $s=Host-Sample $previous;$previous=$s.cpu_ticks;$s.Remove('cpu_ticks');$now=$clock.Elapsed.TotalSeconds;$dt=$now-$last;$last=$now
+            $deadlineState=Get-C2DeadlineState $script:deadline ([Diagnostics.Stopwatch]::GetTimestamp())
+            if($deadlineState.request_stop){$why='shutdown-lead-reached';break}
+            Write-Heartbeat 'running'
+            $s=Host-Sample $previous;$previous=$s.cpu_ticks;$s.Remove('cpu_ticks')
+            $deadlineState=Get-C2DeadlineState $script:deadline ([Diagnostics.Stopwatch]::GetTimestamp());$now=$deadlineState.elapsed_seconds;$dt=$now-$last;$last=$now
             $low=if($s.available_gib -lt $policy.low_available_gib){$low+$dt}else{0.0};$high=if($s.cpu_percent -and $s.cpu_percent -gt $policy.abort_cpu_percent){$high+$dt}else{0.0}
+            if($deadlineState.request_stop){
+                $fault=$s.available_gib -lt $policy.critical_available_gib -or $low -ge $policy.low_available_seconds -or $high -ge $policy.abort_cpu_seconds -or
+                  $s.commit_limit_gib -le 0 -or $s.commit_gib/$s.commit_limit_gib -ge $policy.abort_commit_ratio -or $s.pagefile_used_mib-$samples[0].pagefile_used_mib -ge $policy.abort_pagefile_growth_mib
+                $why=if($fault){'host-pressure-at-shutdown-lead'}else{'shutdown-lead-reached'}
+                $s.elapsed_seconds=$now;$run.Add($s);break
+            }
             $v=Get-OwnedVM;$aclOK=$true
             $watcher.Refresh();if($watcher.HasExited -or (Test-Path -LiteralPath $script:stopPath)){throw 'Independent watchdog stopped; aborting own VM.'}
             try{& $base {param($c) Assert-C2Acl $c.root -Directory;Assert-C2Acl (Join-Path $c.root 'journal.json');Assert-C2Acl (Join-Path $c.root 'operation.lock')} $c}catch{$aclOK=$false}
@@ -199,12 +246,17 @@ try {
             $why=Get-C2ProbeAbortReason $s $state $now $policy $view
             $s.vm=$view;$s.elapsed_seconds=$now;$run.Add($s)
             $events=@(Get-EventSummary $since);if(@($events|Where-Object{$_.level -in 1,2}).Count){$why='hyper-v-error-event'}
-            if($why -or $v.State -ne 'Running'){break};Start-Sleep -Seconds 2
+            $deadlineState=Get-C2DeadlineState $script:deadline ([Diagnostics.Stopwatch]::GetTimestamp())
+            if($deadlineState.request_stop -and -not $why){$why='shutdown-lead-reached'}
+            if($why -or $v.State -ne 'Running'){break};Start-Sleep -Milliseconds ([int](1000*[math]::Min(2,$deadlineState.seconds_until_stop)))
         }while($true)
         Reconcile-Off
-        Write-Private (Join-Path $guard 'heartbeat.json') @{utc=[DateTime]::UtcNow.ToString('o');phase='done'}
-        $report=@{status='PROBE_FINISHED_OFF';stop_reason=$why;samples=$run.ToArray();baseline=$assessment;events=$events
-            journal_reconciled=$true;maximum_restored_gib=4;guest_installation=$false;ownership_authority=$false}
+        $temporal=Get-C2TemporalVerdict $script:deadline $script:timing
+        Write-Private (Join-Path $guard 'deadline-result.json') @{temporal_verdict=$temporal;deadline=$script:deadline;timing=$script:timing}
+        Write-Heartbeat 'done'
+        $report=@{status=if($temporal -eq 'OFF_BY_DEADLINE' -and $why -eq 'shutdown-lead-reached'){'PROBE_FINISHED_OFF_WITHIN_DEADLINE'}else{'PROBE_FAILED_OFF_VERIFIED'}
+            temporal_verdict=$temporal;deadline=$script:deadline;timing=$script:timing;stop_reason=$why;samples=$run.ToArray();baseline=$assessment;events=@(Get-EventSummary $since)
+            journal_reconciled=$true;maximum_restored_gib=4;guest_installation=$false;ownership_authority=$false;guard_directory=$guard}
     }
 }catch{
     $reason=$_.Exception.Message;$rollback='NOT_NEEDED'
@@ -212,10 +264,14 @@ try {
     if($Mode -eq 'Probe' -and $script:ref -and $baselineCaptured){
         try{Reconcile-Off;$rollback='OFF_MAX4_CONFIGURED'}catch{$rollback='OFF_OR_CONTROL_RECONCILIATION_UNRESOLVED'}
         if($script:attempt -and (Get-Variable guard -ErrorAction SilentlyContinue)){
-            try{Write-Private (Join-Path $guard 'heartbeat.json') @{utc=[DateTime]::UtcNow.ToString('o');phase=if($rollback -eq 'OFF_MAX4_CONFIGURED'){'done'}else{'unresolved'}}}catch{}
+            try{Write-Heartbeat $(if($rollback -eq 'OFF_MAX4_CONFIGURED'){'done'}else{'unresolved'})}catch{}
         }
     }
-    $report=@{status='BLOCKED_OR_ABORTED';reason=$reason;rollback=$rollback;boot_started=$started;ownership_authority=$false}
+    $report=@{status='BLOCKED_OR_ABORTED';reason=$reason;rollback=$rollback;boot_started=$started;ownership_authority=$false;timing=$script:timing;deadline=$script:deadline
+      temporal_verdict=if($script:deadline){Get-C2TemporalVerdict $script:deadline $script:timing}else{'NO_BOOT_CLOCK'}}
+    if($script:deadline -and (Get-Variable guard -ErrorAction SilentlyContinue)){
+        try{Write-Private (Join-Path $guard 'deadline-result.json') @{status='FAILED';temporal_verdict=$report.temporal_verdict;timing=$script:timing;deadline=$script:deadline}}catch{}
+    }
 }finally{if($lock){$lock.Dispose()}}
 $report.observed_at_utc=[DateTime]::UtcNow.ToString('o');$report.security_gates='all-18-unverified'
 if(-not $receiptAllowed){$report|ConvertTo-Json -Depth 5;exit 2}
@@ -223,4 +279,4 @@ if($Mode -eq 'Watchdog'){try{Write-Private $ReceiptPath $report}catch{}}else{
     $f=[IO.FileStream]::new($ReceiptPath,'CreateNew','Write','Read')
     try{$bytes=[Text.UTF8Encoding]::new($false).GetBytes(($report|ConvertTo-Json -Depth 10));$f.Write($bytes,0,$bytes.Length);$f.Flush($true)}finally{$f.Dispose()}
 }
-if($report.status -in 'BLOCKED_OR_ABORTED'){exit 2}
+if($report.status -in 'BLOCKED_OR_ABORTED','PROBE_FAILED_OFF_VERIFIED','WATCHDOG_FAILED_OFF_VERIFIED'){exit 2}

@@ -1,6 +1,7 @@
 # Read-only host sensors and bounded first-boot admission/abort policy.
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
+Import-Module (Join-Path $PSScriptRoot 'harness2-c2-deadline.psm1')
 function Initialize-C2HostSensors {
     if (-not ('DaimonC2.HostSensors' -as [type])) {
         Add-Type -TypeDefinition @'
@@ -134,16 +135,27 @@ function Invoke-C2TransitionGate([string]$Path,[scriptblock]$Action,[ValidateRan
     }finally{if($handle){$handle.Dispose()}}
 }
 function Wait-C2WatchdogLease([scriptblock]$ReadHeartbeat,[scriptblock]$Sample,[scriptblock]$Stop,
-    [hashtable]$Policy,[ValidateRange(20,2000)][int]$PollMilliseconds=2000) {
+    [hashtable]$Policy,[ValidateRange(20,2000)][int]$PollMilliseconds=2000,
+    [scriptblock]$ReadDeadline={ $null },[scriptblock]$VerifyDone={ $false }) {
     # Shared by the real VM watchdog and real-process offline smoke. No simulated clock.
     $clock=[Diagnostics.Stopwatch]::StartNew();$reason=''
     try {
         do {
+            $deadline=& $ReadDeadline
+            if($deadline){
+                $now=Get-C2MonotonicStamp
+                if($deadline.frequency -ne $now.frequency){throw 'Deadline clock frequency changed.'}
+                if((Get-C2DeadlineState $deadline $now.ticks).watchdog_stop){$reason='watchdog-boot-deadline';break}
+            }
             $h=& $ReadHeartbeat
             if($h.phase -notin 'arming','running','done','unresolved'){throw 'Invalid heartbeat phase.'}
-            $age=([DateTime]::UtcNow-([datetime]$h.utc).ToUniversalTime()).TotalSeconds
-            if($age -lt -2){throw 'Future heartbeat.'}
-            if($h.phase -eq 'done'){return 'controller-finished'}
+            $now=Get-C2MonotonicStamp
+            if($h.monotonic_ticks -le 0 -or $h.monotonic_ticks -gt $now.ticks){throw 'Invalid monotonic heartbeat.'}
+            $age=($now.ticks-[long]$h.monotonic_ticks)/[double]$now.frequency
+            if($h.phase -eq 'done'){
+                if(& $VerifyDone){return 'controller-finished'}
+                $reason='controller-done-unverified';break
+            }
             if($age -gt $Policy.heartbeat_timeout_seconds){$reason='controller-heartbeat-lost';break}
             $s=& $Sample
             if($null -eq $s.available_gib -or $s.commit_limit_gib -le 0 -or $null -eq $s.commit_gib){throw 'Invalid watchdog telemetry.'}

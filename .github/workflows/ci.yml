@@ -22,6 +22,7 @@ jobs:
         run: |
           ./scripts/test-harness2-c2-lab.ps1
           ./scripts/test-harness2-c2-boot.ps1
+          ./scripts/test-harness2-c2-deadline.ps1
           ./scripts/test-harness2-c2-watchdog.ps1
 
   ui:
