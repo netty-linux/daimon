@@ -228,7 +228,8 @@ Test 'real parser accepts exact bounded contract' {
     function script:Reset-ValidationFixture {
         $j = Get-C2Contract 'D:\lab' 'D:\image.iso' 'ace3eaf4-4e8d-45d0-ae5e-f8029c326a16'
         $j.vm_id = '582f9057-03bf-4b8e-bfb3-a349e11837f4'; $j.disk_id = '6abc46df-80ce-46ae-8aa5-bb536b3c3505'
-        $script:Fixture.vms = @([pscustomobject]@{ Id = [guid]$j.vm_id; Name = $j.vm_name; Generation = 2; ConfigurationLocation = $j.config; SmartPagingFilePath = $j.config; SnapshotFileLocation = $j.config
+        $vmDirectory = [IO.Path]::Combine($j.config, $j.vm_name)
+        $script:Fixture.vms = @([pscustomobject]@{ Id = [guid]$j.vm_id; Name = $j.vm_name; Generation = 2; ConfigurationLocation = $vmDirectory; SmartPagingFilePath = $vmDirectory; SnapshotFileLocation = $vmDirectory
             Notes = 'DAIMON-C2:' + $j.operation_id; State = 'Off'; AutomaticStartAction = 'Nothing'; AutomaticStopAction = 'TurnOff'; AutomaticCheckpointsEnabled = $false; CheckpointType = 'Disabled' })
         $script:Fixture.refs = @{ $j.vm_id = @([pscustomobject]@{ Path = $j.disk }) }; $script:Fixture.snapshots = @{ $j.vm_id = @() }
         $script:Fixture.dvds = @([pscustomobject]@{ Path = $j.iso }); $script:Fixture.nics = @(); $script:Fixture.services = @()
@@ -242,6 +243,13 @@ Test 'real parser accepts exact bounded contract' {
 }
 Test 'real validator accepts complete offline configuration' {
     & $module { $j = Reset-ValidationFixture; $null = Assert-C2VM $j -Complete }
+}
+Test 'real validator refuses parent container in place of exact Hyper-V child directory' {
+    Reject { & $module {
+        $j = Reset-ValidationFixture
+        $script:Fixture.vms[0].ConfigurationLocation = $j.config
+        $null = Get-C2VM $j
+    } } 'ownership/location'
 }
 Test 'real adapter normalizes braced upper-case VHD GUID before recording' {
     & $module {

@@ -234,15 +234,18 @@ function Assert-C2Host([string]$Mode, $c) {
 
 function Get-C2VM($j, [switch]$AllowAbsent) {
     Assert-C2NoLinks $j.config
+    # New-VM -Path is the container; Hyper-V appends the VM name for ConfigurationLocation.
+    $expectedConfig = [IO.Path]::Combine($j.config, $j.vm_name)
+    Assert-C2NoLinks $expectedConfig
     $all = @(Get-VM -ErrorAction Stop)
     $matches = @($all | Where-Object { $_.Id.ToString() -eq $j.vm_id })
     if ($matches.Count -eq 0 -and $AllowAbsent) { return $null }
     if ($matches.Count -ne 1) { throw 'Exact owned VM unavailable.' }
     $vm = $matches[0]
-    if ($vm.Name -cne $j.vm_name -or $vm.Generation -ne 2 -or (Get-C2Path $vm.ConfigurationLocation) -ine $j.config) { throw 'VM ownership/location mismatch.' }
+    if ($vm.Name -cne $j.vm_name -or $vm.Generation -ne 2 -or (Get-C2Path $vm.ConfigurationLocation) -ine $expectedConfig) { throw 'VM ownership/location mismatch.' }
     foreach ($path in @($vm.SmartPagingFilePath, $vm.SnapshotFileLocation)) {
         $canonical = Get-C2Path $path
-        if ($canonical -ine $j.config -and -not $canonical.StartsWith($j.config + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'VM auxiliary path outside owned configuration root.' }
+        if ($canonical -ine $expectedConfig -and -not $canonical.StartsWith($expectedConfig + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'VM auxiliary path outside owned configuration root.' }
         Assert-C2NoLinks $canonical
     }
     $vm
@@ -373,7 +376,8 @@ function New-C2Backend {
         }
         Configure = { param($j)
             $vm = Assert-C2VM $j
-            Set-VM -VM $vm -Notes ('DAIMON-C2:' + $j.operation_id) -AutomaticStartAction Nothing -AutomaticStopAction TurnOff -AutomaticCheckpointsEnabled $false -CheckpointType Disabled -SmartPagingFilePath $j.config -SnapshotFileLocation $j.config -ErrorAction Stop
+            $vmDirectory = [IO.Path]::Combine($j.config, $j.vm_name)
+            Set-VM -VM $vm -Notes ('DAIMON-C2:' + $j.operation_id) -AutomaticStartAction Nothing -AutomaticStopAction TurnOff -AutomaticCheckpointsEnabled $false -CheckpointType Disabled -SmartPagingFilePath $vmDirectory -SnapshotFileLocation $vmDirectory -ErrorAction Stop
             Set-VMProcessor -VM $vm -Count 2 -ExposeVirtualizationExtensions $false -ErrorAction Stop
             Set-VMMemory -VM $vm -DynamicMemoryEnabled $true -MinimumBytes 3GB -StartupBytes 3GB -MaximumBytes 4GB -ErrorAction Stop
             foreach ($nic in @(Get-VMNetworkAdapter -VM $vm -ErrorAction Stop)) {

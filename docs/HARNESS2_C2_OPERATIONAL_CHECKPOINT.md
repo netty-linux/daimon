@@ -1,5 +1,32 @@
 # C2 — aquisição executada e preparação operacional
 
+## VM criada Off, configuração pendente — 2026-10-24
+
+Consulta elevada do disco concluída: GUID real é string em maiúsculas, não vazio;
+VHDX Dynamic 48 GiB, 4 MiB físicos, parent vazio, Attached=false, owner
+Administradores, sem referências em VMs/checkpoints, sem VM ou diretório de
+configuração correspondente naquele momento. Data de criação coincide com a
+tentativa que falhou. Journal protegido confirmou disk-pending/IDs ausentes.
+
+Reconciliação explícita elevada: verificou novamente UUID/raiz protegida,
+GUID/time/tipo/tamanho exatos, ACL, ausência de referências/VM/config e hash da
+ISO privada; salvou registro protegido de revisão e journal disk-ready. Não
+alterou o ID/bytes do VHDX nem recriou o disco. Retomada na autorização original
+criou a VM e persistiu seu VMId, mantendo-a **Off**, sem boot/instalação.
+
+A configuração recusou `VM ownership/location mismatch`: Hyper-V materializou
+ConfigurationLocation em `config-container/vm-name`, não no container passado
+a New-VM -Path. Caminho real e VMId foram lidos no tratamento elevado da falha.
+Validador corrigido para esse filho **exato**, sem aceitar qualquer prefixo;
+SmartPaging/Snapshot permanecem no diretório próprio. **47 testes offline PASS**.
+Estado confirmado no journal: vm-recorded, IDs de VM e disco presentes. IDs e
+caminhos privados não publicados; recibos locais não substituem o journal.
+
+Próxima ação: retomar configuração da mesma VM por VMId após CI e UAC legítimo.
+Não executar New-VM novamente, não apagar recursos, não bootar. Nova VM não
+está ainda declarada conforme à configuração 2 vCPU/3–4 GiB/zero NICs até a
+validação final; não confundir criação com conclusão da configuração.
+
 ## Execução autorizada retomada — 2026-10-24, VHDX pendente
 
 O proprietário confirmou reapresentar UAC e continuar somente a criação Off.

@@ -105,7 +105,7 @@ não existem neste executor.
 
 ## Revisão e evidências deste marco
 
-- PASS: 46 testes offline, incluindo escrita perdida antes/depois de efeitos,
+- PASS: 47 testes offline, incluindo escrita perdida antes/depois de efeitos,
   Start com resposta perdida, idempotência, cleanup interrompido, estado Running,
   IDs divergentes, journal adulterado/duplicado/excessivo, VM/path/VHD trocados,
   refs estrangeiras e drift de rede, integração, boot, memória e firmware.
@@ -130,8 +130,12 @@ não existem neste executor.
   string com chaves/maiúsculas, sem alterar o VHDX. O formato real neste host
   aguarda consulta elevada: UAC da inspeção foi cancelado. Estado pendente não
   autoriza reutilizar/apagar o arquivo; requer reconciliação explícita.
-- NOT RUN: VM, boot, instalação, calibração e descarte real. Testes simulados
-  não substituem o ensaio administrativo. Os 18 gates continuam unverified.
+- Retomada após inspeção/reconciliação explícita: VHDX existente registrado,
+  VM criada **Off**, VMId persistido; configuração interrompida pela expectativa
+  incorreta de ConfigurationLocation. Corrigido layout real: New-VM -Path indica
+  container e Hyper-V acrescenta o nome da VM. Validação permanece exata.
+- NOT RUN: boot, instalação, calibração e descarte real. Configuração final da
+  VM ainda precisa ser concluída e validada. Os 18 gates continuam unverified.
 
 Correções da revisão: criação segura sem adotar diretório concorrente; prevenção
 de merge de checkpoints; referências estrangeiras também para ISO; permissões
