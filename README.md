@@ -25,7 +25,7 @@ nem APIs externas; o comando chat se conecta ao endpoint escolhido pelo usuário
 
 ## Execução e validação
 
-Requisito: Go 1.27.1 ou posterior. Na raiz do projeto:
+Requisito: Go 1.27.3 ou posterior. Na raiz do projeto:
 
 ```sh
 go run ./cmd/daimon demo
@@ -45,10 +45,10 @@ falhas retornam código não zero. Chat imprime resposta final, passos, tool cal
 resultados truncados e StopReason, sem imprimir o histórico.
 
 No ambiente Windows inicial, o SDK foi instalado em
-`%LOCALAPPDATA%\DAIMON\toolchains\go1.27.1\go`:
+`%LOCALAPPDATA%\DAIMON\toolchains\go1.27.3\go`:
 
 ```powershell
-$env:PATH = "$env:LOCALAPPDATA\DAIMON\toolchains\go1.27.1\go\bin;$env:PATH"
+$env:PATH = "$env:LOCALAPPDATA\DAIMON\toolchains\go1.27.3\go\bin;$env:PATH"
 go run ./cmd/daimon demo
 ```
 
@@ -57,8 +57,8 @@ desenvolvedor ou privilégio apropriado, falham explicitamente. Para executar a
 suíte inteira em Linux com Docker Desktop (download inicial requer rede):
 
 ```powershell
-docker pull golang:1.27.1
-docker run --rm --network none --mount "type=bind,source=$((Get-Location).Path),target=/workspace,readonly" -w /workspace golang:1.27.1 bash -c 'go vet ./... && go test -count=1 ./... && go test -race -count=1 ./... && go run ./cmd/daimon demo'
+docker pull golang:1.27.3
+docker run --rm --network none --mount "type=bind,source=$((Get-Location).Path),target=/workspace,readonly" -w /workspace golang:1.27.3 bash -c 'go vet ./... && go test -count=1 ./... && go test -race -count=1 ./... && go run ./cmd/daimon demo'
 ```
 
 ## Arquitetura

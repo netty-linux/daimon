@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 
 const docker=(...args)=>{const r=spawnSync('docker',args,{encoding:'utf8',timeout:30000});assert.equal(r.status,0,r.stderr);return r.stdout.trim()};
 const missing=process.argv.includes('--missing'),name='daimon-computer-'+randomUUID();
-const child=spawn('docker',['run','--rm','--pull','never','--name',name,'-p','127.0.0.1::3001','--mount',`type=bind,source=${resolve('..')},target=/workspace,readonly`,'--tmpfs','/fixture:rw,nosuid,size=32m','--workdir','/workspace','--env','COMPUTER_SMOKE=1',...(missing?['--env','CUA_MISSING=1']:[]),'--env','GOTOOLCHAIN=local','--env','GOPROXY=off','golang:1.27.1','sh','-ec','go build -buildvcs=false -o /tmp/cua-driver ./ui/scripts/cua-fixture\ngo build -tags approvalsmoke -buildvcs=false -o /tmp/approval-fixture ./ui/scripts/approval-fixture\nexec /tmp/approval-fixture'],{stdio:['ignore','pipe','pipe']});
+const child=spawn('docker',['run','--rm','--pull','never','--name',name,'-p','127.0.0.1::3001','--mount',`type=bind,source=${resolve('..')},target=/workspace,readonly`,'--tmpfs','/fixture:rw,nosuid,size=32m','--workdir','/workspace','--env','COMPUTER_SMOKE=1',...(missing?['--env','CUA_MISSING=1']:[]),'--env','GOTOOLCHAIN=local','--env','GOPROXY=off','golang:1.27.3','sh','-ec','go build -buildvcs=false -o /tmp/cua-driver ./ui/scripts/cua-fixture\ngo build -tags approvalsmoke -buildvcs=false -o /tmp/approval-fixture ./ui/scripts/approval-fixture\nexec /tmp/approval-fixture'],{stdio:['ignore','pipe','pipe']});
 let output='',errors='',exited=false,browser;
 child.stdout.on('data',b=>{output+=b});child.stderr.on('data',b=>{errors+=b});
 const exit=new Promise(resolve=>child.once('exit',code=>{exited=true;resolve(code)}));

@@ -6,4 +6,4 @@ dependencies = ["harness2 @ git+https://github.com/google-research/harness2.git@
 
 [tool.uv]
 package = false
-build-constraint-dependencies = ["setuptools==80.9.0", "wheel==0.45.1"]
+build-constraint-dependencies = ["setuptools==84.1.0", "wheel==0.46.2", "packaging==26.3"]
