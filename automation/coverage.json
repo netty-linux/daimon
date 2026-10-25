@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "audit_base": "76a81cff335d54480f3e9ef42ca60b6459d34dfc",
+  "lanes": [
+    {"id":"automation-linux","scope":"Evidence tooling tests on Linux","implemented":true,"status":"NOT RUN","reason":"Requires this run's artifact"},
+    {"id":"automation-windows","scope":"Evidence tooling tests on Windows","implemented":true,"status":"NOT RUN","reason":"Requires this run's artifact"},
+    {"id":"windows-contracts","scope":"Native manifest contracts only; not Hyper-V, process independence or Windows 10 certification","implemented":true,"status":"NOT RUN","reason":"Requires this run's artifact"},
+    {"id":"linux-demo","scope":"Existing credential-free scripted CLI integration","implemented":true,"status":"NOT RUN","reason":"Requires this run's artifact"},
+    {"id":"automation-policy","scope":"Static workflow permissions, action pins and forbidden execution paths only","implemented":true,"status":"NOT RUN","reason":"Requires this run's artifact"},
+    {"id":"linux-existing-ci","scope":"Existing formatting, vet, Go tests and race detector","implemented":false,"status":"NOT RUN","reason":"Separate CI workflow; no result imported or inferred here"},
+    {"id":"ui-existing-ci","scope":"Existing typecheck, Vitest, production build and embed diff","implemented":false,"status":"NOT RUN","reason":"Separate CI workflow; no result imported or inferred here"},
+    {"id":"python-upstream-integration","scope":"Pinned real Python worker, native adapter and Linux resource limits","implemented":false,"status":"BLOCKED","reason":"Pinned Python 3.12 environment and verified upstream dependencies not provisioned by this workflow"},
+    {"id":"browser-integration","scope":"Playwright smokes with fake providers; some require Docker","implemented":false,"status":"NOT RUN","reason":"Browser/container dependencies need a separately reviewed recipe"},
+    {"id":"vulnerability-scanning","scope":"Go and npm vulnerability assessment and dependency review","implemented":false,"status":"NOT RUN","reason":"Static automation policy is not a vulnerability scanner"},
+    {"id":"c2-offline-independence","scope":"Two detached real-process watchdog cases with verified safe cleanup","implemented":false,"status":"BLOCKED","reason":"Source belongs to unmerged PR #28; requires separately validated Job/console-independent executor"},
+    {"id":"c2-hyperv-operational","scope":"Real VM boot, independent emergency stop, deadlines, restoration and journal","implemented":false,"status":"BLOCKED","reason":"No dedicated approved laboratory, exact-operation approval or operational evidence in this workflow"},
+    {"id":"c2-isolation-gates","scope":"All 18 security gates; never modified by development automation","implemented":false,"status":"UNVERIFIED","reason":"Hosted CI and offline fixtures do not attest operational isolation"},
+    {"id":"codex-cloud-environment","scope":"Account access, configured environment and quota for agent development","implemented":false,"status":"UNVERIFIED","reason":"Architecture only; no cloud environment or paid API configured"}
+  ]
+}

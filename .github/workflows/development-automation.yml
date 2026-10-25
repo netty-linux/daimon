@@ -1,0 +1,143 @@
+name: Development Automation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: development-automation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tooling:
+    name: Evidence tooling / ${{ matrix.family }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            family: linux
+          - os: windows-2025
+            family: windows
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Execute evidence tests
+        run: python automation/evidence.py --lane automation-${{ matrix.family }} --output .automation-results/automation-${{ matrix.family }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dev-automation-${{ matrix.family }}-attempt-${{ github.run_attempt }}
+          path: .automation-results/automation-${{ matrix.family }}/
+          retention-days: 1
+          if-no-files-found: error
+
+  contracts:
+    name: Windows manifest contracts (no virtualization)
+    runs-on: windows-2025
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - run: python automation/evidence.py --lane windows-contracts --output .automation-results/windows-contracts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dev-windows-contracts-attempt-${{ github.run_attempt }}
+          path: .automation-results/windows-contracts/
+          retention-days: 1
+          if-no-files-found: error
+
+  integration:
+    name: Linux scripted demo (no external provider)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - run: python automation/evidence.py --lane linux-demo --output .automation-results/linux-demo
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dev-linux-demo-attempt-${{ github.run_attempt }}
+          path: .automation-results/linux-demo/
+          retention-days: 1
+          if-no-files-found: error
+
+  policy:
+    name: Automation workflow policy (not vulnerability scan)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - run: python automation/evidence.py --lane automation-policy --output .automation-results/automation-policy
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dev-automation-policy-attempt-${{ github.run_attempt }}
+          path: .automation-results/automation-policy/
+          retention-days: 1
+          if-no-files-found: error
+
+  report:
+    name: Coverage report (safe lanes only)
+    needs: [tooling, contracts, integration, policy]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: dev-*-attempt-${{ github.run_attempt }}
+          path: .automation-results/input
+      - name: Verify and aggregate this run only
+        if: always()
+        run: python automation/evidence.py --aggregate .automation-results/input --output .automation-results/matrix
+      - name: Publish coverage table
+        if: always()
+        run: cat .automation-results/matrix/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: development-coverage-matrix-attempt-${{ github.run_attempt }}
+          path: .automation-results/matrix/
+          retention-days: 1
+          if-no-files-found: error
