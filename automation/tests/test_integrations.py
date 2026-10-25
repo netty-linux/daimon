@@ -43,6 +43,20 @@ class IntegrationFacts(unittest.TestCase):
         facts = integration.go_results('\n'.join(map(json.dumps, rows)))
         self.assertEqual(facts['skipped'][0]['reason'], 'unsupported-platform gate')
 
+    def test_package_without_tests_is_explicitly_not_run_not_a_skipped_case(self):
+        rows = self.go_events() + [dict(Action='output', Package='fixture', Output='? fixture [no test files]\n'),
+                                 dict(Action='skip', Package='fixture')]
+        facts = integration.go_results('\n'.join(map(json.dumps, rows)))
+        self.assertEqual(facts['skipped'], [])
+        self.assertEqual(facts['not_run_packages'][0]['status'], 'NOT RUN')
+
+    def test_unknown_package_skip_is_not_silently_exempted(self):
+        rows = self.go_events() + [dict(Action='output', Package='fixture', Output='unexplained skip'),
+                                 dict(Action='skip', Package='fixture')]
+        facts = integration.go_results('\n'.join(map(json.dumps, rows)))
+        self.assertEqual(len(facts['skipped']), 1)
+        self.assertEqual(facts['not_run_packages'], [])
+
     def test_go_failure_is_not_hidden_by_other_passes(self):
         with self.assertRaises(ValueError):
             integration.go_results('\n'.join(map(json.dumps, self.go_events() + [dict(Action='fail')])) )

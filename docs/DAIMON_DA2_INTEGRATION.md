@@ -74,12 +74,14 @@ distintos. Skips nas integrações obrigatórias impedem PASS e reprovam o job.
 O Go existente contém um teste propositalmente não aplicável ao Linux:
 `TestManagedPreimageUnsupportedBeforeEffects`. Esse skip é listado com razão em
 test/race e conserva a cobertura Go como UNVERIFIED; somente essa ausência conhecida
-pode manter o job legado verde. Skip da ponte real nunca é permitido. A matriz
+pode manter o job legado verde. Eventos de pacote `[no test files]` ficam listados
+como NOT RUN em `not_run_packages`, separados de testes existentes pulados. Um
+skip de pacote sem essa razão não é isentado. Skip da ponte real nunca é permitido. A matriz
 operacional continua BLOCKED e os 18 gates UNVERIFIED.
 
 ## Validação e limitações
 
-Validação local inicial: 52 testes da automação aprovados, mais 14 testes existentes
+Validação local inicial: 54 testes da automação aprovados, mais 14 testes existentes
 do worker/adaptador Python realmente executados em venv nova no Windows. Os limites
 Linux e browser Linux não são inferidos desse resultado local; devem passar no CI.
 Não iniciar WSL/VM para conseguir esse resultado. A documentação de resultado final

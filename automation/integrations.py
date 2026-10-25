@@ -23,15 +23,25 @@ REQUIRED_WORKER_TESTS = {
 def go_results(text, require_worker=True):
     events = [json.loads(line) for line in text.splitlines() if line.strip()]
     passed = [e for e in events if e.get('Action') == 'pass' and e.get('Test')]
-    skips = [{'package': e.get('Package'), 'test': e.get('Test'), 'reason': ''.join(
-        x.get('Output', '') for x in events if x.get('Action') == 'output' and x.get('Package') == e.get('Package') and x.get('Test') == e.get('Test'))}
-        for e in events if e.get('Action') == 'skip']
+    skips, no_tests = [], []
+    for event in events:
+        if event.get('Action') != 'skip':
+            continue
+        item = {'package': event.get('Package'), 'test': event.get('Test'), 'reason': ''.join(
+            x.get('Output', '') for x in events if x.get('Action') == 'output' and x.get('Package') == event.get('Package') and x.get('Test') == event.get('Test'))}
+        # Go emits package-level skip for [no test files]. Keep that NOT RUN
+        # explicitly, without conflating it with a skipped, existing test case.
+        if not item['test'] and '[no test files]' in item['reason']:
+            no_tests.append(dict(status='NOT RUN', **item))
+        else:
+            skips.append(item)
     if not passed or any(e.get('Action') == 'fail' for e in events):
         raise ValueError('Missing executed Go tests or explicit Go failure')
     worker = {e['Test'] for e in passed if e.get('Package', '').endswith('/internal/harness2bridge')}
     if require_worker and (not REQUIRED_WORKER_TESTS <= worker or any('harness2' in (s['package'] or '') for s in skips)):
         raise ValueError('Required real worker Go integration was absent or skipped')
-    return {'tests': len(passed), 'skipped': skips, 'worker_tests_confirmed': sorted(worker & REQUIRED_WORKER_TESTS)}
+    return {'tests': len(passed), 'skipped': skips, 'not_run_packages': no_tests,
+            'worker_tests_confirmed': sorted(worker & REQUIRED_WORKER_TESTS)}
 
 
 def vitest_results(data):
