@@ -67,13 +67,6 @@
       "reason": "Requires verified evidence from the same workflow SHA, run and attempt"
     },
     {
-      "id": "vulnerability-scanning",
-      "scope": "Go and npm vulnerability assessment and dependency review",
-      "implemented": false,
-      "status": "NOT RUN",
-      "reason": "Static automation policy is not a vulnerability scanner"
-    },
-    {
       "id": "c2-offline-independence",
       "scope": "Two detached real-process watchdog cases with verified safe cleanup",
       "implemented": false,
@@ -107,6 +100,41 @@
       "implemented": false,
       "id": "browser-docker-smokes",
       "scope": "Approval/MCP, computer, sandbox and environment smokes that currently require Docker"
+    },
+    {
+      "id": "security-go",
+      "implemented": true,
+      "reason": "Requires a completed scanner bundle from this SHA, run and attempt",
+      "status": "NOT RUN",
+      "scope": "Pinned govulncheck source analysis for current Linux Go graph including stdlib"
+    },
+    {
+      "id": "security-python",
+      "implemented": true,
+      "reason": "Requires a completed scanner bundle from this SHA, run and attempt",
+      "status": "NOT RUN",
+      "scope": "Pinned pip-audit for CI build/scanner PyPI packages; VCS coverage explicitly unverified"
+    },
+    {
+      "id": "security-npm",
+      "implemented": true,
+      "reason": "Requires a completed scanner bundle from this SHA, run and attempt",
+      "status": "NOT RUN",
+      "scope": "Pinned npm audit for the UI lockfile including development dependencies"
+    },
+    {
+      "id": "security-workflows",
+      "implemented": true,
+      "reason": "Requires a completed scanner bundle from this SHA, run and attempt",
+      "status": "NOT RUN",
+      "scope": "Pinned offline zizmor plus semantic token, permission, pin and untrusted execution policy"
+    },
+    {
+      "id": "security-provenance",
+      "implemented": true,
+      "reason": "Requires a completed scanner bundle from this SHA, run and attempt",
+      "status": "NOT RUN",
+      "scope": "CI input hashes, lock integrity and run-bound scanner toolchain provenance, no OS/producer attestation"
     }
   ]
 }

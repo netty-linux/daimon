@@ -157,8 +157,8 @@ class WorkflowTopology(unittest.TestCase):
         self.assertIn('workflow_call:', ci)
         self.assertNotIn('pull_request:', ci)
         self.assertNotIn('  push:', ci)
-        self.assertEqual(outer.count('uses: ./.github/workflows/ci.yml'), 1)
-        self.assertIn('policy, existing-ci]', outer)
+        self.assertEqual(outer.count('uses: $/.github/workflows/ci.yml'), 1)
+        self.assertIn('policy, existing-ci, security]', outer)
 
     def test_no_privileged_browser_install_or_docker_recipe(self):
         ci = (ROOT / '.github/workflows/ci.yml').read_text()

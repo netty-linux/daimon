@@ -1,5 +1,8 @@
 # DAIMON Development Automation
 
+Evolução DA-3: [Security & Dependency Automation](DAIMON_DA3_SECURITY.md), com
+scanners reais e falhas/limitações explícitas; findings não são autocorrigidos.
+
 Evolução DA-2: [Python real + browser + CI reutilizável](DAIMON_DA2_INTEGRATION.md).
 Essa evolução substitui as limitações DA-1 de integrações não executadas/importadas;
 o texto abaixo conserva a auditoria e o plano inicial. Gates e operação C2 continuam

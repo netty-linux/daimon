@@ -2,6 +2,7 @@
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,37 @@ ROOT = Path(__file__).resolve().parents[1]
 STATES = {'PASS', 'FAIL', 'BLOCKED', 'NOT RUN', 'UNVERIFIED'}
 MAX_LOG = 2 * 1024 * 1024
 MAX_ATTACHMENT = 8 * 1024 * 1024
+SECURITY_LANES = {'security-go', 'security-python', 'security-npm', 'security-workflows', 'security-provenance'}
+
+
+def attachment_name(name):
+    return bool(re.fullmatch(r'stage-\d\d\.log\.gz|vitest\.json|scan\.json|scanner\.stderr\.log', name))
+
+
+def security_result(directory, report):
+    spec = importlib.util.spec_from_file_location('audited_security_parser', ROOT / 'automation/security_parsers.py')
+    parser = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(parser)
+    context = report['security_context']
+    pins = json.loads((ROOT / 'automation/security-tools.json').read_text())
+    if context['commit'] != report['commit'] or context['versions'] != pins:
+        raise ValueError('Scanner identity/pin/commit mismatch')
+    capsule = report.get('scanner_capsule')
+    if capsule and any(capsule[k] != report[k] for k in ('commit', 'run_id', 'run_attempt')):
+        raise ValueError('Stale scanner environment capsule')
+    try:
+        text = (directory / 'scan.json').read_text(encoding='utf-8')
+    except UnicodeDecodeError:
+        if not report.get('unavailable'):
+            raise ValueError('Invalid scanner UTF-8 without explicit incomplete status')
+        text = ''
+    actual = parser.normalize(report['lane'], text,
+                              report['exit_code'], context, report.get('unavailable'))
+    if actual['complete'] and (not capsule or context.get('toolchain_verified') is not True or capsule.get('pins') != pins):
+        raise ValueError('Complete scan lacks a verified run-bound toolchain capsule')
+    if actual != report['security'] or actual['status'] != report['status']:
+        raise ValueError('Scanner findings/status differ from preserved raw evidence')
+    return actual
 INTEGRATIONS = {
     'python-upstream-integration': {'verify-upstream', 'build-dependencies', 'sync-upstream', 'worker', 'native-substrate', 'linux-limits'},
     'linux-existing-ci': {'gofmt', 'vet', 'go-test', 'go-race'},
@@ -101,7 +133,7 @@ def write_bundle(output, report, log=None, attachments=None):
     if log is not None:
         (output / 'raw.log').write_text(log, encoding='utf-8')
     for name, source in (attachments or {}).items():
-        if not re.fullmatch(r'stage-\d\d\.log\.gz|vitest\.json', name) or source.is_symlink() or source.stat().st_size > MAX_ATTACHMENT:
+        if not attachment_name(name) or source.is_symlink() or source.stat().st_size > MAX_ATTACHMENT:
             raise ValueError('Unsafe or oversized integration attachment')
         shutil.copyfile(source, output / name)
     (output / 'report.json').write_text(json.dumps(report, indent=2, ensure_ascii=True) + '\n', encoding='utf-8')
@@ -111,6 +143,10 @@ def write_bundle(output, report, log=None, attachments=None):
     for row in rows:
         cells = [str(row[k]).replace('|', '\\|').replace('\n', ' ') for k in ('lane', 'status', 'reason')]
         summary.append('| ' + ' | '.join(cells) + ' |')
+        security = row.get('security')
+        if security:
+            count = (str(security['advisory_count']) + ' advisories / ' + str(security['finding_count']) + ' records') if security['complete'] else 'unknown (scanner incomplete)'
+            summary.append('| ' + row['lane'] + ' findings | ' + count + ' | No automatic remediation |')
     (output / 'summary.md').write_text('\n'.join(summary) + '\n', encoding='utf-8')
     files = {p.name: {'sha256': digest(p), 'bytes': p.stat().st_size} for p in sorted(output.iterdir())}
     (output / 'manifest.json').write_text(json.dumps({'schema_version': 1, 'files': files}, indent=2) + '\n', encoding='utf-8')
@@ -180,7 +216,9 @@ def load_verified(directory, expected_commit, expected_run=None, expected_attemp
     manifest = json.loads((directory / 'manifest.json').read_text(encoding='utf-8'))
     report = json.loads((directory / 'report.json').read_text(encoding='utf-8'))
     extra = report.get('attachments', [])
-    if any(not re.fullmatch(r'stage-\d\d\.log\.gz|vitest\.json', name) for name in extra):
+    if len(extra) != len(set(extra)):
+        raise ValueError('Duplicate artifact attachment declaration')
+    if any(not attachment_name(name) for name in extra):
         raise ValueError('Unknown attachment name')
     if manifest.get('schema_version') != 1 or set(manifest['files']) != {'report.json', 'summary.md', 'raw.log', *extra}:
         raise ValueError('Incomplete or unknown evidence bundle')
@@ -201,7 +239,37 @@ def load_verified(directory, expected_commit, expected_run=None, expected_attemp
         details = integration_result(report['lane'], (directory / 'raw.log').read_text(encoding='utf-8'))
         if details != report.get('integration') or details['status'] != report['status']:
             raise ValueError('Imported structured integration evidence mismatch')
+    if report['lane'] in SECURITY_LANES:
+        security_result(directory, report)
     return report
+
+
+def cross_job_provenance(reports):
+    errors = []
+    audited = reports.get('security-provenance')
+    if not audited or not audited.get('security', {}).get('complete'):
+        return errors  # Missing/incomplete required scanner remains non-PASS separately.
+    pins = audited['security_context']['input_hashes']
+    capsule = audited.get('scanner_capsule') or {}
+    for lane in ('python-upstream-integration', 'linux-existing-ci', 'ui-existing-ci', 'browser-integration'):
+        row = reports.get(lane, {})
+        if row.get('status') not in ('PASS', 'UNVERIFIED'):
+            continue
+        facts = row.get('integration', {}).get('provenance', {})
+        if lane == 'python-upstream-integration':
+            claimed = facts.get('pins', {})
+            expected_names = {'python/harness2_bridge/uv.lock', 'python/harness2_bridge/pyproject.toml',
+                              'python/harness2_bridge/upstream.lock.json', 'automation/build-requirements.txt'}
+            if set(claimed) != expected_names or any(pins.get(name) != value for name, value in claimed.items()):
+                errors.append('Cross-job Python dependency pin mismatch')
+        elif lane == 'linux-existing-ci' and facts.get('go_version') != capsule.get('go_version'):
+            errors.append('Cross-job Go toolchain mismatch')
+        elif lane in ('ui-existing-ci', 'browser-integration'):
+            if facts.get('node_lock_sha256') != pins.get('ui/package-lock.json'):
+                errors.append('Cross-job npm lock mismatch: ' + lane)
+            if lane == 'ui-existing-ci' and facts.get('node_version') != capsule.get('node_version'):
+                errors.append('Cross-job Node toolchain mismatch')
+    return errors
 
 
 def aggregate(inputs, output, inventory=None):
@@ -219,6 +287,7 @@ def aggregate(inputs, output, inventory=None):
             reports[lane] = report
         except (OSError, ValueError, KeyError, TypeError):
             errors.append('Invalid or duplicate evidence bundle: ' + path.parent.name)
+    errors.extend(cross_job_provenance(reports))
     rows = []
     for source in inventory['lanes']:
         row = {'lane': source['id'], 'scope': source['scope'], 'status': source['status'], 'reason': source['reason']}
@@ -227,6 +296,8 @@ def aggregate(inputs, output, inventory=None):
             row['skipped'] = reports[source['id']].get('skipped', [])
             row['source'] = {k: reports[source['id']].get(k) for k in ('commit', 'run_id', 'run_attempt', 'scope')}
             row['stages'] = reports[source['id']].get('integration', {}).get('stages', [])
+            if 'security' in reports[source['id']]:
+                row['security'] = reports[source['id']]['security']
         rows.append(row)
     priority = ['FAIL', 'BLOCKED', 'UNVERIFIED', 'NOT RUN', 'PASS']
     status = 'FAIL' if errors else next(value for value in priority if any(r['status'] == value for r in rows))

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "govulncheck": "v1.9.0",
+  "govulncheck_module_sum": "h1:12VaqnI9kJfqwRoPptxoqsUhQtdfrSbdksT7X/KY/sc=",
+  "pip-audit": "2.10.1",
+  "zizmor": "1.31.1",
+  "PyYAML": "6.0.3",
+  "uv": "0.12.17",
+  "npm": "11.13.0",
+  "npm_tarball": "https://registry.npmjs.org/npm/-/npm-11.13.0.tgz",
+  "npm_integrity": "sha512-cRmhaghDWA1lFgl3Ug4/VxDJdPBK/U+tNtnrl9kXunFqhWw1x4xL5txkNn7qzPuVfvXOmXyjHpMwsuk2uisbkg=="
+}

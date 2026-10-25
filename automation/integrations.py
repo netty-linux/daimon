@@ -162,6 +162,7 @@ def python_suite(p):
 
 
 def linux_ci(p):
+    p.provenance = {'go_version': p.run('go-version', ['go', 'version']).strip()}
     if not all(os.environ.get(k) for k in ('DAIMON_HARNESS2_TEST_PYTHON', 'DAIMON_HARNESS2_TEST_SITE')):
         raise ValueError('Real worker prerequisite absent; refusing optional integration skips')
     def formatting(text):
@@ -179,6 +180,7 @@ def linux_ci(p):
 
 def ui_ci(p):
     ui = ROOT / 'ui'
+    node_version = p.run('node-version', ['node', '--version']).strip()
     p.run('npm-ci', ['npm', 'ci'], cwd=ui)
     result = p.directory / 'vitest.json'
     try:
@@ -189,7 +191,7 @@ def ui_ci(p):
             p.attachments['vitest.json'] = str(result.relative_to(ROOT))
     p.run('build', ['npm', 'run', 'build'], cwd=ui)
     p.run('embed-diff', ['git', 'diff', '--exit-code', '--', 'internal/server/ui'])
-    p.provenance = {'node_lock_sha256': hashlib.sha256((ui / 'package-lock.json').read_bytes()).hexdigest()}
+    p.provenance = {'node_version': node_version, 'node_lock_sha256': hashlib.sha256((ui / 'package-lock.json').read_bytes()).hexdigest()}
 
 
 def browser(p):

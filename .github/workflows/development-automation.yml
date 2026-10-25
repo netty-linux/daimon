@@ -16,7 +16,7 @@ concurrency:
 jobs:
   existing-ci:
     name: Existing CI and real integrations
-    uses: ./.github/workflows/ci.yml
+    uses: $/.github/workflows/ci.yml
 
   tooling:
     name: Evidence tooling / ${{ matrix.family }}
@@ -115,9 +115,72 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  security:
+    name: Security scanners and dependency integrity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12.10'
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: '0.12.17'
+          enable-cache: false
+      - name: Install hash-verified scanner pins without project dependency updates
+        run: python -I -B automation/security_setup.py
+      - name: Run all scanners and integrity checks independently
+        if: always()
+        run: python -I -B automation/security.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dev-security-go-attempt-${{ github.run_attempt }}
+          path: .automation-results/security-go/
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dev-security-python-attempt-${{ github.run_attempt }}
+          path: .automation-results/security-python/
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dev-security-npm-attempt-${{ github.run_attempt }}
+          path: .automation-results/security-npm/
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dev-security-workflows-attempt-${{ github.run_attempt }}
+          path: .automation-results/security-workflows/
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dev-security-provenance-attempt-${{ github.run_attempt }}
+          path: .automation-results/security-provenance/
+          retention-days: 1
+          if-no-files-found: error
+
   report:
     name: Coverage report (safe lanes only)
-    needs: [tooling, contracts, integration, policy, existing-ci]
+    needs: [tooling, contracts, integration, policy, existing-ci, security]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
