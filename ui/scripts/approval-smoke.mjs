@@ -15,7 +15,7 @@ const docker = (...args) => {
 const child = spawn('docker', ['run', '--rm', '--pull', 'never', '--name', name,
   '-p', '127.0.0.1::3001', '--mount', `type=bind,source=${resolve('..')},target=/workspace,readonly`,
   '--tmpfs', '/fixture:rw,nosuid,size=32m', '--workdir', '/workspace',
-  ...(mcpMode ? ['--env', 'MCP_SMOKE=1'] : []), '--env', 'GOTOOLCHAIN=local', '--env', 'GOPROXY=off', 'golang:1.27.1', 'sh', '-ec',
+  ...(mcpMode ? ['--env', 'MCP_SMOKE=1'] : []), '--env', 'GOTOOLCHAIN=local', '--env', 'GOPROXY=off', 'golang:1.27.3', 'sh', '-ec',
   'go build -tags approvalsmoke -buildvcs=false -o /tmp/approval-fixture ./ui/scripts/approval-fixture\nexec /tmp/approval-fixture'], { stdio: ['ignore', 'pipe', 'pipe'] });
 let output = '', errors = '', exited = false, browser;
 child.stdout.on('data', b => { output += b; }); child.stderr.on('data', b => { errors += b; });

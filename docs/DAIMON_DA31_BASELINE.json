@@ -1,0 +1,342 @@
+{
+  "schema_version": 1,
+  "historical_head": "4a648db81e2cc0f58528d4e710c09a7d9559a932",
+  "historical_tested_sha": "371644be726e84d4ace9e9bc42f347fcfa17c06c",
+  "run_id": "40239742452",
+  "run_attempt": "1",
+  "historical_status": "FAIL",
+  "advisories": [
+    {
+      "lane": "go",
+      "advisory": "GO-2026-6599",
+      "package": "stdlib",
+      "affected_version": "v1.27.1",
+      "aliases": [
+        "CVE-2026-94448"
+      ],
+      "reported_fixes": [
+        "v1.27.2"
+      ],
+      "remediation_target": "1.27.3",
+      "official_record": {
+        "url": "https://vuln.go.dev/ID/GO-2026-6599.json",
+        "sha256": "c38e8f1f16170826bdda20a8331b6119661aabfdc0da2a85223afa88884a749e",
+        "bytes": 1174
+      }
+    },
+    {
+      "lane": "go",
+      "advisory": "GO-2026-6600",
+      "package": "stdlib",
+      "affected_version": "v1.27.1",
+      "aliases": [
+        "CVE-2026-97030"
+      ],
+      "reported_fixes": [
+        "v1.27.2"
+      ],
+      "remediation_target": "1.27.3",
+      "official_record": {
+        "url": "https://vuln.go.dev/ID/GO-2026-6600.json",
+        "sha256": "7ed76e290b366142cbbaac2c0fb12057ba378c96a102180705fa6c7505269dac",
+        "bytes": 1071
+      }
+    },
+    {
+      "lane": "go",
+      "advisory": "GO-2026-6603",
+      "package": "stdlib",
+      "affected_version": "v1.27.1",
+      "aliases": [
+        "CVE-2026-78659"
+      ],
+      "reported_fixes": [
+        "v1.27.2"
+      ],
+      "remediation_target": "1.27.3",
+      "official_record": {
+        "url": "https://vuln.go.dev/ID/GO-2026-6603.json",
+        "sha256": "76a1945737d8c2ea4a34d18fd44230946b1185894ea155f9812d1149b2838d3c",
+        "bytes": 10737
+      }
+    },
+    {
+      "lane": "go",
+      "advisory": "GO-2026-6604",
+      "package": "stdlib",
+      "affected_version": "v1.27.1",
+      "aliases": [
+        "CVE-2026-56857"
+      ],
+      "reported_fixes": [
+        "v1.27.2"
+      ],
+      "remediation_target": "1.27.3",
+      "official_record": {
+        "url": "https://vuln.go.dev/ID/GO-2026-6604.json",
+        "sha256": "8b5ef99e9faea517629d07377cb0a47b29980cfa4d6d37fb75038ef893ea16f9",
+        "bytes": 1433
+      }
+    },
+    {
+      "lane": "go",
+      "advisory": "GO-2026-6605",
+      "package": "stdlib",
+      "affected_version": "v1.27.1",
+      "aliases": [
+        "CVE-2026-56866"
+      ],
+      "reported_fixes": [
+        "v1.27.2"
+      ],
+      "remediation_target": "1.27.3",
+      "official_record": {
+        "url": "https://vuln.go.dev/ID/GO-2026-6605.json",
+        "sha256": "d49f2ab0c0d4c1c2e854008c2434e132ec422ce378e8a91170169cef30a727f1",
+        "bytes": 2005
+      }
+    },
+    {
+      "lane": "go",
+      "advisory": "GO-2026-6607",
+      "package": "stdlib",
+      "affected_version": "v1.27.1",
+      "aliases": [
+        "CVE-2026-97031"
+      ],
+      "reported_fixes": [
+        "v1.27.2"
+      ],
+      "remediation_target": "1.27.3",
+      "official_record": {
+        "url": "https://vuln.go.dev/ID/GO-2026-6607.json",
+        "sha256": "f4bf7540a2b1f5671a55ab2445ed6071036a699dcd9ec215ac73f7a57aadc8d6",
+        "bytes": 1252
+      }
+    },
+    {
+      "lane": "go",
+      "advisory": "GO-2026-6608",
+      "package": "stdlib",
+      "affected_version": "v1.27.1",
+      "aliases": [
+        "CVE-2026-94440"
+      ],
+      "reported_fixes": [
+        "v1.27.2"
+      ],
+      "remediation_target": "1.27.3",
+      "official_record": {
+        "url": "https://vuln.go.dev/ID/GO-2026-6608.json",
+        "sha256": "5bbf511ad6cc75190d3661c5d79d705e41e3cd40010c325e5fa3b9183237eb54",
+        "bytes": 1286
+      }
+    },
+    {
+      "lane": "go",
+      "advisory": "GO-2026-6609",
+      "package": "stdlib",
+      "affected_version": "v1.27.1",
+      "aliases": [
+        "CVE-2026-78667"
+      ],
+      "reported_fixes": [
+        "v1.27.2"
+      ],
+      "remediation_target": "1.27.3",
+      "official_record": {
+        "url": "https://vuln.go.dev/ID/GO-2026-6609.json",
+        "sha256": "3a47edb3f881a474a00b696392923a6f97a8b84fb8ca90cf440c1b2b32366ea7",
+        "bytes": 1087
+      }
+    },
+    {
+      "lane": "go",
+      "advisory": "GO-2026-6610",
+      "package": "stdlib",
+      "affected_version": "v1.27.1",
+      "aliases": [
+        "CVE-2026-78660"
+      ],
+      "reported_fixes": [
+        "v1.27.2"
+      ],
+      "remediation_target": "1.27.3",
+      "official_record": {
+        "url": "https://vuln.go.dev/ID/GO-2026-6610.json",
+        "sha256": "2c7881c7945c7c5eadefd3d0caceb1a23b14467373fb28c601141545ff21f190",
+        "bytes": 2766
+      }
+    },
+    {
+      "lane": "go",
+      "advisory": "GO-2026-6611",
+      "package": "stdlib",
+      "affected_version": "v1.27.1",
+      "aliases": [
+        "CVE-2026-78669"
+      ],
+      "reported_fixes": [
+        "v1.27.2"
+      ],
+      "remediation_target": "1.27.3",
+      "official_record": {
+        "url": "https://vuln.go.dev/ID/GO-2026-6611.json",
+        "sha256": "5e89ac4314a24eac41111b71ef4544f22836c7b1baf48747e31c5c1d8282c3de",
+        "bytes": 12064
+      }
+    },
+    {
+      "lane": "go",
+      "advisory": "GO-2026-6612",
+      "package": "stdlib",
+      "affected_version": "v1.27.1",
+      "aliases": [
+        "CVE-2026-78663"
+      ],
+      "reported_fixes": [
+        "v1.27.2"
+      ],
+      "remediation_target": "1.27.3",
+      "official_record": {
+        "url": "https://vuln.go.dev/ID/GO-2026-6612.json",
+        "sha256": "76c44a4cbdbc463286fb968abd288a26025b8576fe2aed3dcda542fde9518452",
+        "bytes": 9922
+      }
+    },
+    {
+      "lane": "go",
+      "advisory": "GO-2026-6613",
+      "package": "stdlib",
+      "affected_version": "v1.27.1",
+      "aliases": [
+        "CVE-2026-94439"
+      ],
+      "reported_fixes": [
+        "v1.27.2"
+      ],
+      "remediation_target": "1.27.3",
+      "official_record": {
+        "url": "https://vuln.go.dev/ID/GO-2026-6613.json",
+        "sha256": "6c2bd0f788183c22cae14deb2b3c80fdf1552bd12f5f09614b084ed3233967d0",
+        "bytes": 4640
+      }
+    },
+    {
+      "lane": "go",
+      "advisory": "GO-2026-6617",
+      "package": "stdlib",
+      "affected_version": "v1.27.1",
+      "aliases": [
+        "CVE-2026-97032"
+      ],
+      "reported_fixes": [
+        "v1.27.2"
+      ],
+      "remediation_target": "1.27.3",
+      "official_record": {
+        "url": "https://vuln.go.dev/ID/GO-2026-6617.json",
+        "sha256": "197efc1b2f05e891ab3dad2127b7ea3997dc80dc39b21294ab93e11333c4c08b",
+        "bytes": 10669
+      }
+    },
+    {
+      "lane": "go",
+      "advisory": "GO-2026-6809",
+      "package": "stdlib",
+      "affected_version": "v1.27.1",
+      "aliases": [
+        "CVE-2026-111943"
+      ],
+      "reported_fixes": [
+        "v1.27.3"
+      ],
+      "remediation_target": "1.27.3",
+      "official_record": {
+        "url": "https://vuln.go.dev/ID/GO-2026-6809.json",
+        "sha256": "67d1ae42283683c4fe26081cb174da0b945370d846ebafce11bedd14c1b99151",
+        "bytes": 1205
+      }
+    },
+    {
+      "lane": "python",
+      "advisory": "PYSEC-2026-3447",
+      "package": "setuptools",
+      "affected_version": "80.9.0",
+      "aliases": [
+        "BIT-setuptools-2026-59890",
+        "CVE-2026-59890",
+        "GHSA-h35f-9h28-mq5c"
+      ],
+      "reported_fixes": [
+        "83.0.0"
+      ],
+      "remediation_target": "84.1.0",
+      "official_record": {
+        "url": "https://api.osv.dev/v1/vulns/PYSEC-2026-3447",
+        "sha256": "e1c11dec8038932a21d576c16fe50d09e3a87540c114f6d280576a7027d3e055",
+        "bytes": 6787
+      }
+    },
+    {
+      "lane": "python",
+      "advisory": "GHSA-xmj3-9gf7-h52w",
+      "package": "setuptools",
+      "affected_version": "80.9.0",
+      "aliases": [],
+      "reported_fixes": [
+        "84.1.0"
+      ],
+      "remediation_target": "84.1.0",
+      "official_record": {
+        "url": "https://api.osv.dev/v1/vulns/GHSA-xmj3-9gf7-h52w",
+        "sha256": "92eb6079a8df98cc6586377d253b85ede2108f7617adfc86c0d2be12524c4e56",
+        "bytes": 6980
+      }
+    },
+    {
+      "lane": "python",
+      "advisory": "CVE-2026-24049",
+      "package": "wheel",
+      "affected_version": "0.45.1",
+      "aliases": [
+        "GHSA-8rrh-rw8j-w5fx"
+      ],
+      "reported_fixes": [
+        "0.46.2"
+      ],
+      "remediation_target": "0.46.2",
+      "official_record": {
+        "url": "https://api.osv.dev/v1/vulns/CVE-2026-24049",
+        "sha256": "ed90718e4f53af1e9ac703fc74b1fac0e0901eb4fc0e561b5779ef1bb2693299",
+        "bytes": 6433
+      }
+    }
+  ],
+  "artifacts": {
+    "go/report.json": {
+      "bytes": 2087516,
+      "sha256": "64f482e2a8986a115f2db521a38b0d6f73dcccf980134bb6131d4f5fba5ba4c3"
+    },
+    "go/scan.json": {
+      "bytes": 922421,
+      "sha256": "024b8c2747a4a6db92d6ef15589350ad7767f24a137f6fdc06ad85c39040752e"
+    },
+    "go/manifest.json": {
+      "bytes": 702,
+      "sha256": "d8ae0421c13267d8beabf378a9878be7804a263e11fd90f93d96324f9e32f188"
+    },
+    "python/report.json": {
+      "bytes": 105263,
+      "sha256": "0a66e301ddfd26913d7be5b3272970293975530ea91c01c5d7257b581ca97fcf"
+    },
+    "python/scan.json": {
+      "bytes": 16192,
+      "sha256": "a436f4ae2b328bbb066df5e3a45e3ad61dc40a078a6238e523895a50fd37ba70"
+    },
+    "python/manifest.json": {
+      "bytes": 702,
+      "sha256": "521deecade7724ac14b7ef4de8cea1887e1fbccc9b8d7f9c0f68f867165054e1"
+    }
+  }
+}
