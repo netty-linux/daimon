@@ -1,70 +1,87 @@
 name: CI
 
+# Called once by Development Automation; no duplicate push/PR execution.
 on:
-  push:
-  pull_request:
+  workflow_call:
 
 permissions:
   contents: read
 
 jobs:
-  ui:
-    name: Web UI
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: ui
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-      - name: Set up Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '24'
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
-      - name: Check embedded build is current
-        run: git diff --exit-code -- ../internal/server/ui
-
   linux:
-    name: Go / Linux
+    name: Go / Linux and real Python worker
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       CGO_ENABLED: '1'
-    defaults:
-      run:
-        shell: bash
+      UV_NO_CACHE: '1'
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12.10'
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: '0.12.17'
+          enable-cache: false
+      - name: Verify, provision and test the pinned real Python worker
+        run: python automation/evidence.py --lane python-upstream-integration --output .automation-results/python-upstream-integration
+      - name: Existing Go formatting, vet, test and race (real worker configured)
+        run: python automation/evidence.py --lane linux-existing-ci --output .automation-results/linux-existing-ci
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dev-python-upstream-integration-attempt-${{ github.run_attempt }}
+          path: .automation-results/python-upstream-integration/
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dev-linux-existing-ci-attempt-${{ github.run_attempt }}
+          path: .automation-results/linux-existing-ci/
+          retention-days: 1
+          if-no-files-found: error
 
-      - name: Check formatting
-        run: |
-          unformatted=$(gofmt -l .)
-          if [[ -n "$unformatted" ]]; then
-            printf 'Files requiring gofmt:\n%s\n' "$unformatted"
-            exit 1
-          fi
-
-      - name: Vet
-        run: go vet ./...
-
-      - name: Test
-        run: go test -count=1 ./...
-
-      - name: Test with race detector
-        run: go test -race -count=1 ./...
+  ui:
+    name: Web UI and real Playwright browser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12.10'
+      - name: Existing Vitest, typecheck/build and embedded bundle diff
+        run: python automation/evidence.py --lane ui-existing-ci --output .automation-results/ui-existing-ci
+      - name: Existing UI and memory smokes in Chromium (fake providers only)
+        run: python automation/evidence.py --lane browser-integration --output .automation-results/browser-integration
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dev-ui-existing-ci-attempt-${{ github.run_attempt }}
+          path: .automation-results/ui-existing-ci/
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dev-browser-integration-attempt-${{ github.run_attempt }}
+          path: .automation-results/browser-integration/
+          retention-days: 1
+          if-no-files-found: error

@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "audit_base": "76a81cff335d54480f3e9ef42ca60b6459d34dfc",
+  "lanes": [
+    {
+      "id": "automation-linux",
+      "scope": "Evidence tooling tests on Linux",
+      "implemented": true,
+      "status": "NOT RUN",
+      "reason": "Requires this run's artifact"
+    },
+    {
+      "id": "automation-windows",
+      "scope": "Evidence tooling tests on Windows",
+      "implemented": true,
+      "status": "NOT RUN",
+      "reason": "Requires this run's artifact"
+    },
+    {
+      "id": "windows-contracts",
+      "scope": "Native manifest contracts only; not Hyper-V, process independence or Windows 10 certification",
+      "implemented": true,
+      "status": "NOT RUN",
+      "reason": "Requires this run's artifact"
+    },
+    {
+      "id": "linux-demo",
+      "scope": "Existing credential-free scripted CLI integration",
+      "implemented": true,
+      "status": "NOT RUN",
+      "reason": "Requires this run's artifact"
+    },
+    {
+      "id": "automation-policy",
+      "scope": "Static workflow permissions, action pins and forbidden execution paths only",
+      "implemented": true,
+      "status": "NOT RUN",
+      "reason": "Requires this run's artifact"
+    },
+    {
+      "id": "linux-existing-ci",
+      "scope": "Existing formatting, vet, Go tests and race detector",
+      "implemented": true,
+      "status": "NOT RUN",
+      "reason": "Requires verified evidence from the same workflow SHA, run and attempt",
+      "allow_unverified": true
+    },
+    {
+      "id": "ui-existing-ci",
+      "scope": "Existing typecheck, Vitest, production build and embed diff",
+      "implemented": true,
+      "status": "NOT RUN",
+      "reason": "Requires verified evidence from the same workflow SHA, run and attempt"
+    },
+    {
+      "id": "python-upstream-integration",
+      "scope": "Pinned real Python worker, native adapter and Linux resource limits",
+      "implemented": true,
+      "status": "NOT RUN",
+      "reason": "Requires verified evidence from the same workflow SHA, run and attempt"
+    },
+    {
+      "id": "browser-integration",
+      "scope": "Existing embedded UI and memory Playwright smokes only; real browser with local fake providers",
+      "implemented": true,
+      "status": "NOT RUN",
+      "reason": "Requires verified evidence from the same workflow SHA, run and attempt"
+    },
+    {
+      "id": "c2-offline-independence",
+      "scope": "Two detached real-process watchdog cases with verified safe cleanup",
+      "implemented": false,
+      "status": "BLOCKED",
+      "reason": "Source belongs to unmerged PR #28; requires separately validated Job/console-independent executor"
+    },
+    {
+      "id": "c2-hyperv-operational",
+      "scope": "Real VM boot, independent emergency stop, deadlines, restoration and journal",
+      "implemented": false,
+      "status": "BLOCKED",
+      "reason": "No dedicated approved laboratory, exact-operation approval or operational evidence in this workflow"
+    },
+    {
+      "id": "c2-isolation-gates",
+      "scope": "All 18 security gates; never modified by development automation",
+      "implemented": false,
+      "status": "UNVERIFIED",
+      "reason": "Hosted CI and offline fixtures do not attest operational isolation"
+    },
+    {
+      "id": "codex-cloud-environment",
+      "scope": "Account access, configured environment and quota for agent development",
+      "implemented": false,
+      "status": "UNVERIFIED",
+      "reason": "Architecture only; no cloud environment or paid API configured"
+    },
+    {
+      "status": "NOT RUN",
+      "reason": "Not part of the two non-privileged DA-2 browser recipes",
+      "implemented": false,
+      "id": "browser-docker-smokes",
+      "scope": "Approval/MCP, computer, sandbox and environment smokes that currently require Docker"
+    },
+    {
+      "id": "security-go",
+      "implemented": true,
+      "reason": "Requires a completed scanner bundle from this SHA, run and attempt",
+      "status": "NOT RUN",
+      "scope": "Pinned govulncheck source analysis for current Linux Go graph including stdlib"
+    },
+    {
+      "id": "security-python",
+      "implemented": true,
+      "reason": "Requires a completed scanner bundle from this SHA, run and attempt",
+      "status": "NOT RUN",
+      "scope": "Pinned pip-audit for CI build/scanner PyPI packages; VCS coverage explicitly unverified"
+    },
+    {
+      "id": "security-npm",
+      "implemented": true,
+      "reason": "Requires a completed scanner bundle from this SHA, run and attempt",
+      "status": "NOT RUN",
+      "scope": "Pinned npm audit for the UI lockfile including development dependencies"
+    },
+    {
+      "id": "security-workflows",
+      "implemented": true,
+      "reason": "Requires a completed scanner bundle from this SHA, run and attempt",
+      "status": "NOT RUN",
+      "scope": "Pinned offline zizmor plus semantic token, permission, pin and untrusted execution policy"
+    },
+    {
+      "id": "security-provenance",
+      "implemented": true,
+      "reason": "Requires a completed scanner bundle from this SHA, run and attempt",
+      "status": "NOT RUN",
+      "scope": "CI input hashes, lock integrity and run-bound scanner toolchain provenance, no OS/producer attestation"
+    }
+  ]
+}

@@ -42,3 +42,6 @@ ui/test-results/
 __pycache__/
 *.pyc
 !python/harness2_bridge/Dockerfile.test
+
+# Per-run development automation evidence (published as bounded CI artifacts)
+.automation-results/
