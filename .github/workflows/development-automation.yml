@@ -14,6 +14,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  existing-ci:
+    name: Existing CI and real integrations
+    uses: ./.github/workflows/ci.yml
+
   tooling:
     name: Evidence tooling / ${{ matrix.family }}
     strategy:
@@ -113,7 +117,7 @@ jobs:
 
   report:
     name: Coverage report (safe lanes only)
-    needs: [tooling, contracts, integration, policy]
+    needs: [tooling, contracts, integration, policy, existing-ci]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

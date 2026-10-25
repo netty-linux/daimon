@@ -14,6 +14,13 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 STATES = {'PASS', 'FAIL', 'BLOCKED', 'NOT RUN', 'UNVERIFIED'}
 MAX_LOG = 2 * 1024 * 1024
+MAX_ATTACHMENT = 8 * 1024 * 1024
+INTEGRATIONS = {
+    'python-upstream-integration': {'verify-upstream', 'build-dependencies', 'sync-upstream', 'worker', 'native-substrate', 'linux-limits'},
+    'linux-existing-ci': {'gofmt', 'vet', 'go-test', 'go-race'},
+    'ui-existing-ci': {'npm-ci', 'vitest', 'build', 'embed-diff'},
+    'browser-integration': {'install-browser', 'ui-smoke', 'memory-smoke'},
+}
 COMMANDS = {
     'automation-linux': ('Linux', [sys.executable, '-I', '-B', '-m', 'unittest', 'discover', '-s', 'automation/tests', '-v']),
     'automation-windows': ('Windows', [sys.executable, '-I', '-B', '-m', 'unittest', 'discover', '-s', 'automation/tests', '-v']),
@@ -21,6 +28,32 @@ COMMANDS = {
     'linux-demo': ('Linux', ['go', 'run', './cmd/daimon', 'demo']),
     'automation-policy': ('Linux', [sys.executable, '-I', '-B', 'automation/policy.py']),
 }
+COMMANDS.update({lane: ('Linux', [sys.executable, '-I', '-B', 'automation/integrations.py', lane]) for lane in INTEGRATIONS})
+
+
+def integration_result(lane, log):
+    records = [json.loads(line.removeprefix('DAIMON_INTEGRATION_RESULT ')) for line in log.splitlines() if line.startswith('DAIMON_INTEGRATION_RESULT ')]
+    if len(records) != 1:
+        raise ValueError('Exactly one structured integration result required')
+    record = records[0]
+    if record.get('schema_version') != 1 or record.get('lane') != lane or record.get('status') not in STATES:
+        raise ValueError('Invalid integration schema, lane or status')
+    stages = record['stages']
+    if len({s['name'] for s in stages}) != len(stages):
+        raise ValueError('Duplicate integration stage')
+    if record['status'] in ('PASS', 'UNVERIFIED'):
+        if not INTEGRATIONS[lane] <= {s['name'] for s in stages} or any(s['status'] not in ('PASS', 'UNVERIFIED') for s in stages):
+            raise ValueError('Incomplete integration stages')
+        if any((s['status'] == 'PASS' and (s['exit_code'] != 0 or s['skipped'])) or
+               (s['status'] == 'UNVERIFIED' and not s['skipped']) for s in stages):
+            raise ValueError('Stage exit/skip evidence contradicts status')
+        skipped = [dict(stage=s['name'], **skip) for s in stages for skip in s['skipped']]
+        if skipped != record['skipped'] or (record['status'] == 'PASS' and skipped):
+            raise ValueError('Hidden skipped tests')
+        for s in stages:
+            if s['name'] in ('worker', 'native-substrate', 'linux-limits', 'vitest', 'ui-smoke', 'memory-smoke', 'go-test', 'go-race') and s['tests'] <= 0:
+                raise ValueError('No executed tests for mandatory stage')
+    return record
 
 
 def digest(path):
@@ -35,6 +68,11 @@ def revision(root=ROOT):
 
 
 def classify(lane, code, log):
+    if lane in INTEGRATIONS:
+        record = integration_result(lane, log)
+        if code and record['status'] == 'PASS':
+            return 'FAIL', 'Process exit contradicts structured evidence', record['skipped']
+        return record['status'], record['reason'], record['skipped']
     if code != 0:
         return 'FAIL', 'Command failed', []
     if lane == 'windows-contracts':
@@ -58,10 +96,14 @@ def classify(lane, code, log):
     return 'PASS', 'Executed this exact non-operational scope successfully', []
 
 
-def write_bundle(output, report, log=None):
+def write_bundle(output, report, log=None, attachments=None):
     output.mkdir(parents=True, exist_ok=False)
     if log is not None:
         (output / 'raw.log').write_text(log, encoding='utf-8')
+    for name, source in (attachments or {}).items():
+        if not re.fullmatch(r'stage-\d\d\.log\.gz|vitest\.json', name) or source.is_symlink() or source.stat().st_size > MAX_ATTACHMENT:
+            raise ValueError('Unsafe or oversized integration attachment')
+        shutil.copyfile(source, output / name)
     (output / 'report.json').write_text(json.dumps(report, indent=2, ensure_ascii=True) + '\n', encoding='utf-8')
     rows = report.get('coverage', [report])
     summary = ['# DAIMON Development Automation', '', 'CI evidence only; not operational isolation proof.', '',
@@ -84,9 +126,11 @@ def run_lane(lane, output):
               'run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT', 'local'),
               'worktree_dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
               'operational_proof': False, 'isolation_gates': 'UNVERIFIED'}
+    inventory = json.loads((ROOT / 'automation/coverage.json').read_text(encoding='utf-8'))
+    report['scope'] = next(r['scope'] for r in inventory['lanes'] if r['id'] == lane)
     if output.exists():
         raise ValueError('Fresh evidence directory required; prior results are never overwritten')
-    log = ''
+    log = ''; attachments = {}
     if platform.system() != wanted_os:
         report['reason'] = f'Requires {wanted_os}; no cross-platform proof inferred'
     elif not shutil.which(command[0]):
@@ -98,7 +142,7 @@ def run_lane(lane, output):
         with tempfile.TemporaryFile() as capture:
             try:
                 result = subprocess.run(command, cwd=ROOT, stdout=capture, stderr=subprocess.STDOUT,
-                                        timeout=240, check=False, shell=False)
+                                        timeout=1200 if lane in INTEGRATIONS else 240, check=False, shell=False)
                 report['exit_code'] = result.returncode
                 capture.seek(0, 2)
                 size = capture.tell()
@@ -110,26 +154,39 @@ def run_lane(lane, output):
                 else:
                     status, reason, skipped = classify(lane, result.returncode, log)
                     report.update(status=status, reason=reason, skipped=skipped)
+                    if lane in INTEGRATIONS:
+                        details = integration_result(lane, log)
+                        report['integration'] = details
+                        for name, source in details['attachments'].items():
+                            path = (ROOT / source).resolve(strict=True)
+                            if not path.is_relative_to((ROOT / '.automation-results/stages' / lane).resolve()):
+                                raise ValueError('Integration attachment outside its own staging directory')
+                            attachments[name] = path
+                        report['attachments'] = sorted(attachments)
             except subprocess.TimeoutExpired:
                 capture.seek(0)
                 log = capture.read(MAX_LOG).decode('utf-8', errors='replace')
                 report.update(status='FAIL', reason='Command timeout; direct child stopped; descendant cleanup NOT attested')
             except (OSError, ValueError, json.JSONDecodeError) as error:
                 report.update(status='FAIL', reason='Invalid execution/evidence: ' + type(error).__name__)
-    write_bundle(output, report, log)
+    write_bundle(output, report, log, attachments)
     print(report['status'] + ': ' + report['reason'])
-    return 0 if report['status'] == 'PASS' else 1
+    return 0 if report['status'] == 'PASS' or (lane == 'linux-existing-ci' and report['status'] == 'UNVERIFIED' and report.get('exit_code') == 0) else 1
 
 
-def load_verified(directory, expected_commit, expected_run=None, expected_attempt=None):
-    if directory.is_symlink() or (directory / 'manifest.json').is_symlink() or (directory / 'manifest.json').stat().st_size > MAX_LOG:
+def load_verified(directory, expected_commit, expected_run=None, expected_attempt=None, expected_scopes=None):
+    if directory.is_symlink() or (directory / 'manifest.json').is_symlink() or (directory / 'manifest.json').stat().st_size > MAX_LOG or (directory / 'report.json').stat().st_size > MAX_LOG * 2:
         raise ValueError('Unsafe or oversized manifest')
     manifest = json.loads((directory / 'manifest.json').read_text(encoding='utf-8'))
-    if manifest.get('schema_version') != 1 or set(manifest['files']) != {'report.json', 'summary.md', 'raw.log'}:
+    report = json.loads((directory / 'report.json').read_text(encoding='utf-8'))
+    extra = report.get('attachments', [])
+    if any(not re.fullmatch(r'stage-\d\d\.log\.gz|vitest\.json', name) for name in extra):
+        raise ValueError('Unknown attachment name')
+    if manifest.get('schema_version') != 1 or set(manifest['files']) != {'report.json', 'summary.md', 'raw.log', *extra}:
         raise ValueError('Incomplete or unknown evidence bundle')
     for name, expected in manifest['files'].items():
         path = directory / name
-        if path.is_symlink() or path.stat().st_size > MAX_LOG * 2 or path.stat().st_size != expected['bytes'] or digest(path) != expected['sha256']:
+        if path.is_symlink() or path.stat().st_size > (MAX_ATTACHMENT if name in extra else MAX_LOG * 2) or path.stat().st_size != expected['bytes'] or digest(path) != expected['sha256']:
             raise ValueError('Evidence bytes changed or exceeded bounds')
     report = json.loads((directory / 'report.json').read_text(encoding='utf-8'))
     if report.get('schema_version') != 1 or report['commit'] != expected_commit or report['status'] not in STATES or report.get('worktree_dirty') is not False or report.get('operational_proof') is not False or report.get('isolation_gates') != 'UNVERIFIED':
@@ -138,6 +195,12 @@ def load_verified(directory, expected_commit, expected_run=None, expected_attemp
         raise ValueError('Evidence belongs to another workflow run')
     if expected_attempt is not None and report.get('run_attempt') != expected_attempt:
         raise ValueError('Evidence belongs to another workflow attempt')
+    if expected_scopes is not None and (report['lane'] not in expected_scopes or report.get('scope') != expected_scopes[report['lane']]):
+        raise ValueError('Evidence scope mismatch')
+    if report['lane'] in INTEGRATIONS:
+        details = integration_result(report['lane'], (directory / 'raw.log').read_text(encoding='utf-8'))
+        if details != report.get('integration') or details['status'] != report['status']:
+            raise ValueError('Imported structured integration evidence mismatch')
     return report
 
 
@@ -146,9 +209,10 @@ def aggregate(inputs, output, inventory=None):
     commit = revision()
     reports, errors = {}, []
     allowed = {row['id'] for row in inventory['lanes'] if row['implemented']}
+    scopes = {row['id']: row['scope'] for row in inventory['lanes'] if row['implemented']}
     for path in sorted(inputs.rglob('report.json')):
         try:
-            report = load_verified(path.parent, commit, os.environ.get('GITHUB_RUN_ID'), os.environ.get('GITHUB_RUN_ATTEMPT'))
+            report = load_verified(path.parent, commit, os.environ.get('GITHUB_RUN_ID'), os.environ.get('GITHUB_RUN_ATTEMPT'), scopes)
             lane = report['lane']
             if lane not in allowed or lane in reports:
                 raise ValueError('Unknown or duplicate lane')
@@ -160,6 +224,9 @@ def aggregate(inputs, output, inventory=None):
         row = {'lane': source['id'], 'scope': source['scope'], 'status': source['status'], 'reason': source['reason']}
         if source['id'] in reports:
             row.update({key: reports[source['id']][key] for key in ('status', 'reason')})
+            row['skipped'] = reports[source['id']].get('skipped', [])
+            row['source'] = {k: reports[source['id']].get(k) for k in ('commit', 'run_id', 'run_attempt', 'scope')}
+            row['stages'] = reports[source['id']].get('integration', {}).get('stages', [])
         rows.append(row)
     priority = ['FAIL', 'BLOCKED', 'UNVERIFIED', 'NOT RUN', 'PASS']
     status = 'FAIL' if errors else next(value for value in priority if any(r['status'] == value for r in rows))
@@ -171,7 +238,9 @@ def aggregate(inputs, output, inventory=None):
     print('Coverage: ' + status)
     # A green reporting job means only that required safe lanes supplied PASS.
     # Planned/privileged rows can remain BLOCKED without suppressing their status.
-    return 1 if errors or any(reports.get(lane, {}).get('status') != 'PASS' for lane in allowed) else 0
+    return 1 if errors or any(reports.get(row['id'], {}).get('status') not in
+                             (('PASS', 'UNVERIFIED') if row.get('allow_unverified') and reports.get(row['id'], {}).get('exit_code') == 0 else ('PASS',))
+                             for row in inventory['lanes'] if row['implemented']) else 0
 
 
 def main():

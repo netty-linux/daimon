@@ -62,6 +62,7 @@ class BundleTests(unittest.TestCase):
 
     def bundle(self, name='one', lane='automation-linux', **fields):
         row = dict(schema_version=1, lane=lane, commit=SHA, status='PASS', reason='Own scope',
+                   scope='safe',
                    operational_proof=False, isolation_gates='UNVERIFIED', worktree_dirty=False,
                    run_id=os.environ.get('GITHUB_RUN_ID', 'local'), run_attempt=os.environ.get('GITHUB_RUN_ATTEMPT', 'local'))
         row.update(fields)
@@ -86,6 +87,23 @@ class BundleTests(unittest.TestCase):
     def test_other_revision_rejected(self):
         with self.assertRaises(ValueError):
             evidence.load_verified(self.bundle(), 'b' * 40)
+
+    def test_imported_scope_must_match_inventory(self):
+        with self.assertRaises(ValueError):
+            evidence.load_verified(self.bundle(scope='foreign coverage'), SHA, expected_scopes={'automation-linux': 'safe'})
+
+    def test_compressed_stage_attachment_hash_is_checked(self):
+        source = self.root / 'owned.gz'
+        source.write_bytes(b'fixed compressed fixture')
+        original = self.bundle()
+        report = json.loads((original / 'report.json').read_text())
+        report['attachments'] = ['stage-00.log.gz']
+        output = self.root / 'attached'
+        evidence.write_bundle(output, report, 'Own test log', {'stage-00.log.gz': source})
+        self.assertEqual(evidence.load_verified(output, SHA)['status'], 'PASS')
+        (output / 'stage-00.log.gz').write_bytes(b'tampered')
+        with self.assertRaises(ValueError):
+            evidence.load_verified(output, SHA)
 
     def test_stale_run_or_attempt_is_rejected(self):
         path = self.bundle(run_id='123', run_attempt='1')

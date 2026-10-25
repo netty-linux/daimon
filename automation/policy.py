@@ -11,6 +11,8 @@ def check(root):
     for path in workflows:
         text = path.read_text(encoding='utf-8-sig')
         for action in re.findall(r'^\s*-?\s*uses:\s*([^\s#]+)', text, re.M):
+            if action == './.github/workflows/ci.yml':
+                continue  # Reviewed local reusable CI; same checked-out revision.
             if not re.fullmatch(r'[\w-]+/[\w.-]+@[0-9a-f]{40}', action):
                 errors.append(f'{path.name}: unpinned or unsupported action {action}')
         for expression in (r'pull_request_target', r'workflow_run', r'self-hosted',

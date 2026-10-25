@@ -1,5 +1,10 @@
 # DAIMON Development Automation
 
+Evolução DA-2: [Python real + browser + CI reutilizável](DAIMON_DA2_INTEGRATION.md).
+Essa evolução substitui as limitações DA-1 de integrações não executadas/importadas;
+o texto abaixo conserva a auditoria e o plano inicial. Gates e operação C2 continuam
+sem homologação, mesmo com integrações de desenvolvimento aprovadas.
+
 Plano técnico e primeira entrega não privilegiada — 25/10/2026.
 Base auditada: `main` em `76a81cff335d54480f3e9ef42ca60b6459d34dfc`.
 Branch independente: `feature/daimon-development-automation`. Não inclui os commits
