@@ -1,0 +1,638 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/google-research/harness2",
+  "revision": "1cfe254e8d25b15f37048c3730134686abe60335",
+  "tree": "edc756a4d03a2826a248115482084a176e60e751",
+  "entries": {
+    "CONTRIBUTING.md": {
+      "mode": "100644",
+      "oid": "b16bd944285bc0e5c8f354249f8b61017c8783ff"
+    },
+    "LICENSE": {
+      "mode": "100644",
+      "oid": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "MANIFEST.in": {
+      "mode": "100644",
+      "oid": "e7cc8b27fe7a1f48dd9c9c66d43f27eddd6943b3",
+      "bytes": 265,
+      "sha256": "c63d6ff6c6579316b8d97eaa7b57e068d1543bf9dd4747631e4641709e375441"
+    },
+    "README.md": {
+      "mode": "100644",
+      "oid": "a5e91206948cd3d5bbed30c2a951923020e780d2",
+      "bytes": 9374,
+      "sha256": "17639ac4194bb5c042cbf645430a772ae9be81baee95ab41eaea73cafa138f23"
+    },
+    "assets/Harness2-wordmark.png": {
+      "mode": "100644",
+      "oid": "f2e7b32e75c98a4cadc519a1e25710527677ff66"
+    },
+    "assets/components.png": {
+      "mode": "100644",
+      "oid": "aed42ec94a60d74555ab4eb93c442ebb8be6e4c1"
+    },
+    "assets/harness2-setup.gif": {
+      "mode": "100644",
+      "oid": "1e82df991c75083f5a7135efd4902b11b5cf2f54"
+    },
+    "assets/harness2-video.mp4": {
+      "mode": "100644",
+      "oid": "32e4f3da2cdf6357da1be6d77d8dfb74e1e9d34d"
+    },
+    "assets/harness2_pipeline.png": {
+      "mode": "100644",
+      "oid": "64fac99cc9392ccac4c5b24fe6e937f3a509da54"
+    },
+    "assets/harness2_recursion_modes.png": {
+      "mode": "100644",
+      "oid": "91f55033bde219bdca0203ed774c655d85bfc3e4"
+    },
+    "assets/logo.png": {
+      "mode": "100644",
+      "oid": "80dce74034a0c8e86dd892a30304569a59d82e75"
+    },
+    "dependencies/ASSETS.json": {
+      "mode": "100644",
+      "oid": "64c838fd1321ae9f65211a76ad6ca8ea9b47e6e4",
+      "bytes": 5856,
+      "sha256": "9044ca36a70eb2977981b143298cf3e6aadca8f5aff8a9a8bc26a71cb1d517e9"
+    },
+    "dependencies/PINNED.md": {
+      "mode": "100644",
+      "oid": "bd62a57c55dbdd57b071457b6e4c41ad75076278"
+    },
+    "dependencies/README.md": {
+      "mode": "100644",
+      "oid": "85346f2219d9652b3ff3dbc1d683d8c1a734341c"
+    },
+    "docs/BENCHMARKS.md": {
+      "mode": "100644",
+      "oid": "18ca85f02a817aaf891a19b999cbe2d9b322f003"
+    },
+    "docs/EXPERIMENTS.md": {
+      "mode": "100644",
+      "oid": "bd52e1506037d172a03c128427881d5342bbace7"
+    },
+    "docs/SETUP.md": {
+      "mode": "100644",
+      "oid": "0d037b8a1482391410cec9b5e9ea2a2ce27b07c8"
+    },
+    "harness2/__init__.py": {
+      "mode": "100644",
+      "oid": "e2bf767dbe010e23fd18e416ea21f438b1a1fc93",
+      "bytes": 639,
+      "sha256": "de20a79ef3cf3974bf32cb6afdbb32608655676e749a466ffd6c7c173bb7e26a"
+    },
+    "harness2/benchmarks/__init__.py": {
+      "mode": "100644",
+      "oid": "828e61ff724e26221ad6691622367de1c269b45e",
+      "bytes": 632,
+      "sha256": "6c0fb1a1a69906258c5a0a7765aa7d0e862c71ac955707d938933f9c26f73fa8"
+    },
+    "harness2/benchmarks/jb_opencode_runner.py": {
+      "mode": "100644",
+      "oid": "1b35190d44c0b09c3efe01730a96e3887d94230a",
+      "bytes": 10595,
+      "sha256": "aadfb0d1307b41da84900d353505c72d322937aef8f5400e2b95c7701ae9b768"
+    },
+    "harness2/benchmarks/jobbench.py": {
+      "mode": "100644",
+      "oid": "3d5e1720c8b85e055e121780d2f5fd8fc90f64a2",
+      "bytes": 51747,
+      "sha256": "446738c854a5fc1639c7a8a312aa90367d1f73bc7f1df1f00ccd2d243b2aeafb"
+    },
+    "harness2/benchmarks/lab.py": {
+      "mode": "100644",
+      "oid": "77320b21ebe5777812927617157286d028eedf90",
+      "bytes": 44979,
+      "sha256": "95bfa213048e870f6c4e45f9040d881ef60f2282d25175b0f8fefe6ce9eb4e71"
+    },
+    "harness2/benchmarks/tasks.py": {
+      "mode": "100644",
+      "oid": "6fff81cdd53906703a6c88bb3f78f4e4c5ff235a",
+      "bytes": 3901,
+      "sha256": "368fa8d5f7596522a9e54c6c0cb9cd8feb12a3de110d29af05cdd7e6f74dabc7"
+    },
+    "harness2/benchmarks/wb_render.py": {
+      "mode": "100644",
+      "oid": "3c5bee619d4dd1c42738ff4c8663aa1a211088d2",
+      "bytes": 20690,
+      "sha256": "df516796e3f29842b2ee9efa0f9f7274fe062b6e1232be75fb83cf76a93c32b5"
+    },
+    "harness2/benchmarks/workbuddy.py": {
+      "mode": "100644",
+      "oid": "27a95b5c75798b31a880ea68c4858041242e1b93",
+      "bytes": 41925,
+      "sha256": "1e08d17a9ad0b23a3b6dabc6da2d2e65a8110cba17d7882d5f113940f7dfeb91"
+    },
+    "harness2/cli/__init__.py": {
+      "mode": "100644",
+      "oid": "3c22791bce99b5be50410877a25d0be02709a896",
+      "bytes": 631,
+      "sha256": "8fd4345e5586666df552582be8e8d69adbb4daffae69088b08a773400c844b78"
+    },
+    "harness2/cli/_common.py": {
+      "mode": "100644",
+      "oid": "06d413073885de370ab8936e13824a315d69e4f6",
+      "bytes": 5520,
+      "sha256": "aba8393739a6ae343ce95ef005c7037b737466f444064aba63735f2ac5a22037"
+    },
+    "harness2/cli/bridge.py": {
+      "mode": "100644",
+      "oid": "3e340bf89e74a3dbf79dca3756c6133294733832",
+      "bytes": 3728,
+      "sha256": "6092475dd656eccbd454067fd20166d2ca44948d91d3c574b4da2e3b28e2af7e"
+    },
+    "harness2/cli/check.py": {
+      "mode": "100644",
+      "oid": "638eaab5c60e46a0ea5c3fe3b02a4e649c9df65b",
+      "bytes": 1745,
+      "sha256": "0c42509009b292613d46c7a87287036b5080116c14b0da4ead984896d108c2e0"
+    },
+    "harness2/cli/demo.py": {
+      "mode": "100644",
+      "oid": "2d957dba34890d76f5cf41cf5e31e4ebe79b6771",
+      "bytes": 2141,
+      "sha256": "f8ba578ff547d1f78666ee222d0ace3fea34d468405c9766d103b856c6272d25"
+    },
+    "harness2/cli/judge.py": {
+      "mode": "100644",
+      "oid": "6e8be6f0387fbdc10785521d543e488331f6ac79",
+      "bytes": 7855,
+      "sha256": "7dfb882266dd541100e5a1d4f7ac6cf728441e26c6850e420651bae8a4c7fb26"
+    },
+    "harness2/cli/report.py": {
+      "mode": "100644",
+      "oid": "8f80fc56efd3a3337184fc8d7e10d62f6665b1e5",
+      "bytes": 4428,
+      "sha256": "2cb4460658d982d9ef9921b4393b1adbb95d1909b07a967759167b97f78cf5d4"
+    },
+    "harness2/cli/run_sweep.py": {
+      "mode": "100644",
+      "oid": "0876f4e68f3b92a4cf9d6838223c00e2ef960d27",
+      "bytes": 9359,
+      "sha256": "83998848662cdf3e101250ae13afbfbf82d9b88db4d9181ab973ae9fe32f8b0a"
+    },
+    "harness2/cli/setup.py": {
+      "mode": "100644",
+      "oid": "6c9afc352d7fa7ea36732bc5856042398eb6421c",
+      "bytes": 4361,
+      "sha256": "c0a5438fcbea074e61b749554198638777f393c48d0a686161699e298ee18d0b"
+    },
+    "harness2/config.py": {
+      "mode": "100644",
+      "oid": "59e0703d11f3904e63c526bb2d7ebaf3ce2bb53d",
+      "bytes": 6615,
+      "sha256": "0db5ba0c42b87f5b14cbff2d11aaecddda1cd45500903c1d61741232bd1e0a88"
+    },
+    "harness2/core/__init__.py": {
+      "mode": "100644",
+      "oid": "d59d80d5c6ccb02d7d224fce5435fe4d928125c8",
+      "bytes": 802,
+      "sha256": "ce487673e00fd8921139e3afb688c566fc43d9b07acba048d2102663a81f7151"
+    },
+    "harness2/core/context.py": {
+      "mode": "100644",
+      "oid": "72f2868b06c13e30c031cb91c0f04dcd80293ec9",
+      "bytes": 21597,
+      "sha256": "63dd482e5d9467d7e659d186a11289fc7861d08c8aed603244ff0cee92de91f3"
+    },
+    "harness2/core/judge.py": {
+      "mode": "100644",
+      "oid": "cf4e7b9fe2b603421fce6519808deb81bc3ec9c0",
+      "bytes": 5005,
+      "sha256": "0f8cd6f4ec659f5d5976bdad4ccdc432651f51486c3fbbee36be53a6d619fbba"
+    },
+    "harness2/core/ledger.py": {
+      "mode": "100644",
+      "oid": "319a6697758d05294dab9f42e8f8700759d7e6f6",
+      "bytes": 4536,
+      "sha256": "7059de5d90fc9fb8d4b3b799ff075f09d34f182ba0fdb56eb9d8b8383d0bbf55"
+    },
+    "harness2/core/library.py": {
+      "mode": "100644",
+      "oid": "39e50684b4044e483a3c16a447958044d4b5e6de",
+      "bytes": 8449,
+      "sha256": "00219fda201a030f43b35b49c4e73ccf336aedc81164144c435b4b06a1256dd3"
+    },
+    "harness2/core/prompts.py": {
+      "mode": "100644",
+      "oid": "9ccacf23b64ac15b06a1939f26224960f56d757c",
+      "bytes": 66499,
+      "sha256": "d1f4f8db4ab4cb4addcbca175b548db2270375499fda727ac95d271c63cc2504"
+    },
+    "harness2/core/proposer.py": {
+      "mode": "100644",
+      "oid": "4a235075cae72059fa701001f31bf4505cbbc3ba",
+      "bytes": 18560,
+      "sha256": "475ef49d72228e249d7172d793f8362913774412402dfd259ae6e01c6586e175"
+    },
+    "harness2/core/recursion.py": {
+      "mode": "100644",
+      "oid": "dda6b98cd5af100b8941f33cbb079462299c5280",
+      "bytes": 18895,
+      "sha256": "b299813b5334f2c0f89024a7f14162f0fdd5418ebd4413be93920b5334a204c1"
+    },
+    "harness2/core/report.py": {
+      "mode": "100644",
+      "oid": "b7ecf6e42a1061218b0eb8cde9c441c136e28e72",
+      "bytes": 6183,
+      "sha256": "9d5b119ec93dc6b2c6341095130103ab4ba2f2dc6867c4b7ea759fca5de3cac9"
+    },
+    "harness2/core/runmark.py": {
+      "mode": "100644",
+      "oid": "1de5794b40f043e40ecba66be08a65a5787ebbb1",
+      "bytes": 3783,
+      "sha256": "99a7c3f0b023623224c3376bc0390e985b8e6608f0928d34b821ffe6c36f9175"
+    },
+    "harness2/core/schedule.py": {
+      "mode": "100644",
+      "oid": "f91f450b1d01011982069f4b41e6e3a77abcc9cc",
+      "bytes": 30524,
+      "sha256": "6e46c5ab1e4ac111818ff3acd6b636e39d650898189ac0c21802a8233ad4cd38"
+    },
+    "harness2/core/selection.py": {
+      "mode": "100644",
+      "oid": "2cf04f50e35fd82d7abaea279a83b4a7eb4c2193",
+      "bytes": 18262,
+      "sha256": "2cb3353b2fd4ec72e6322f2c1f35db1ff2cdab88b0b50c8809d1841d235cb92f"
+    },
+    "harness2/core/spec.py": {
+      "mode": "100644",
+      "oid": "e58d14852490b2d4ae3aa6da1c1c796e3e961b48",
+      "bytes": 9720,
+      "sha256": "f245ec9e314778e2a1a51594b906584255b9eed8340c073b864a8a6f2c8dc400"
+    },
+    "harness2/core/tree.py": {
+      "mode": "100644",
+      "oid": "c9bf1341226aac448f6ec82038cb6d3896799412",
+      "bytes": 16265,
+      "sha256": "c2a15690b1b6b02156e922c5e0b1a215c5065d7bea5a3bae2e56b47309197552"
+    },
+    "harness2/demo.py": {
+      "mode": "100644",
+      "oid": "487de02d44941754d955ad8a4b0a9e0e6f841db5",
+      "bytes": 6921,
+      "sha256": "8f338b3254922a8a48d66162f7796dde435d3ef65a7ccd441ef604c81a1d39d4"
+    },
+    "harness2/install.py": {
+      "mode": "100644",
+      "oid": "e126bc42402164f3886e3d1a13c3a03ac3e6bc20",
+      "bytes": 12499,
+      "sha256": "a75eaa452d405020a268864e1f047346ec10cb64b81c4045f6bda0f72bd152c4"
+    },
+    "harness2/preflight.py": {
+      "mode": "100644",
+      "oid": "93651cde7318f60a401a05e88ce53a1405caac6f",
+      "bytes": 6533,
+      "sha256": "78b6a7bc81ced28987f6d9a47bb20e7e5c6d70ff89f2a70cc9a6d179363d6c53"
+    },
+    "harness2/substrate/__init__.py": {
+      "mode": "100644",
+      "oid": "3fa7f651352570390e081742a555549f74c40c9b",
+      "bytes": 1155,
+      "sha256": "57f95d86cb0d4acfd60fddd52f2d140ffadcf0c318e28093532580339dc3f37d"
+    },
+    "harness2/substrate/base.py": {
+      "mode": "100644",
+      "oid": "19ef1dac7c07e1788e1a99fbdd1e7b833da44a41",
+      "bytes": 2891,
+      "sha256": "50a63f174e3772888af3882f3ffff3162cefba8d36e927b1a5de343c5806dd16"
+    },
+    "harness2/substrate/codex.py": {
+      "mode": "100644",
+      "oid": "fd34eacdf4a7b6991ba75e6ed34df5dd87f4e5e0",
+      "bytes": 18082,
+      "sha256": "281a07271ebed72a617a671ced1b9137901aa8f5d1deffb56c706f44c295e416"
+    },
+    "harness2/substrate/opencode.py": {
+      "mode": "100644",
+      "oid": "ad0a2ea4d59bda362838c76912e43b6f7c333254",
+      "bytes": 15411,
+      "sha256": "dabc79953d164a0d38802125756379ffa6acdc7b553d2f9036475f8220166ff0"
+    },
+    "pyproject.toml": {
+      "mode": "100644",
+      "oid": "d5892bea7cfd1d2a6d509b057a9cb6a66d6901ae",
+      "bytes": 1195,
+      "sha256": "c78fd0d09d2f92bf796871c168b548dd4d33e21566dbb582e343266e24a0bada"
+    },
+    "scripts/check_provenance.py": {
+      "mode": "100644",
+      "oid": "84dd8a3647f4847f73df68e9e7668560cb9507ba",
+      "bytes": 1463,
+      "sha256": "8824e1903e106b55005f7ad0ceb0de4db5353599298656f8fdbc7d025dbd8bcd"
+    },
+    "scripts/check_setup.py": {
+      "mode": "100644",
+      "oid": "a6d231f437a5271c2ffa5a8c7787c12101131939",
+      "bytes": 749,
+      "sha256": "80bbfc87370cce7f77884b963659180fd572d8795b6a60f87d87043d4a9011c1"
+    },
+    "scripts/render_readme_typing.py": {
+      "mode": "100644",
+      "oid": "d01d722d7df9f0a599700038a78d00a1228c4fd8",
+      "bytes": 5712,
+      "sha256": "79513f898a84028850f52cecf7f08161f854da1a08fb7e831d028e388837713a"
+    },
+    "scripts/run_jobbench.sh": {
+      "mode": "100644",
+      "oid": "b00204e19f54c30705119f6f00aa1725bd102864",
+      "bytes": 1390,
+      "sha256": "e8d89cff47433e50a790156dc1a46fc3991e4f3cc7f46593a48a1d6ef039ea4c"
+    },
+    "scripts/run_lab.sh": {
+      "mode": "100644",
+      "oid": "df94d8038eaba0b42a594bfad125affec762803b",
+      "bytes": 1382,
+      "sha256": "b967e519dfb93f57385c7f31222642fcfc8d68a061cbaf4a2f24ef923c0edae0"
+    },
+    "scripts/run_workbuddy.sh": {
+      "mode": "100644",
+      "oid": "8df4d7985984fc9ff98850caf9eba72b1be0548b",
+      "bytes": 1477,
+      "sha256": "70d20b9a8d0cd7138cc8a8eacf1395e76bc7804d60915a2b5114d9d51564cb3a"
+    },
+    "scripts/setup_benchmark.py": {
+      "mode": "100644",
+      "oid": "871d1cb9bb960319a85c028f1cde162f2fd13d73",
+      "bytes": 749,
+      "sha256": "80291a59cf6e6fcd761c605ead0c5a6bdf11e92fd1f82bc42c72842a6ec5e777"
+    },
+    "scripts/split_tasks.py": {
+      "mode": "100644",
+      "oid": "8a778e7c3060ab18d8071fc62705b91b58332339",
+      "bytes": 2596,
+      "sha256": "491a9b2aba767e9cf6d5c98e96e00e6575e614c519f52491f7531546881557c0"
+    },
+    "tests/test_workflow.py": {
+      "mode": "100644",
+      "oid": "2b7ebeb1816346f606922816a6f3609c64e8f8cc",
+      "bytes": 10587,
+      "sha256": "fda03aa8d1d4bb1a43b16a96da4a272427969a1a540cc0954709aeed7a03a4aa"
+    },
+    "third_party/README.md": {
+      "mode": "100644",
+      "oid": "ba0d8279542c82324bf025f6767d53ae759584cd"
+    },
+    "third_party/jb_runner/LICENSE": {
+      "mode": "100644",
+      "oid": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+    },
+    "third_party/jb_runner/PROVENANCE.md": {
+      "mode": "100644",
+      "oid": "65e16ced77fe8f8b1026ebc4a7fcdfb320e40f98"
+    },
+    "third_party/jb_runner/codex_base_harness/AGENTS.md": {
+      "mode": "100644",
+      "oid": "327d75c88d5af5d356ef6005cedbe527908d3883"
+    },
+    "third_party/jb_runner/harness_baseline_oc/LongTermMEMORY.md": {
+      "mode": "100644",
+      "oid": "e0b86091859d854d424d8d747df8de5cb31821e4"
+    },
+    "third_party/jb_runner/harness_baseline_oc/guardrails.md": {
+      "mode": "100644",
+      "oid": "e4881bdc393dc77dcce700fa0c22b10420f0038b"
+    },
+    "third_party/jb_runner/harness_baseline_oc/harness.yaml": {
+      "mode": "100644",
+      "oid": "a15be2beaa2b7a8664d03b15a8493f877494fad0",
+      "bytes": 2181,
+      "sha256": "2b308c3b6bbbc4600b2fd5fa9396167310b076cb5a432c0fef34cf8f0883c3b9"
+    },
+    "third_party/jb_runner/harness_baseline_oc/plugin/README.md": {
+      "mode": "100644",
+      "oid": "56758a042a9b973578730b9e67c2f47859dd7625"
+    },
+    "third_party/jb_runner/harness_baseline_oc/scripts/README.md": {
+      "mode": "100644",
+      "oid": "b0c7e509c8c27be4622b404390aad288bf13fcbb"
+    },
+    "third_party/jb_runner/harness_baseline_oc/sub_agents/README.md": {
+      "mode": "100644",
+      "oid": "a1a23d3755fd5aa1c2e90540272317bb624de1e0"
+    },
+    "third_party/jb_runner/harness_baseline_oc/systemprompt.md": {
+      "mode": "100644",
+      "oid": "2294860f9cd507f904916a1a1f3d65d2b1a05752"
+    },
+    "third_party/jb_runner/harness_baseline_oc/tool_descriptions/tool_guidance.md": {
+      "mode": "100644",
+      "oid": "3064d02c5dde87c25bb2208a0c355f511471e238"
+    },
+    "third_party/jb_runner/run_benchmark_codex_cli_adapt.sh": {
+      "mode": "100644",
+      "oid": "0105da58ad7567061489bc5d95236bfec2b6106a",
+      "bytes": 20526,
+      "sha256": "a94c645d3061da354591dde446d11f8b3e6d08b4005f8f587668aae07c0fc100"
+    },
+    "third_party/lab_runner/LICENSE": {
+      "mode": "100644",
+      "oid": "e04042669602230e08975f78d470c4f72ce2d027"
+    },
+    "third_party/lab_runner/PROVENANCE.md": {
+      "mode": "100644",
+      "oid": "25c29d8feeb7d3973f15255aa9ba1280e9e2eff4"
+    },
+    "third_party/lab_runner/adapt_runs_cx/run_codex_lab.py": {
+      "mode": "100644",
+      "oid": "cb4ed81c72343697c1c0d1ff6c538ae4552371d9",
+      "bytes": 16474,
+      "sha256": "567d6a06d8104f853b8d83953af333ea8ef57a9053e0c9788a42692c48196556"
+    },
+    "third_party/lab_runner/opencode/README.md": {
+      "mode": "100644",
+      "oid": "896362f5a8740fef38880f5dea47acf20376e34e"
+    },
+    "third_party/lab_runner/opencode/__init__.py": {
+      "mode": "100644",
+      "oid": "59acbb58b2584bc484d8d4054bed61769c0aff1a",
+      "bytes": 233,
+      "sha256": "df2b298f529bbcba94713aa748b5a04569f38bbb3f96c9219b7fb0d7186066a8"
+    },
+    "third_party/lab_runner/opencode/render.py": {
+      "mode": "100644",
+      "oid": "747c7469296d91c169243fce843fcdeef85b9016",
+      "bytes": 17527,
+      "sha256": "b636a60d039fdfa66d64eb5d5d3c93a99464be2bcbd5b80dc8f91d1f104ea5ee"
+    },
+    "third_party/lab_runner/opencode/render_tree.py": {
+      "mode": "100644",
+      "oid": "f7a34137be1cc65292cc8b92a42c9c7c1d3deea0",
+      "bytes": 690,
+      "sha256": "54d64b461e430905b212b46902512aad38d3585fb5921b7a9982eea0413a4b73"
+    },
+    "third_party/lab_runner/opencode/run_opencode.py": {
+      "mode": "100644",
+      "oid": "c30cdac42112314d0fa5e4e390950cb5a82e4471",
+      "bytes": 19781,
+      "sha256": "7e7178583a6acb2e07bffd1fbef78f1b0095975bc2c61f8b0038fcc528090e32"
+    },
+    "third_party/lab_runner/opencode/scripts/read_doc.py": {
+      "mode": "100644",
+      "oid": "30fe95b5b1774dd3ecae0b6bb724ce6caa577e29",
+      "bytes": 3554,
+      "sha256": "6b3c8feb3b90b0b2bbbf4cb491c81f1114b67ada04d2c988fac8cb1af68533b5"
+    },
+    "third_party/lab_runner/opencode/session.py": {
+      "mode": "100644",
+      "oid": "13e948b1a711ad3734f04f46b615605bcc25c42d",
+      "bytes": 4653,
+      "sha256": "e804e29a20ac4fd71454c85b9e15432cf303739c7f8d7aacc0df19f732bfcb62"
+    },
+    "third_party/lab_runner/tts_lab/__init__.py": {
+      "mode": "100644",
+      "oid": "0495a83e27de9cd7f3fdde44b384d866cfe7709a",
+      "bytes": 429,
+      "sha256": "4ae8a9112bc00a182c983a35c8c5db40717007cefbc1b0bed89f04bc384a0106"
+    },
+    "third_party/lab_runner/tts_lab/config.py": {
+      "mode": "100644",
+      "oid": "83eeb647150e2d051e930c6d88d8a586f0e03649",
+      "bytes": 482,
+      "sha256": "f6eb8551c3cb3538de42a2e43cd5cd1aa466370d64dd681e46ec70f1c3dcf965"
+    },
+    "third_party/licenses/harvey-labs.LICENSE": {
+      "mode": "100644",
+      "oid": "e04042669602230e08975f78d470c4f72ce2d027"
+    },
+    "third_party/licenses/job-bench-eval.LICENSE": {
+      "mode": "100644",
+      "oid": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+    },
+    "third_party/licenses/opencode.LICENSE": {
+      "mode": "100644",
+      "oid": "6439474beed8e0271df9862eff97ffd70ec2464c"
+    },
+    "third_party/licenses/workbuddy-bench.LICENSE": {
+      "mode": "100644",
+      "oid": "d3644c78e0b06f49aad4157bbcc89798e2fdde6a"
+    },
+    "third_party/patches/harvey-labs-judge-vertex-anthropic.diff": {
+      "mode": "100644",
+      "oid": "f1dbfe131c5432909cacb76f7ed050f2b23085ca",
+      "bytes": 12059,
+      "sha256": "7fc4385025916054be504b98f063e2a161515b8b4dc3bcc5cd6f4272b707ed6d"
+    },
+    "third_party/patches/job-bench-eval-judge.diff": {
+      "mode": "100644",
+      "oid": "95279bd27eeabd2f0c62633d7314f47e7b2c717a",
+      "bytes": 2202,
+      "sha256": "b5878bce91f6322c9fd1fa777b3a5dd3866922f704173a658d007c62456c5728"
+    },
+    "third_party/patches/opencode-compat.diff": {
+      "mode": "100644",
+      "oid": "eca02dd04d02fe576c87b97f62afe31ee4510615",
+      "bytes": 1607,
+      "sha256": "c9a8a0e826d48f3fcfc7d818321d128c28e1f7f7c594954c19453dfca4946dc8"
+    },
+    "third_party/patches/workbuddy-bench-runtime.diff": {
+      "mode": "100644",
+      "oid": "9797a9875b7fc15453fd4c227136be6cd15c90df",
+      "bytes": 43663,
+      "sha256": "1d581ee0c23a9a5574ce0f9317d0bda17f6c3a2556898c89b34ccbdbd5b87b3f"
+    },
+    "third_party/wb_runner/LICENSE": {
+      "mode": "100644",
+      "oid": "d3644c78e0b06f49aad4157bbcc89798e2fdde6a"
+    },
+    "third_party/wb_runner/PROVENANCE.md": {
+      "mode": "100644",
+      "oid": "4d099148e568e703791704cd6df501c96fa44479"
+    },
+    "third_party/wb_runner/agents/codex_agent.py": {
+      "mode": "100644",
+      "oid": "f42dbc398a3c70adf23784f498f9524571ea734d",
+      "bytes": 17095,
+      "sha256": "dbdf48c19c51d7a0389caf3f5601c1ff967ef534137d829afe8ca8792db40c9d"
+    },
+    "third_party/wb_runner/agents/codex_harness_agent.py": {
+      "mode": "100644",
+      "oid": "2e1e356b0a7400b1328cbac685019cc56ed3f8fd",
+      "bytes": 3155,
+      "sha256": "fc1d1ecfc2de1debabb0ff84ec7a113b05536873ac76f73806835ff873b2f580"
+    },
+    "third_party/wb_runner/agents/oc_agent.py": {
+      "mode": "100644",
+      "oid": "eeac9f6b1b7c6add26ba8f19e0d81ede027d85b0",
+      "bytes": 20695,
+      "sha256": "5375a49b9a9e6d6d6212b47156b36dca17934e54728ddeed6218ac3662c67fff"
+    },
+    "third_party/wb_runner/agents/oc_harness_agent.py": {
+      "mode": "100644",
+      "oid": "2aee77633694dba005aef060f22b50978932d713",
+      "bytes": 4388,
+      "sha256": "647e31187af1305a5ddc42f7e41740795f825e0c708f63f5d1f29b954625c09c"
+    },
+    "third_party/wb_runner/configs/harnesses/codex-harness/_defaults.yaml": {
+      "mode": "100644",
+      "oid": "e29b33f689f953d98079097563c3f2c3a0866319",
+      "bytes": 413,
+      "sha256": "5dddd5c358eff75ca69f7277ae6ccd58a2e208e19d722b862f04062a3718479e"
+    },
+    "third_party/wb_runner/configs/harnesses/codex-harness/versions/0.144.6.yaml": {
+      "mode": "100644",
+      "oid": "7f804e9b9dcddbad534cfc929199e38686bd49b4",
+      "bytes": 124,
+      "sha256": "f6ebdc457786c3869ceb8a11ee0c4a63db53a080961075c15edff2a7640293bf"
+    },
+    "third_party/wb_runner/configs/harnesses/oc-harness/_defaults.yaml": {
+      "mode": "100644",
+      "oid": "60632b62fb537abe6a61eb53faf6cdeb68d9d65d",
+      "bytes": 1861,
+      "sha256": "418843868dc1b01431b339791ae63bb23c88cad3238bf9ab844fbefae8acd71e"
+    },
+    "third_party/wb_runner/configs/harnesses/oc-harness/versions/1.14.18.yaml": {
+      "mode": "100644",
+      "oid": "29ef983a887ba914fb90770c6739454379df10ab",
+      "bytes": 1293,
+      "sha256": "fd0515a9d539c011501984b1017f90410cef79045e172c20a9598596f39106a6"
+    },
+    "third_party/wb_runner/configs/harnesses/opencode/CONFIG.md": {
+      "mode": "100644",
+      "oid": "1a7166d9262e6d9509f628b22bb28e8804834da9"
+    },
+    "third_party/wb_runner/configs/harnesses/opencode/_defaults.yaml": {
+      "mode": "100644",
+      "oid": "20a45f1a07f932af707a3fddb6eb4209fabd4acf",
+      "bytes": 1594,
+      "sha256": "0ff808c61e7d0a0f4709d86fe6ed0457cb47a1401e754a18500eaf162c03fe84"
+    },
+    "third_party/wb_runner/configs/harnesses/opencode/docker/Dockerfile": {
+      "mode": "100644",
+      "oid": "ee558fbad3d3beb3344d46a63f57bc832ad1170b",
+      "bytes": 4536,
+      "sha256": "407a631ad135c6960bc319ade205efc37175999c349466b8d82e9a2aedff7266"
+    },
+    "third_party/wb_runner/configs/harnesses/opencode/presets/settings/v1_14.json": {
+      "mode": "100644",
+      "oid": "c0fd7cb7206c5db1b790b2fe59d495dafbf9eb53",
+      "bytes": 350,
+      "sha256": "1cc19b36f9aa7a8b6a9bf84d63fed256b9e807ecc163c49c52add1c06e6bdc7b"
+    },
+    "third_party/wb_runner/configs/harnesses/opencode/versions/1.14.18.yaml": {
+      "mode": "100644",
+      "oid": "ee4df0336757b409554d769a6c296c8b189d3db6",
+      "bytes": 1240,
+      "sha256": "54cb6265d12b74098aab5425425b13afba581ac4a2c0cef43ba8ce6d7c1c9767"
+    }
+  },
+  "runtime_loaded": [
+    "harness2/__init__.py",
+    "harness2/core/__init__.py",
+    "harness2/core/tree.py",
+    "harness2/substrate/base.py"
+  ],
+  "worker_sha256": "8e1aafb0964434ce1f885d1964002629050bbbc6aa8d490678d54ab7df2c3af4",
+  "verifier_sha256": "a96d3aacaa604fd1c505b7313bad8c98bbd00ee23ece53fb38a87c6b4ad52989",
+  "worker_loaded": [
+    "harness2/__init__.py",
+    "harness2/core/__init__.py",
+    "harness2/core/tree.py"
+  ],
+  "native_adapter_sha256": "ddd5a867d2648dfbc0c38e188aa40f38404186beb9a9751be300e606d7d8a62f"
+}

@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STATES = {'PASS', 'FAIL', 'BLOCKED', 'NOT RUN', 'UNVERIFIED'}
 MAX_LOG = 2 * 1024 * 1024
 MAX_ATTACHMENT = 8 * 1024 * 1024
-SECURITY_LANES = {'security-go', 'security-python', 'security-npm', 'security-workflows', 'security-provenance'}
+SECURITY_LANES = {'security-go', 'security-python', 'security-npm', 'security-workflows', 'security-provenance', 'security-upstream'}
 
 
 def attachment_name(name):
@@ -146,6 +146,8 @@ def write_bundle(output, report, log=None, attachments=None):
         security = row.get('security')
         if security:
             count = (str(security['advisory_count']) + ' advisories / ' + str(security['finding_count']) + ' records') if security['complete'] else 'unknown (scanner incomplete)'
+            if row['lane'] == 'security-upstream' and security['complete']:
+                count = str(security['static_rule_count']) + ' static rules / ' + str(security['finding_count']) + ' risk records (not advisories)'
             summary.append('| ' + row['lane'] + ' findings | ' + count + ' | No automatic remediation |')
     (output / 'summary.md').write_text('\n'.join(summary) + '\n', encoding='utf-8')
     files = {p.name: {'sha256': digest(p), 'bytes': p.stat().st_size} for p in sorted(output.iterdir())}
@@ -246,6 +248,23 @@ def load_verified(directory, expected_commit, expected_run=None, expected_attemp
 
 def cross_job_provenance(reports):
     errors = []
+    upstream = reports.get('security-upstream')
+    worker = reports.get('python-upstream-integration')
+    if upstream and upstream.get('security', {}).get('complete') and worker:
+        covered = upstream['security']['coverage']
+        actual = worker.get('integration', {}).get('provenance', {}).get('upstream_revision')
+        if actual != covered.get('revision'):
+            errors.append('Independent upstream scan and real worker revisions differ')
+    if upstream and upstream.get('security', {}).get('complete'):
+        py = reports.get('security-python', {})
+        if not py.get('security', {}).get('complete'):
+            errors.append('Upstream build/scanner dependency advisory evidence incomplete')
+        else:
+            targets = {p['name'] for p in py['security']['coverage']['targets']}
+            declared = upstream['security']['coverage'].get('dependencies', {}).get('build_declared', [])
+            names = {re.split(r'[<>=!~;\[\s]', requirement)[0].lower() for requirement in declared}
+            if not names <= targets or not {'setuptools', 'wheel', 'packaging'} <= targets:
+                errors.append('Upstream build requirements absent from PyPI advisory targets')
     audited = reports.get('security-provenance')
     if not audited or not audited.get('security', {}).get('complete'):
         return errors  # Missing/incomplete required scanner remains non-PASS separately.
