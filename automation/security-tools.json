@@ -5,6 +5,7 @@
   "pip-audit": "2.10.1",
   "zizmor": "1.31.1",
   "PyYAML": "6.0.3",
+  "bandit": "1.9.4",
   "uv": "0.12.17",
   "npm": "11.13.0",
   "npm_tarball": "https://registry.npmjs.org/npm/-/npm-11.13.0.tgz",

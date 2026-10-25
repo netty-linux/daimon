@@ -152,6 +152,7 @@ def main():
         'security-npm': ['node', str(TOOLS / 'npm/package/bin/npm-cli.js'), 'audit', '--json', '--package-lock-only', '--ignore-scripts', '--audit-level=low'],
         'security-workflows': [str(ve / 'zizmor'), '--offline', '--no-config', '--no-ignores', '--format', 'sarif', '.github/workflows'],
         'security-provenance': [],
+        'security-upstream': [sys.executable, '-I', '-B', str(ROOT / 'automation/upstream_security.py')],
     }
     failed = False
     for lane, command in commands.items():

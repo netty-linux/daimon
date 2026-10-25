@@ -18,7 +18,11 @@ INPUTS = ('go.mod', 'ui/package-lock.json', 'python/harness2_bridge/pyproject.to
           'python/harness2_bridge/uv.lock', 'python/harness2_bridge/upstream.lock.json',
           'automation/build-requirements.txt', 'automation/security-tools.in',
           'automation/security-tools.lock', 'automation/security-tools.json',
-          '.github/workflows/ci.yml', '.github/workflows/development-automation.yml')
+          '.github/workflows/ci.yml', '.github/workflows/development-automation.yml',
+          'automation/upstream-inventory.lock.json', 'automation/bandit.json',
+          'automation/upstream_checks.py', 'automation/upstream_security.py',
+          'python/harness2_bridge/worker.py', 'python/harness2_bridge/verify_pin.py',
+          'python/harness2_native_substrate/substrate.py')
 
 
 def sha(path):
@@ -84,7 +88,7 @@ def main():
         if capture(['node', npm, '--version']) != pins['npm']:
             raise ValueError('Unexpected npm scanner version')
         versions = json.loads(capture([python, '-I', '-c',
-            'import importlib.metadata as m,json; print(json.dumps({n:m.version(n) for n in ("pip-audit","zizmor","PyYAML")}))']))
+            'import importlib.metadata as m,json; print(json.dumps({n:m.version(n) for n in ("pip-audit","zizmor","PyYAML","bandit")}))']))
         if any(versions[k] != pins[k] for k in versions):
             raise ValueError('Python scanner version mismatch')
         installed = json.loads(capture([python, '-I', '-c',
@@ -94,7 +98,7 @@ def main():
         if expected != {re.sub(r'[-_.]+', '-', n).lower(): v for n, v in installed.items()}:
             raise ValueError('Installed scanner dependency inventory differs from hash lock')
         entrypoints = {'govulncheck': govuln, 'pip-audit': venv / 'bin/pip-audit',
-                       'zizmor': venv / 'bin/zizmor', 'npm': npm}
+                       'zizmor': venv / 'bin/zizmor', 'npm': npm, 'bandit': venv / 'bin/bandit'}
         report = dict(schema_version=1, commit=capture(['git', 'rev-parse', 'HEAD']),
                       run_id=os.environ.get('GITHUB_RUN_ID', 'local'), run_attempt=os.environ.get('GITHUB_RUN_ATTEMPT', 'local'),
                       created_utc=datetime.now(timezone.utc).isoformat(), pins=pins, python_versions=versions, installed_python=installed,

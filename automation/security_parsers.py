@@ -2,7 +2,7 @@
 import json
 import re
 
-LANES = {'security-go', 'security-python', 'security-npm', 'security-workflows', 'security-provenance'}
+LANES = {'security-go', 'security-python', 'security-npm', 'security-workflows', 'security-provenance', 'security-upstream'}
 
 
 class Incomplete(ValueError):
@@ -228,15 +228,53 @@ def provenance(text, code, context):
                           'limitations': ['Content hashes and Go sumdb are integrity/provenance evidence, not independent producer signatures or OS attestation.']}
 
 
+def upstream(text, code, context):
+    from pathlib import Path
+    import importlib.util
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location('independent_upstream_checks', root / 'automation/upstream_checks.py')
+    checks = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(checks)
+    data = decode(text)
+    if data.get('error'):
+        if data.get('category') == 'integrity':
+            raise Contradiction(data['error'])
+        raise Incomplete(data['error'])
+    if code != 0:
+        raise Incomplete('Upstream scanner process did not complete')
+    policy = decode((root / 'automation/upstream-inventory.lock.json').read_text(encoding='utf-8'))
+    try:
+        signals, facts = checks.evaluate(data, policy, (root / 'python/harness2_bridge/worker.py').read_bytes(), context['versions']['bandit'],
+                                        (root / 'python/harness2_native_substrate/substrate.py').read_bytes())
+    except checks.IntegrityError as error:
+        raise Contradiction(str(error)) from error
+    except (ValueError, SyntaxError, StopIteration) as error:
+        raise Incomplete(str(error)) from error
+    findings = [record(f['rule'], f['path'], policy['revision'], f['severity'], [], **{k:v for k,v in f.items() if k not in ('rule','path','severity')}) for f in signals]
+    coverage = dict(repository=policy['repository'], revision=policy['revision'], git_tree=policy['tree'],
+                    inventory={p:{**item, 'usage': facts['modules'].get(p, {}).get('usage', 'build-input' if p in ('pyproject.toml', 'MANIFEST.in', 'README.md') else 'repository-data-not-executed')} for p,item in policy['entries'].items()},
+                    python_files=len(facts['modules']), runtime_loaded=facts['runtime_loaded'], imports=facts['imports'],
+                    dependencies=facts['dependencies'], rules=facts['rules'], bandit=data['scanner'],
+                    bandit_findings=len(data['bandit']['results']), custom_risk_signals=len(facts['risk_signals']),
+                    limitations=['Syntactic security signals require review; no interprocedural taint or exploit proof.', 'No upstream execution, build, extra resolution, VM or operational gate attestation.'])
+    return findings, facts['coverage_gaps'], coverage
+
+
 def normalize(lane, text, code, context, unavailable=None):
     if unavailable:
         return dict(status='BLOCKED', reason=unavailable, complete=False, findings=[], finding_count=None, coverage={})
     try:
         findings, skipped, coverage = {'security-go': go, 'security-python': python, 'security-npm': npm,
-                                       'security-workflows': workflows, 'security-provenance': provenance}[lane](text, code, context)
+                                       'security-workflows': workflows, 'security-provenance': provenance,
+                                       'security-upstream': upstream}[lane](text, code, context)
         status = 'FAIL' if findings else ('UNVERIFIED' if skipped else 'PASS')
-        return dict(status=status, reason='Known findings require review' if findings else ('Explicit coverage gaps' if skipped else 'Complete audit within declared scope; no known findings'),
+        result = dict(status=status, reason='Known findings require review' if findings else ('Explicit coverage gaps' if skipped else 'Complete audit within declared scope; no known findings'),
                     complete=True, findings=findings, finding_count=len(findings), advisory_count=len({f['advisory'] for f in findings}), skipped=skipped, coverage=coverage)
+        if lane == 'security-upstream':
+            result.update(advisory_count=0, static_rule_count=len({f['advisory'] for f in findings}))
+            if findings:
+                result['reason'] = 'Static findings/risk signals require review; not confirmed vulnerabilities'
+        return result
     except Incomplete as error:
         return dict(status='BLOCKED' if code else 'UNVERIFIED', reason=str(error), complete=False, findings=[], finding_count=None, coverage={})
     except (Contradiction, KeyError, TypeError, AttributeError) as error:

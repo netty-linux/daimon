@@ -135,6 +135,13 @@
       "reason": "Requires a completed scanner bundle from this SHA, run and attempt",
       "status": "NOT RUN",
       "scope": "CI input hashes, lock integrity and run-bound scanner toolchain provenance, no OS/producer attestation"
+    },
+    {
+      "id": "security-upstream",
+      "implemented": true,
+      "reason": "Requires independently acquired pinned Git objects, full inventory and real static scan from this run",
+      "status": "NOT RUN",
+      "scope": "Harness2 pinned Git inventory, all Python Bandit scan and explicit trust-boundary risk signals; no execution or operational proof"
     }
   ]
 }
