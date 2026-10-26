@@ -153,6 +153,7 @@ def main():
         'security-workflows': [str(ve / 'zizmor'), '--offline', '--no-config', '--no-ignores', '--format', 'sarif', '.github/workflows'],
         'security-provenance': [],
         'security-upstream': [sys.executable, '-I', '-B', str(ROOT / 'automation/upstream_security.py')],
+        'security-triage': [sys.executable, '-I', '-B', str(ROOT / 'automation/context_triage.py')],
     }
     failed = False
     for lane, command in commands.items():

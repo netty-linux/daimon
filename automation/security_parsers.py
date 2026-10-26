@@ -2,7 +2,7 @@
 import json
 import re
 
-LANES = {'security-go', 'security-python', 'security-npm', 'security-workflows', 'security-provenance', 'security-upstream'}
+LANES = {'security-go', 'security-python', 'security-npm', 'security-workflows', 'security-provenance', 'security-upstream', 'security-triage'}
 
 
 class Incomplete(ValueError):
@@ -260,13 +260,51 @@ def upstream(text, code, context):
     return findings, facts['coverage_gaps'], coverage
 
 
+def triage(text, code, context):
+    from pathlib import Path
+    import importlib.util
+    root=Path(__file__).resolve().parents[1]
+    spec=importlib.util.spec_from_file_location('independent_context_review',root/'automation/context_review.py')
+    review=importlib.util.module_from_spec(spec);spec.loader.exec_module(review)
+    checks_spec=importlib.util.spec_from_file_location('triage_source_checks',root/'automation/upstream_checks.py')
+    checks=importlib.util.module_from_spec(checks_spec);checks_spec.loader.exec_module(checks)
+    data=decode(text)
+    if data.get('error'):
+        if data.get('category')=='review-unavailable':raise Incomplete(data['error'])
+        raise Contradiction('Triage evidence invalid: '+data['error'])
+    if code!=0 or data.get('schema_version')!=1:raise Incomplete('Triage process did not complete')
+    raw_text=data['upstream_raw']
+    if review.digest(raw_text.encode())!=data['upstream_sha256']:raise Contradiction('Triage source hash mismatch')
+    # Re-run the existing verifier against preserved raw bytes, not a clean summary.
+    upstream(raw_text,0,context)
+    raw=decode(raw_text)
+    sources=checks.verify_snapshot(raw['snapshot'],decode((root/'automation/upstream-inventory.lock.json').read_text()))
+    integration={p:(root/p).read_bytes().replace(b'\r\n',b'\n') for p in review.INTEGRATION_FILES}
+    ledger=decode((root/'automation/context-review.json').read_text())
+    try:actual=review.review(raw,sources,integration,ledger)
+    except ValueError as error:raise Contradiction(str(error)) from error
+    if actual!=data['review']:raise Contradiction('Triage decisions/graph differ from independent recomputation')
+    confirmed=[r for r in actual['entries'] if r['classification']=='confirmed-vulnerability']
+    findings=[record('DA33-'+r['id'],r['path'],raw['snapshot']['revision'],r['severity'],[],
+                     description=r['reason'],original_rule=r['rule'],line=r['line'],classification=r['classification'],
+                     remediation='Do not expose runmark reuse; propose length-framed SHA-256 plus marker schema/cache invalidation in a reviewed upstream patch.') for r in confirmed]
+    gaps=[dict(scope='contextual-review',reason=str(actual['counts'].get('inconclusive',0))+' findings remain inconclusive; approximate graph does not prove unreachability'),
+          dict(scope='whole-upstream',reason='Original scanner gate and coverage gaps retained; no automatic PASS promotion')]
+    coverage={k:actual[k] for k in ('integrity','counts','high_reviews','original_findings_retained','proof_tests_required','security_gate_promoted','coverage','limitations')}
+    coverage.update(groups=len(actual['groups']),graph_nodes=len(actual['graph']['nodes']),graph_edges=len(actual['graph']['edges']),
+                    graph_sha256=review.digest(json.dumps(actual['graph'],sort_keys=True).encode()),
+                    source_scan_sha256=data['upstream_sha256'],integration_hashes=ledger['integration_hashes'],
+                    note='Annotations never remove, suppress or reclassify the original scanner bundle.')
+    return findings,gaps,coverage
+
+
 def normalize(lane, text, code, context, unavailable=None):
     if unavailable:
         return dict(status='BLOCKED', reason=unavailable, complete=False, findings=[], finding_count=None, coverage={})
     try:
         findings, skipped, coverage = {'security-go': go, 'security-python': python, 'security-npm': npm,
                                        'security-workflows': workflows, 'security-provenance': provenance,
-                                       'security-upstream': upstream}[lane](text, code, context)
+                                       'security-upstream': upstream, 'security-triage': triage}[lane](text, code, context)
         status = 'FAIL' if findings else ('UNVERIFIED' if skipped else 'PASS')
         result = dict(status=status, reason='Known findings require review' if findings else ('Explicit coverage gaps' if skipped else 'Complete audit within declared scope; no known findings'),
                     complete=True, findings=findings, finding_count=len(findings), advisory_count=len({f['advisory'] for f in findings}), skipped=skipped, coverage=coverage)
@@ -274,6 +312,9 @@ def normalize(lane, text, code, context, unavailable=None):
             result.update(advisory_count=0, static_rule_count=len({f['advisory'] for f in findings}))
             if findings:
                 result['reason'] = 'Static findings/risk signals require review; not confirmed vulnerabilities'
+        if lane=='security-triage':
+            result.update(advisory_count=0,static_rule_count=len({f['original_rule'] for f in findings}))
+            result['reason']='Contextual integrity defect confirmed; original findings and uncertainty retained' if findings else 'Contextual coverage remains unverified'
         return result
     except Incomplete as error:
         return dict(status='BLOCKED' if code else 'UNVERIFIED', reason=str(error), complete=False, findings=[], finding_count=None, coverage={})

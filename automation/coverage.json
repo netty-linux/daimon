@@ -142,6 +142,13 @@
       "reason": "Requires independently acquired pinned Git objects, full inventory and real static scan from this run",
       "status": "NOT RUN",
       "scope": "Harness2 pinned Git inventory, all Python Bandit scan and explicit trust-boundary risk signals; no execution or operational proof"
+    },
+    {
+      "id": "security-triage",
+      "implemented": true,
+      "reason": "Requires original findings, reviewed decisions, reproducible graph and same-run safe Linux proof tests",
+      "status": "NOT RUN",
+      "scope": "Contextual review integrity, individual risk dispositions and approximate reachability; no scanner suppression or operational gate promotion"
     }
   ]
 }
