@@ -106,6 +106,76 @@ class WorkerTests(unittest.TestCase):
                 self.assertIn(b'worker operation denied',proc.stderr)
                 self.assertFalse((Path(d)/'forbidden').exists())
 
+    def test_context_in_memory_sensitive_sinks_not_called(self):
+        # Only the existing disposable Linux integration recipe runs these probes.
+        self.assertEqual(sys.platform, 'linux')
+        self.assertNotEqual(os.geteuid(), 0)
+        self.assertEqual(os.environ.get('DAIMON_CONTEXT_REVIEW_TESTS'), '1')
+        import importlib.util
+        from unittest import mock
+        from contextlib import ExitStack
+        spec=importlib.util.spec_from_file_location('_context_worker', HERE/'worker.py')
+        worker=importlib.util.module_from_spec(spec);spec.loader.exec_module(worker)
+        surface,validate=worker.load_upstream(SITE)
+        tree=sys.modules['harness2.core.tree']
+        with ExitStack() as stack:
+            denied=[stack.enter_context(mock.patch.object(tree, name, side_effect=AssertionError('unexpected sensitive flow')))
+                    for name in ('read_tree','write_tree','check_hooks','_py_compiles')]
+            for prompt in ('Hello', '__import__("os").system("never-executed")',
+                           'https://example.invalid/../../not-a-path', '{"hooks":{"Run":"inert"}}'):
+                manifest=self.manifest();manifest['components']['system_prompt']=prompt
+                self.assertEqual(worker.validate_manifest(manifest,surface,validate),1)
+            for call in denied:call.assert_not_called()
+
+    def test_context_disallowed_components_stop_before_upstream(self):
+        import importlib.util
+        from unittest import mock
+        spec=importlib.util.spec_from_file_location('_context_worker', HERE/'worker.py')
+        worker=importlib.util.module_from_spec(spec);spec.loader.exec_module(worker)
+        for key,value in (('scripts',[{'id':'inert'}]),('plugins',[{}]),('skills',[{}]),
+                          ('subagents',[{}]),('guardrails','inert'),('memory','inert'),('tool_guidance','inert')):
+            manifest=self.manifest();manifest['components'][key]=value
+            downstream=mock.Mock(side_effect=AssertionError('must reject before upstream'))
+            with self.assertRaises(ValueError):worker.validate_manifest(manifest,object(),downstream)
+            downstream.assert_not_called()
+
+    def test_context_compile_does_not_execute(self):
+        import importlib.util
+        spec=importlib.util.spec_from_file_location('_context_worker', HERE/'worker.py')
+        worker=importlib.util.module_from_spec(spec);spec.loader.exec_module(worker)
+        worker.load_upstream(SITE)
+        tree=sys.modules['harness2.core.tree']
+        # Compile-only proof: if execution occurs this inert raise makes the test fail.
+        errors=[]
+        tree._py_compiles('inert.py', 'raise AssertionError("must not execute")', errors)
+        self.assertEqual(errors,[])
+
+    def test_context_original_runmark_collision(self):
+        self.assertEqual(sys.platform,'linux')
+        self.assertNotEqual(os.geteuid(),0)
+        self.assertEqual(os.environ.get('DAIMON_CONTEXT_REVIEW_TESTS'),'1')
+        import hashlib
+        import importlib.util
+        spec=importlib.util.spec_from_file_location('_context_worker', HERE/'worker.py')
+        worker=importlib.util.module_from_spec(spec);spec.loader.exec_module(worker)
+        worker.load_upstream(SITE)  # Verifies every installed original .py first.
+        lock=json.loads((HERE/'upstream.lock.json').read_text())
+        rel='harness2/core/runmark.py';source=(SITE/rel).read_bytes()
+        self.assertIn(hashlib.sha256(source).hexdigest(),lock['files'][rel].values())
+        namespace={'__name__':'_context_verified_runmark'}
+        # Reviewed original module only, inside existing disposable Linux test job.
+        # No launchers, providers, network or candidate execution are imported.
+        exec(compile(source,str(SITE/rel),'exec'),namespace)
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);first=root/'first';second=root/'second';marker=root/'marker'
+            first.mkdir();second.mkdir()
+            (first/'a').write_bytes(b'x\0b\0y')
+            (second/'a').write_bytes(b'x');(second/'b').write_bytes(b'y')
+            self.assertNotEqual(sorted(p.name for p in first.iterdir()), sorted(p.name for p in second.iterdir()))
+            self.assertEqual(namespace['fingerprint'](first),namespace['fingerprint'](second))
+            namespace['mark_complete'](marker,run_id='owned-test-only',harness_dir=first)
+            self.assertTrue(namespace['is_complete'](marker,harness_dir=second))
+
 
 if __name__ == '__main__':
     unittest.main()

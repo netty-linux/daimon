@@ -115,7 +115,13 @@ def unittest_facts(name, text):
         raise ValueError('Missing, skipped or unsuccessful real Python suite')
     if not rows[0]['successful'] and not rows[0]['skipped']:
         raise ValueError('Unsuccessful Python suite')
-    return {'tests': rows[0]['tests'], 'skipped': rows[0]['skipped']}
+    facts = {'tests': rows[0]['tests'], 'skipped': rows[0]['skipped']}
+    if 'executed_test_ids' in rows[0]:
+        ids=rows[0]['executed_test_ids']
+        if len(ids)!=rows[0]['tests'] or len(set(ids))!=len(ids):
+            raise ValueError('Missing or duplicate Python test identity')
+        facts['executed_test_ids']=ids
+    return facts
 
 
 def python_environment(p):
@@ -156,6 +162,7 @@ def python_environment(p):
 
 def python_suite(p):
     python, env = python_environment(p)
+    env = dict(env, DAIMON_CONTEXT_REVIEW_TESTS='1')
     for name in ('worker', 'native-substrate', 'linux-limits'):
         p.run(name, [python, '-I', '-S', '-B', ROOT / 'automation/unittest_integration.py', name],
               env=env, inspect=lambda text, name=name: unittest_facts(name, text))

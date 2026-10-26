@@ -20,11 +20,19 @@ def main():
     args = parser.parse_args()
     module = types.ModuleType('audited_integration')
     module.__dict__.update(runpy.run_path(str(ROOT / SUITES[args.suite]), run_name='audited_integration'))
-    result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromModule(module))
+    class TrackedResult(unittest.TextTestResult):
+        def startTest(self, test):
+            self.executed_ids.append(test.id())
+            super().startTest(test)
+        def __init__(self, *args):
+            super().__init__(*args)
+            self.executed_ids=[]
+    result = unittest.TextTestRunner(verbosity=2,resultclass=TrackedResult).run(unittest.defaultTestLoader.loadTestsFromModule(module))
     record = {'suite': args.suite, 'tests': result.testsRun,
               'failures': len(result.failures), 'errors': len(result.errors),
               'skipped': [{'test': test.id(), 'reason': reason} for test, reason in result.skipped],
-              'successful': result.wasSuccessful() and result.testsRun > 0 and not result.skipped}
+              'successful': result.wasSuccessful() and result.testsRun > 0 and not result.skipped,
+              'executed_test_ids':result.executed_ids}
     print('DAIMON_UNITTEST_RESULT ' + json.dumps(record), flush=True)
     return 0 if record['successful'] else 1
 

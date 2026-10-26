@@ -22,7 +22,12 @@ INPUTS = ('go.mod', 'ui/package-lock.json', 'python/harness2_bridge/pyproject.to
           'automation/upstream-inventory.lock.json', 'automation/bandit.json',
           'automation/upstream_checks.py', 'automation/upstream_security.py',
           'python/harness2_bridge/worker.py', 'python/harness2_bridge/verify_pin.py',
-          'python/harness2_native_substrate/substrate.py')
+          'python/harness2_native_substrate/substrate.py', 'automation/context_review.py',
+          'automation/context_triage.py', 'automation/context-review.json',
+          'python/harness2_bridge/test_worker.py', 'automation/unittest_integration.py',
+          'internal/harness2bridge/bridge.go', 'internal/harness2bridge/process_linux.go',
+          'internal/harness2bridge/process_windows.go', 'internal/harness2substrate/substrate.go',
+          'internal/harness2substrate/gates.go')
 
 
 def sha(path):

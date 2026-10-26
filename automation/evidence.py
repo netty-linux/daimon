@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STATES = {'PASS', 'FAIL', 'BLOCKED', 'NOT RUN', 'UNVERIFIED'}
 MAX_LOG = 2 * 1024 * 1024
 MAX_ATTACHMENT = 8 * 1024 * 1024
-SECURITY_LANES = {'security-go', 'security-python', 'security-npm', 'security-workflows', 'security-provenance', 'security-upstream'}
+SECURITY_LANES = {'security-go', 'security-python', 'security-npm', 'security-workflows', 'security-provenance', 'security-upstream', 'security-triage'}
 
 
 def attachment_name(name):
@@ -148,6 +148,8 @@ def write_bundle(output, report, log=None, attachments=None):
             count = (str(security['advisory_count']) + ' advisories / ' + str(security['finding_count']) + ' records') if security['complete'] else 'unknown (scanner incomplete)'
             if row['lane'] == 'security-upstream' and security['complete']:
                 count = str(security['static_rule_count']) + ' static rules / ' + str(security['finding_count']) + ' risk records (not advisories)'
+            if row['lane']=='security-triage' and security['complete']:
+                count=str(security['finding_count'])+' confirmed contextual defects / '+str(security['coverage']['original_findings_retained'])+' original records retained'
             summary.append('| ' + row['lane'] + ' findings | ' + count + ' | No automatic remediation |')
     (output / 'summary.md').write_text('\n'.join(summary) + '\n', encoding='utf-8')
     files = {p.name: {'sha256': digest(p), 'bytes': p.stat().st_size} for p in sorted(output.iterdir())}
@@ -243,11 +245,27 @@ def load_verified(directory, expected_commit, expected_run=None, expected_attemp
             raise ValueError('Imported structured integration evidence mismatch')
     if report['lane'] in SECURITY_LANES:
         security_result(directory, report)
+        # Internal verified value; never trust a same-named field supplied in JSON.
+        report['_verified_scan_sha256']=digest(directory/'scan.json')
     return report
 
 
 def cross_job_provenance(reports):
     errors = []
+    triage=reports.get('security-triage')
+    if triage and triage.get('security',{}).get('complete'):
+        worker=reports.get('python-upstream-integration',{})
+        stage=next((s for s in worker.get('integration',{}).get('stages',[]) if s['name']=='worker'),{})
+        actual={name.rsplit('.',1)[-1] for name in stage.get('executed_test_ids',[])}
+        required={'test_context_in_memory_sensitive_sinks_not_called','test_context_disallowed_components_stop_before_upstream',
+                  'test_context_compile_does_not_execute','test_context_original_runmark_collision'}
+        if worker.get('status')!='PASS' or stage.get('status')!='PASS' or not required<=actual:
+            errors.append('Contextual review requires real same-run Linux regression identities and successful execution')
+        source=reports.get('security-upstream',{})
+        if source.get('original_output_bytes',{}).get('stdout') is None or not source.get('security',{}).get('complete'):
+            errors.append('Contextual review has no complete original scanner evidence')
+        if triage['security']['coverage']['source_scan_sha256']!=source.get('_verified_scan_sha256'):
+            errors.append('Contextual review did not use the exact original scanner bytes of this run')
     upstream = reports.get('security-upstream')
     worker = reports.get('python-upstream-integration')
     if upstream and upstream.get('security', {}).get('complete') and worker:
