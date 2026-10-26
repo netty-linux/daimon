@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 import unittest
+from unittest import mock
+import os
 
 ROOT=Path(__file__).resolve().parents[2]
 def module(name,file):
@@ -13,6 +15,7 @@ r=module('review_tests','context_review.py')
 p=module('review_parser_tests','security_parsers.py')
 e=module('review_evidence_tests','evidence.py')
 i=module('review_integration_tests','integrations.py')
+t=module('review_identity_tests','context_triage.py')
 
 
 def fixture():
@@ -137,6 +140,12 @@ class ReviewTests(unittest.TestCase):
     def test_python_duplicate_test_ids_rejected(self):
         record=dict(suite='worker',tests=2,successful=True,failures=0,errors=0,skipped=[],executed_test_ids=['same','same'])
         with self.assertRaises(ValueError):i.unittest_facts('worker','DAIMON_UNITTEST_RESULT '+json.dumps(record))
+
+    def test_run_identity_is_explicit_after_environment_is_scrubbed(self):
+        with mock.patch.dict(os.environ,{},clear=True):
+            identity=t.identity_args(['--run-id','123','--run-attempt','2'])
+            self.assertEqual((identity.run_id,identity.run_attempt),('123','2'))
+            with mock.patch('sys.stderr'),self.assertRaises(SystemExit):t.identity_args([])
 
 
 if __name__=='__main__':unittest.main()

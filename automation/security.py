@@ -153,7 +153,9 @@ def main():
         'security-workflows': [str(ve / 'zizmor'), '--offline', '--no-config', '--no-ignores', '--format', 'sarif', '.github/workflows'],
         'security-provenance': [],
         'security-upstream': [sys.executable, '-I', '-B', str(ROOT / 'automation/upstream_security.py')],
-        'security-triage': [sys.executable, '-I', '-B', str(ROOT / 'automation/context_triage.py')],
+        'security-triage': [sys.executable, '-I', '-B', str(ROOT / 'automation/context_triage.py'),
+                            '--run-id', os.environ.get('GITHUB_RUN_ID','local'),
+                            '--run-attempt', os.environ.get('GITHUB_RUN_ATTEMPT','local')],
     }
     failed = False
     for lane, command in commands.items():

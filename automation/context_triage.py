@@ -1,5 +1,6 @@
 """Attach a reproducible contextual review to this run's existing static evidence."""
 import json
+import argparse
 import os
 from pathlib import Path
 import sys
@@ -11,11 +12,19 @@ import upstream_checks
 from security_setup import ROOT
 
 
+def identity_args(argv=None):
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--run-id',required=True)
+    parser.add_argument('--run-attempt',required=True)
+    return parser.parse_args(argv)
+
+
 def main():
+    identity=identity_args()
     try:
         scopes={r['id']:r['scope'] for r in json.loads((ROOT/'automation/coverage.json').read_text())['lanes']}
         source=ROOT/'.automation-results/security-upstream'
-        evidence.load_verified(source,evidence.revision(),os.environ.get('GITHUB_RUN_ID','local'),os.environ.get('GITHUB_RUN_ATTEMPT','local'),scopes)
+        evidence.load_verified(source,evidence.revision(),identity.run_id,identity.run_attempt,scopes)
         raw_text=(source/'scan.json').read_text(encoding='utf-8')
         raw=json.loads(raw_text)
         policy=json.loads((ROOT/'automation/upstream-inventory.lock.json').read_text())

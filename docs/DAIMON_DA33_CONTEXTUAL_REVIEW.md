@@ -197,9 +197,11 @@ evidência original indisponível; UNVERIFIED para lacunas de contexto/cobertura
 NOT RUN para fluxos externos não exercitados; PASS para integridade/testes
 efetivamente comprovados, sem inferir a segurança integral do upstream.
 
-Os 121 testes de automação incluem casos de identidade, deriva de fonte/integração,
+Os 122 testes de automação incluem casos de identidade, deriva de fonte/integração,
 escopo de falso positivo, agrupamento, grafo incompleto, finding perdido/novo,
 indisponibilidade, adjudicação inválida e provas de teste ausentes/duplicadas.
+Run ID e tentativa são argumentos obrigatórios explícitos: a remoção deliberada
+de metadados do ambiente dos scanners não autoriza fallback de identidade.
 Os quatro testes funcionais novos devem executar no CI sem skips; a prova
 runmark usa exclusivamente arquivos privados e o módulo original verificado.
 Resultados definitivos, SHA/run/tentativa, logs e manifestos ficam no PR e no
